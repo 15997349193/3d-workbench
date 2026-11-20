@@ -1,0 +1,4959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch3D · 轻量 3D 建模工作台</title>
+<!--
+  ============================================================================
+  Sketch3D · 单文件轻量 3D 建模工作台（对标 3D One / 3D One Cut 的草图拉伸建模）
+  ----------------------------------------------------------------------------
+  · 原生 HTML + JS + Three.js（CDN 引入），双击本文件即可运行，无需服务器 / 打包
+  · 核心功能：
+      - 基础实体拖拽放置（立方体 / 圆柱），明亮糖果色实体
+      - 草图五件套：线段 / 矩形 / 圆 / 椭圆 / 正多边形（等边等角，边数可调）
+      - 轮廓闭合即成面：闭合草图自动带蓝色阴影平面，直接输高度拉伸成实体
+      - 选面浮出「拉伸」菜单，面板输入高度实时预览
+      - 拉伸四种运算卡片：新建实体 / 加运算 / 减运算 / 交运算（three-bvh-csg）
+      - 通用面识别：共面三角形聚类 + 边界环提取，高亮的面 = 拉伸的面
+      - 拾取选中高亮、拖动移动、撤销 / 删除、视角控制、线框切换
+      - 文件：.z1 自有工程保存/打开、STL / STEP 导出（供 3D One「输入」导入）
+  · 未实现：倒角、DXF 导出、激光排版
+  ============================================================================
+-->
+<style>
+  /* =========================================================
+     01 · 设计令牌与基础样式
+     ========================================================= */
+  :root{
+    --bg:#e9eff7;
+    --panel:#ffffff;
+    --line:#e3e9f1;
+    --line-soft:#eef2f7;
+    --text:#182234;
+    --text-2:#5d6b80;
+    --text-3:#94a1b4;
+    --accent:#2f6fed;
+    --accent-2:#1b56d4;
+    --accent-soft:#eaf1ff;
+    --face:#f5871f;
+    --navy:#12213b;
+    --shadow:0 6px 20px rgba(28,42,70,.09);
+    --shadow-lg:0 16px 40px rgba(24,38,66,.16);
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Roboto,sans-serif;
+    font-size:13px;color:var(--text);background:var(--bg);
+    overflow:hidden;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 600px at 12% -10%,#f4f8ff 0%,transparent 55%),
+                     radial-gradient(1000px 500px at 100% 0%,#eef4ff 0%,transparent 50%);
+  }
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  input{font:inherit;color:inherit}
+
+  /* =========================================================
+     02 · 三栏布局骨架：顶栏 / 左工具栏 / 中视口 / 右属性面板
+     ========================================================= */
+  .app{
+    height:100vh;
+    display:grid;
+    grid-template-columns:236px 1fr 302px;
+    grid-template-rows:52px 1fr;
+    grid-template-areas:
+      "top   top   top"
+      "tools view  panel";
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{
+    grid-area:top;display:flex;align-items:center;gap:14px;
+    padding:0 16px;
+    background:linear-gradient(180deg,#ffffff 0%,#f7faff 58%,#f1f6fe 100%);
+    border-bottom:1px solid #dbe4f0;
+    box-shadow:0 2px 10px rgba(28,42,70,.045),inset 0 -1px 0 rgba(255,255,255,.9);
+    position:relative;z-index:5;
+  }
+  .brand{display:flex;align-items:center;gap:10px;user-select:none;padding-right:14px;border-right:1px solid #e2e9f3}
+  .brand .mark{
+    width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(140deg,#7db0ff 0%,#3a78ec 45%,#1c50c9 100%);
+    display:grid;place-items:center;color:#fff;flex:none;
+    box-shadow:0 3px 9px rgba(37,99,224,.4),inset 0 1px 1px rgba(255,255,255,.5);
+    position:relative;
+  }
+  .brand .mark::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.22),transparent 55%)}
+  .brand .mark svg{width:17px;height:17px;position:relative;z-index:1}
+  .brand .name{font-weight:700;letter-spacing:.01em;font-size:14px;color:var(--navy)}
+  .brand .sub{color:var(--text-3);font-size:11px;padding-left:10px;margin-left:2px;border-left:1px solid var(--line);letter-spacing:.03em}
+
+  .segmented{display:flex;gap:3px;background:#e7eef9;padding:3px;border-radius:10px;margin-left:2px;box-shadow:inset 0 1px 2px rgba(28,42,70,.06)}
+  .segmented button{
+    padding:5px 15px;border-radius:7px;font-size:12.5px;color:var(--text-2);font-weight:500;
+    transition:background .14s,color .14s,box-shadow .14s;
+  }
+  .segmented button:hover{color:var(--text)}
+  .segmented button.on{background:#fff;color:#1d6ae5;box-shadow:0 1px 4px rgba(28,42,70,.16);font-weight:700}
+
+  .topbar .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .unit{color:#2f62c4;font-size:11.5px;letter-spacing:.03em;padding:5px 10px;border:1px solid #cfe0f8;border-radius:7px;background:linear-gradient(180deg,#f4f8ff,#eaf2ff);font-weight:600}
+
+  /* ---------- 文件操作：打开 / 保存 / 导出 ---------- */
+  .fileops{display:flex;align-items:center;gap:6px}
+  .fileops button{
+    padding:6px 13px;border-radius:8px;font-size:12.5px;font-weight:600;
+    background:linear-gradient(180deg,#ffffff,#f7faff);border:1px solid #d3e0f4;color:#2f5d9e;white-space:nowrap;
+    box-shadow:0 1px 2px rgba(28,42,70,.05),inset 0 1px 0 #fff;
+    transition:background .14s,border-color .14s,box-shadow .14s,transform .1s;
+  }
+  .fileops button:hover{background:linear-gradient(180deg,#f6faff,#eaf2ff);border-color:#a9c8f5;box-shadow:0 2px 6px rgba(43,93,180,.14);transform:translateY(-1px)}
+  .fileops button:active{transform:translateY(0)}
+  .fileops .dd{position:relative}
+  .fileops .dd-menu{
+    display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:186px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+    padding:6px;z-index:30;
+  }
+  .fileops .dd.open .dd-menu{display:block}
+  .fileops .dd-menu button{
+    display:block;width:100%;text-align:left;border:none;background:none;color:var(--text);
+    padding:8px 10px;border-radius:6px;font-weight:500;
+  }
+  .fileops .dd-menu button:hover{background:var(--accent-soft);color:var(--accent)}
+  .fileops .dd-menu .muted{font-size:11px;color:var(--text-3);padding:6px 10px 2px}
+
+  /* ---------- 左工具栏：3D One 式分类导航 + 二级弹出面板 ---------- */
+  .toolbar{
+    grid-area:tools;background:linear-gradient(180deg,#ffffff,#fbfcfe);border-right:1px solid #e2e9f2;
+    display:flex;flex-direction:row;align-items:stretch;z-index:4;
+    box-shadow:2px 0 12px rgba(28,42,70,.035);
+  }
+  .toolbar::-webkit-scrollbar,.panel::-webkit-scrollbar{width:6px}
+  .toolbar::-webkit-scrollbar-thumb,.panel::-webkit-scrollbar-thumb{background:#d8e0ec;border-radius:6px}
+
+  /* 左侧分类竖栏 */
+  .cat-rail{
+    width:74px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;
+    padding:10px 4px 12px;border-right:1px solid #edf1f7;background:linear-gradient(180deg,#fbfdff,#f6f9fd);
+    overflow-y:auto;
+  }
+  .cat{
+    width:62px;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    padding:7px 2px;border-radius:11px;color:var(--text-2);border:1px solid transparent;
+    transition:background .15s,color .15s,border-color .15s,box-shadow .15s,transform .12s;
+  }
+  .cat svg{width:22px;height:22px;stroke:#4a9fb0;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .cat span{font-size:10px;line-height:1.25;color:var(--text-3);text-align:center}
+  .cat:hover{background:#f0f7fb;border-color:#dbeaf0;transform:translateY(-1px)}
+  .cat.on{
+    background:#eaf8f2;border-color:#8fd9b6;color:#1a9d63;
+    box-shadow:0 2px 9px rgba(34,180,120,.14),inset 0 0 0 1px #fff;
+  }
+  .cat.on svg{stroke:#1a9d63}
+  .cat.on span{color:#1a9d63;font-weight:700}
+
+  /* 二级弹出面板 */
+  .flyout{flex:1;min-width:0;padding:10px 8px;overflow-y:auto;background:#fff}
+  .fly-panel{display:none;flex-direction:column;gap:3px}
+  .fly-panel.on{display:flex}
+  .fly-head{font-size:11px;font-weight:700;color:var(--text);letter-spacing:.03em;padding:3px 8px 8px;border-bottom:1px solid var(--line-soft);margin-bottom:4px}
+  .fly-hint{font-size:10.5px;line-height:1.6;color:var(--text-3);padding:8px 8px 10px}
+
+  .tool{
+    position:relative;width:100%;display:flex;flex-direction:row;align-items:center;gap:10px;
+    padding:8px 9px;border-radius:9px;color:var(--text-2);text-align:left;
+    border:1px solid transparent;transition:background .15s,color .15s,border-color .15s,box-shadow .15s,transform .12s;
+    --tc:var(--text-2);
+  }
+  .tool svg{
+    width:19px;height:19px;stroke:var(--tc);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none;
+    transition:transform .14s;
+  }
+  .tool span{font-size:12px}
+  .tool:hover{background:#f1f8fb;color:var(--text);transform:translateX(2px);border-color:#dcecf2;box-shadow:0 2px 7px rgba(28,42,70,.05)}
+  .tool:hover svg{transform:scale(1.08)}
+  .tool.on{
+    background:linear-gradient(90deg,#eaf8f2,#f3fbf7);
+    color:#1a9d63;border-color:#a5e0c4;
+    box-shadow:0 2px 8px rgba(34,180,120,.12);
+  }
+  .tool.on svg{stroke:#1a9d63}
+  .tool.on span{color:#1a9d63;font-weight:700}
+  .tool:disabled{opacity:.32;cursor:not-allowed;transform:none;box-shadow:none}
+  /* 彩色工具图标（3D One 风格：每个工具一个识别色） */
+  .tool[data-tool="select"]{--tc:#2f6fed}
+  .tool[data-tool="box"]{--tc:#10b981}
+  .tool[data-tool="sphere"]{--tc:#0ea5e9}
+  .tool[data-tool="torus"]{--tc:#14b8a6}
+  .tool[data-tool="cylinder"]{--tc:#f59e0b}
+  .tool[data-tool="cone"]{--tc:#f97316}
+  .tool[data-tool="ellipsoid"]{--tc:#8b5cf6}
+  .tool[data-tool="pyramid"]{--tc:#ec4899}
+  .tool[data-tool="frustum"]{--tc:#6366f1}
+  .tool[data-tool^="sketch"]{--tc:#8b5cf6}
+  .tool[data-act="undo"]{--tc:#64748b}
+  .tool[data-act="delete"]{--tc:#ef4444}
+  .tool[data-act="shade"]{--tc:#0ea5e9}
+  /* 实体布尔运算区（A / Shift+B） */
+  .tool.booltool{--tc:#6366f1}
+  .tool.booltool:not(.ready){opacity:.45}
+  .tool.booltool.ready{
+    background:linear-gradient(90deg,#f2f2ff,#f8f8ff);border-color:#c7d2fe;
+    box-shadow:0 2px 8px rgba(99,102,241,.14);
+  }
+  .tool.booltool.ready span{color:#4f46e5;font-weight:700}
+
+  /* ---------- 中央 3D 视口 ---------- */
+  #viewport{
+    grid-area:view;position:relative;overflow:hidden;
+    background:radial-gradient(125% 115% at 58% 24%,#ffffff 0%,#fcfdff 56%,#eef3fa 100%);
+  }
+  /* 视口四角柔光，增强纵深感（不干扰拾取） */
+  #viewport::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+    background:radial-gradient(80% 60% at 50% 8%,rgba(120,160,225,.07),transparent 60%),
+               radial-gradient(70% 50% at 50% 100%,rgba(150,175,215,.10),transparent 60%);
+  }
+  #viewport.cross,#viewport.cross canvas{cursor:crosshair}
+  #viewport canvas{display:block}
+
+  /* 视口左上角场景角标 */
+  .viewchip{
+    position:absolute;left:16px;top:14px;z-index:3;pointer-events:none;
+    display:flex;align-items:center;gap:8px;padding:6px 11px 6px 8px;border-radius:9px;
+    background:rgba(255,255,255,.82);backdrop-filter:blur(10px);
+    border:1px solid rgba(219,228,240,.95);box-shadow:0 3px 12px rgba(28,42,70,.07);
+    font-size:11px;color:var(--text-2);letter-spacing:.02em;
+  }
+  .viewchip .ic{width:18px;height:18px;border-radius:5px;background:linear-gradient(140deg,#7db0ff,#2f6fed);display:grid;place-items:center;color:#fff;flex:none;box-shadow:0 1px 3px rgba(47,111,237,.35)}
+  .viewchip .ic svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .viewchip b{color:var(--navy);font-weight:600}
+
+  /* 提示条居中放底部，左下角留给视角立方体 */
+  .hintbar{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:15px;z-index:3;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
+    padding:8px 14px;border-radius:11px;
+    background:rgba(255,255,255,.92);backdrop-filter:blur(12px) saturate(1.2);
+    border:1px solid rgba(219,228,240,.95);box-shadow:0 6px 22px rgba(28,42,70,.11),inset 0 1px 0 #fff;
+    font-size:11.5px;color:var(--text-2);max-width:calc(100% - 28px);
+  }
+  .hintbar b{color:var(--navy);font-weight:600}
+  .hintbar .dot{width:3px;height:3px;border-radius:50%;background:#b9c4d4;flex:none}
+  kbd{
+    font-family:inherit;font-size:10.5px;padding:1.5px 6px;border-radius:5px;
+    background:linear-gradient(180deg,#f6f8fc,#eef2f8);border:1px solid #dde4ef;border-bottom-width:2px;color:#4a5a72;font-weight:600;
+    box-shadow:0 1px 0 rgba(255,255,255,.8) inset;
+  }
+
+  .statusbar{
+    position:absolute;right:14px;bottom:15px;z-index:3;
+    display:flex;align-items:center;gap:7px;
+    font-size:11px;color:var(--text-2);letter-spacing:.02em;font-weight:500;
+    padding:6px 11px;border-radius:9px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);
+    border:1px solid rgba(219,228,240,.95);box-shadow:0 3px 12px rgba(28,42,70,.07);
+  }
+  .statusbar::before{content:"";width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.15);flex:none}
+
+  /* ---------- 尺寸编辑 gizmo（3D One 式） ---------- */
+  .dimlayer{position:absolute;inset:0;z-index:3;pointer-events:none;display:none}
+  .dimlayer.show{display:block}
+  .dimsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .dimlabels{position:absolute;inset:0;pointer-events:none}
+  .dim-tag{
+    position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
+    background:rgba(255,255,255,.96);border:1px solid #d7dfea;border-radius:8px;
+    padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;white-space:nowrap;
+    box-shadow:0 3px 10px rgba(28,42,70,.14);font-variant-numeric:tabular-nums;
+    transition:border-color .14s,box-shadow .14s;
+  }
+  .dim-tag:hover{border-color:#2f9bbd;box-shadow:0 4px 14px rgba(47,155,189,.24);color:#1a7f9c}
+  .dim-tag input{
+    width:60px;border:none;outline:none;background:transparent;font:inherit;color:inherit;
+    text-align:center;padding:0;font-variant-numeric:tabular-nums;
+  }
+  .dim-tag .u{color:#9aa4b4;font-weight:400;margin-left:2px}
+  /* 箭头拖拽热区：透明粗线，鼠标抓住即可改尺寸 */
+  .dim-hit{pointer-events:stroke;cursor:grab}
+  .dim-hit:active{cursor:grabbing}
+  /* 3D One 式绿色「确定」按钮：确认后收起标注，之后选中不再出现 */
+  .dim-confirm{
+    position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
+    display:flex;align-items:center;gap:5px;padding:5px 11px 5px 8px;border-radius:18px;
+    background:linear-gradient(180deg,#34d174,#1eb85d);color:#fff;font-size:11.5px;font-weight:600;
+    box-shadow:0 3px 11px rgba(30,184,93,.35),inset 0 1px 0 rgba(255,255,255,.35);
+    border:1px solid rgba(255,255,255,.5);user-select:none;
+  }
+  .dim-confirm:hover{filter:brightness(1.06);box-shadow:0 4px 14px rgba(30,184,93,.45)}
+  .dim-confirm svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+
+  /* 线段长度提示浮层：绘制中显示实时长度，成线后可点标签输入、点绿勾确定 */
+  .seglayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none}
+  .seglayer.show{display:block}
+  .seg-tag{pointer-events:auto}
+  .seg-confirm{padding:6px;border-radius:50%}
+  .seg-confirm svg{width:14px;height:14px}
+
+  .firstrun{
+    position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);
+    text-align:center;color:var(--text-3);font-size:12.5px;line-height:1.9;
+    pointer-events:none;z-index:2;
+    padding:20px 32px;border-radius:16px;
+    background:rgba(255,255,255,.55);backdrop-filter:blur(4px);
+    border:1px dashed rgba(180,198,224,.8);
+  }
+  .firstrun b{display:block;color:var(--text-2);font-weight:600;font-size:14.5px;margin-bottom:4px}
+
+  .toast{
+    position:absolute;left:50%;top:16px;transform:translate(-50%,-8px);
+    background:#1e2633;color:#fff;font-size:12px;padding:7px 13px;border-radius:8px;
+    opacity:0;transition:opacity .18s,transform .18s;pointer-events:none;z-index:9;
+    box-shadow:0 6px 18px rgba(23,32,48,.22);max-width:70%;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- 右属性面板 ---------- */
+  .panel{
+    grid-area:panel;
+    background:linear-gradient(180deg,#ffffff 0%,#fcfdff 100%);
+    border-left:1px solid #e2e9f2;
+    overflow-y:auto;display:flex;flex-direction:column;z-index:4;
+    box-shadow:-2px 0 12px rgba(28,42,70,.035);
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;padding:17px 17px 14px;
+    border-bottom:1px solid var(--line-soft);
+    background:linear-gradient(180deg,#fbfdff,transparent);
+  }
+  .panel-head .t{font-weight:700;font-size:14px;color:var(--navy);display:flex;align-items:center;gap:8px}
+  .panel-head .t::before{content:"";width:3px;height:15px;border-radius:2px;background:linear-gradient(180deg,#7db0ff,#2f6fed)}
+  .badge{
+    font-size:10.5px;color:var(--accent);background:var(--accent-soft);
+    padding:3px 10px;border-radius:20px;border:1px solid #d5e4ff;white-space:nowrap;font-weight:600;
+  }
+  .badge.muted{color:var(--text-3);background:#f4f6fa;border-color:var(--line)}
+
+  .empty{padding:46px 24px;text-align:center;color:var(--text-3);font-size:12px;line-height:1.9}
+  .empty svg{width:38px;height:38px;stroke:#a9c4ec;fill:none;stroke-width:1.3;margin-bottom:12px}
+  .empty p:first-of-type{color:var(--text-2);font-size:12.5px;margin-bottom:2px;font-weight:500}
+
+  .group{
+    margin:11px 12px 0;padding:13px 14px 15px;
+    border:1px solid #e8edf5;border-radius:11px;
+    background:linear-gradient(180deg,#ffffff,#fcfdff);
+    box-shadow:0 2px 8px rgba(28,42,70,.04);
+  }
+  .group[hidden]{display:none}
+  .gtitle{
+    font-size:10px;letter-spacing:.12em;color:#8090a6;
+    margin-bottom:13px;font-weight:700;display:flex;align-items:center;gap:7px;
+  }
+  .gtitle::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);flex:none}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+  .row:last-child{margin-bottom:0}
+  .row label{font-size:12px;color:var(--text-2);flex:none}
+  .row .val{font-size:12px;color:var(--text);text-align:right}
+  .num{
+    width:98px;height:30px;border:1px solid #dde4ee;border-radius:7px;
+    padding:0 10px;font-size:12px;text-align:right;background:linear-gradient(180deg,#fff,#fbfcfe);
+    font-variant-numeric:tabular-nums;outline:none;font-weight:500;color:var(--navy);
+    box-shadow:inset 0 1px 2px rgba(28,42,70,.03);
+    transition:border-color .14s,box-shadow .14s;
+  }
+  .num:hover{border-color:#c3d0e2}
+  .num:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,111,237,.14);background:#fff}
+  .num:disabled{background:#f5f7fa;color:var(--text-3);cursor:not-allowed}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+  /* 属性面板：实体颜色色板（截图式圆点，选中带外圈） */
+  .swatches{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px}
+  .swatch{
+    width:23px;height:23px;border-radius:50%;border:2px solid #fff;
+    box-shadow:0 0 0 1px rgba(28,42,70,.14),0 2px 5px rgba(28,42,70,.12);cursor:pointer;padding:0;
+    transition:transform .14s,box-shadow .14s;position:relative;
+  }
+  .swatch:hover{transform:scale(1.16) translateY(-1px)}
+  .swatch.on{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent),0 3px 8px rgba(47,111,237,.3);transform:scale(1.1)}
+  .swatch:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+  .hint{font-size:11.5px;color:var(--text-3);line-height:1.65;margin-bottom:10px}
+  .hint.face{color:var(--face)}
+  .btn{
+    width:100%;height:34px;border-radius:8px;font-size:12.5px;font-weight:600;
+    border:1px solid #dde4ee;background:linear-gradient(180deg,#fff,#fafcff);color:var(--text);
+    box-shadow:0 1px 2px rgba(28,42,70,.04),inset 0 1px 0 #fff;
+    transition:background .14s,border-color .14s,opacity .14s,transform .1s,box-shadow .14s;
+  }
+  .btn:hover{background:linear-gradient(180deg,#f8faff,#f2f6fb);border-color:#c8d5e6;transform:translateY(-1px);box-shadow:0 3px 8px rgba(28,42,70,.08)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:linear-gradient(180deg,#5b98ff,#2f6fed);border-color:#2f6fed;color:#fff;box-shadow:0 3px 10px rgba(47,111,237,.28),inset 0 1px 0 rgba(255,255,255,.3)}
+  .btn.primary:hover{background:linear-gradient(180deg,#4a8bff,#2563e0);border-color:#2563e0;box-shadow:0 5px 14px rgba(47,111,237,.34)}
+
+  .panel-foot{
+    margin-top:auto;padding:13px 17px 15px;border-top:1px solid var(--line-soft);
+    background:linear-gradient(180deg,transparent,#f9fbfe);
+    font-size:10.5px;color:var(--text-3);line-height:1.9;letter-spacing:.01em;
+  }
+  .panel-foot span{
+    color:#3d74d8;font-weight:700;background:#eef4ff;border:1px solid #dbe7fa;
+    padding:1px 5px;border-radius:4px;margin-right:1px;
+  }
+
+  /* =========================================================
+     03 · 草图工具组（线段 / 矩形 / 圆 / 椭圆 / 多边形）
+     ========================================================= */
+  .tb-label{
+    font-size:9px;color:#8a97ab;letter-spacing:.16em;font-weight:700;
+    padding:2px 0 0;user-select:none;
+  }
+  .tool.compact{padding:5px 0 4px;gap:2px}
+  .tool.compact svg{width:17px;height:17px}
+  .tool.compact span{font-size:9.5px}
+  .tool[data-tool="sketch"]{--tc:#8b5cf6}
+  .tool[data-tool="sketch-rect"]{--tc:#8b5cf6}
+  .tool[data-tool="sketch-circle"]{--tc:#a855f7}
+  .tool[data-tool="sketch-ellipse"]{--tc:#a855f7}
+  .tool[data-tool="sketch-poly"]{--tc:#7c3aed}
+
+  /* =========================================================
+     04 · 草图绘制选项（正多边形边数等）
+     ========================================================= */
+  .sk-opt{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:56px;z-index:4;display:none;align-items:center;gap:8px;
+    padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);
+    border:1px solid rgba(214,225,240,.95);box-shadow:var(--shadow);
+    font-size:11.5px;color:var(--text-2);
+  }
+  .sk-opt.show{display:flex}
+  .sk-opt input{
+    width:44px;height:24px;border:1px solid var(--line);border-radius:6px;text-align:center;
+    font-size:12px;font-variant-numeric:tabular-nums;outline:none;background:#fff;
+  }
+  .sk-opt input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,111,237,.12)}
+
+  /* =========================================================
+     05 · 选面浮出菜单（3D One 式快捷工具）
+     ========================================================= */
+  .face-menu{
+    position:absolute;z-index:6;display:none;flex-direction:column;gap:2px;
+    padding:5px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
+    border:1px solid #d7e2f0;box-shadow:var(--shadow-lg),inset 0 1px 0 #fff;
+    transform-origin:0 0;animation:pop .13s ease-out;
+  }
+  @keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+  .face-menu.show{display:flex}
+  .fm-btn{
+    display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:8px;
+    font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;
+    transition:background .13s,color .13s;
+  }
+  .fm-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .fm-btn:hover{background:linear-gradient(180deg,#f0f6ff,#e6efff);color:#1d6ae5}
+  .fm-btn .k{font-size:10px;color:var(--text-3);margin-left:3px;background:#eef2f8;padding:1px 5px;border-radius:4px}
+
+  /* =========================================================
+     06 · 拉伸面板（高度 + 4 张运算卡片）
+     ========================================================= */
+  .ex-pop{
+    position:absolute;z-index:7;display:none;width:282px;
+    border-radius:14px;background:#fff;border:1px solid #d7e2f0;
+    box-shadow:0 20px 50px rgba(24,38,66,.24),inset 0 1px 0 #fff;
+    overflow:hidden;animation:pop .15s ease-out;
+  }
+  .ex-pop.show{display:block}
+  .ex-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 12px 9px;background:linear-gradient(180deg,#f7fbff,#eff5fe);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .ex-head .t{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .ex-head .t svg{width:15px;height:15px;stroke:#2f6fed;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .ex-close{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--text-3)}
+  .ex-close:hover{background:#e8eefb;color:var(--text)}
+  .ex-close svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+  .ex-body{padding:11px 12px 12px}
+  .ex-row{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+  .ex-row label{font-size:11.5px;color:var(--text-2);flex:none}
+  .ex-row .num{flex:1;width:auto;height:30px;text-align:right;font-size:13px;min-width:0;padding:0 7px}
+  .ex-row .unit2{font-size:11px;color:var(--text-3);flex:none}
+  .ex-dir{
+    display:flex;gap:2px;background:#eef2f9;padding:2px;border-radius:7px;flex:none;
+  }
+  .ex-dir button{padding:3px 8px;border-radius:5px;font-size:11px;color:var(--text-2)}
+  .ex-dir button.on{background:#fff;color:#1d6ae5;font-weight:600;box-shadow:0 1px 2px rgba(23,32,48,.14)}
+  .ex-dbtn{flex:none;padding:4px 10px;border-radius:6px;font-size:11.5px;border:1px solid #c9d4e6;background:#fff;color:var(--text-2);cursor:pointer}
+  .ex-dbtn:hover{border-color:#9fb4d4}
+  .ex-dbtn.on{background:#1d6ae5;border-color:#1d6ae5;color:#fff;font-weight:600}
+  .ex-dinfo{font-size:10.5px;color:var(--text-3);flex:1;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .ex-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:2px 0 11px}
+  .ex-mode{
+    display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 4px 6px;
+    border:1px solid var(--line);border-radius:9px;background:#fff;
+    font-size:11px;color:var(--text-2);transition:border-color .13s,background .13s,color .13s,box-shadow .13s;
+  }
+  .ex-mode svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .ex-mode:hover{background:#f7faff;border-color:#cfdcee}
+  .ex-mode.on{border-color:#2f6fed;background:#eef5ff;color:#1d6ae5;box-shadow:0 0 0 2px rgba(47,111,237,.13)}
+  .ex-mode.on svg{stroke-width:1.7}
+  .ex-foot{display:flex;gap:7px}
+  .ex-foot .btn{height:30px;font-size:12px}
+  .ex-tip{font-size:10.5px;color:var(--text-3);line-height:1.6;margin-bottom:9px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ 顶栏 ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">
+          <path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z"/>
+          <path d="M4 7.6l8 4.6 8-4.6M12 12.2V21"/>
+        </svg>
+      </div>
+      <span class="name">Sketch3D</span>
+      <span class="sub">轻量建模工作台</span>
+    </div>
+
+    <div class="segmented" id="modeSwitch">
+      <button data-mode="object" class="on">物体模式</button>
+      <button data-mode="sketch">草图模式</button>
+    </div>
+
+    <div class="fileops">
+      <button id="btnOpen" title="打开 .z1 工程文件">打开</button>
+      <button id="btnSave" title="保存为 .z1 工程文件">保存</button>
+      <div class="dd" id="exportDD">
+        <button id="btnExport" title="导出 STL / STEP 供 3D One 导入">导出 ▾</button>
+        <div class="dd-menu">
+          <div class="muted">供 3D One「输入」导入</div>
+          <button data-export="stl">STL 模型（.stl）</button>
+          <button data-export="step">STEP 模型（.step）</button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept=".z1,.json" style="display:none" />
+
+    <div class="right"><span class="unit">单位 mm</span></div>
+  </header>
+
+  <!-- ============ 左工具栏 ============ -->
+  <nav class="toolbar" id="toolbar">
+    <!-- 左侧分类导航（3D One 式） -->
+    <div class="cat-rail" id="catRail">
+      <button class="cat on" data-cat="model" title="预设模型">
+        <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+        <span>预设<br>模型</span>
+      </button>
+      <button class="cat" data-cat="sketch" title="绘制草图">
+        <svg viewBox="0 0 24 24"><path d="M4 17l5-7 4 4 6-8"/><circle cx="4" cy="17" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>
+        <span>绘制<br>草图</span>
+      </button>
+      <button class="cat" data-cat="basic" title="基础工具">
+        <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M8 5.25v9M16 5.25v9M4 7.5l8 4.5 8-4.5"/></svg>
+        <span>基础<br>工具</span>
+      </button>
+      <button class="cat" data-cat="feature" title="特征工具">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>
+        <span>特征<br>工具</span>
+      </button>
+      <button class="cat" data-cat="smart" title="智能工具">
+        <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 8l3 2v4l-3 2-3-2v-4z"/></svg>
+        <span>智能<br>工具</span>
+      </button>
+      <button class="cat" data-cat="measure" title="测量">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 7v4M11 7v6M15 7v4M19 7v6"/></svg>
+        <span>测量</span>
+      </button>
+    </div>
+
+    <!-- 二级弹出面板：每个分类一组 -->
+    <div class="flyout" id="flyout">
+      <!-- 预设模型：8 种基本体 -->
+      <div class="fly-panel on" data-panel="model">
+        <div class="fly-head">预设模型</div>
+        <button class="tool mitem" data-tool="box" title="六面体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span>六面体</span></button>
+        <button class="tool mitem" data-tool="sphere" title="球体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17" opacity=".5"/></svg><span>球体</span></button>
+        <button class="tool mitem" data-tool="torus" title="圆环体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="5.6"/><ellipse cx="12" cy="12" rx="4" ry="2.2"/></svg><span>圆环体</span></button>
+        <button class="tool mitem" data-tool="cylinder" title="圆柱体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.6" rx="6.6" ry="2.9"/><path d="M5.4 6.6v10.8c0 1.6 3 2.9 6.6 2.9s6.6-1.3 6.6-2.9V6.6"/></svg><span>圆柱体</span></button>
+        <button class="tool mitem" data-tool="cone" title="圆锥体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><path d="M12 3l6.6 15.5c0 1.6-3 2.6-6.6 2.6s-6.6-1-6.6-2.6z"/><ellipse cx="12" cy="18.5" rx="6.6" ry="2.6"/></svg><span>圆锥体</span></button>
+        <button class="tool mitem" data-tool="ellipsoid" title="椭球体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6.4"/><path d="M12 5.6c3 2 3 10.8 0 12.8M12 5.6c-3 2-3 10.8 0 12.8" opacity=".5"/></svg><span>椭球体</span></button>
+        <button class="tool mitem" data-tool="pyramid" title="棱锥体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 15.5L12 21 4 18.5z"/><path d="M12 3v18M4 18.5l8 2.5 8-2.5"/></svg><span>棱锥体</span></button>
+        <button class="tool mitem" data-tool="frustum" title="圆台体 · 地面拖拽放置">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.4" rx="4" ry="1.9"/><ellipse cx="12" cy="18" rx="8" ry="3"/><path d="M8 6.4L4 18M16 6.4l4 11.6"/></svg><span>圆台体</span></button>
+      </div>
+
+      <!-- 绘制草图 -->
+      <div class="fly-panel" data-panel="sketch">
+        <div class="fly-head">绘制草图</div>
+        <button class="tool mitem" data-tool="sketch" title="线段 (S) · 逐点点击，回到起点闭合">
+          <svg viewBox="0 0 24 24"><path d="M4.2 16.6l5-6.8 4 3.8 6.6-8.2"/><circle cx="4.2" cy="16.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="19.8" cy="5.4" r="1.5" fill="currentColor" stroke="none"/></svg><span>线段</span></button>
+        <button class="tool mitem" data-tool="sketch-rect" title="矩形 (R) · 对角线拖拽绘制">
+          <svg viewBox="0 0 24 24"><rect x="4" y="6.5" width="16" height="11" rx="1"/></svg><span>矩形</span></button>
+        <button class="tool mitem" data-tool="sketch-circle" title="圆 (O) · 圆心拖出半径">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.6"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg><span>圆</span></button>
+        <button class="tool mitem" data-tool="sketch-ellipse" title="椭圆 (E) · 拖出长短轴">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8.4" ry="5.4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg><span>椭圆</span></button>
+        <button class="tool mitem" data-tool="sketch-poly" title="正多边形 (P) · 拖出外接圆">
+          <svg viewBox="0 0 24 24"><path d="M12 4.2l6.8 3.9v7.8L12 19.8l-6.8-3.9V8.1z"/></svg><span>正多边形</span></button>
+      </div>
+
+      <!-- 基础工具 -->
+      <div class="fly-panel" data-panel="basic">
+        <div class="fly-head">基础工具</div>
+        <button class="tool mitem" data-tool="select" title="选择 (V)">
+          <svg viewBox="0 0 24 24"><path d="M5 3l6.6 16.2 2.3-6.4 6.4-2.3z"/></svg><span>选择</span></button>
+        <button class="tool mitem" data-act="undo" id="btnUndo" title="撤销 (Ctrl+Z)" disabled>
+          <svg viewBox="0 0 24 24"><path d="M4 9h9.5a5 5 0 0 1 0 10H8"/><path d="M8 5L4 9l4 4"/></svg><span>撤销</span></button>
+        <button class="tool mitem" data-act="delete" id="btnDelete" title="删除选中 (Del)">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/></svg><span>删除</span></button>
+        <button class="tool mitem" data-act="shade" id="btnShade" title="线框 / 实体着色切换">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9M8 5.25v9M16 5.25v9"/></svg><span>线框</span></button>
+      </div>
+
+      <!-- 特征工具 -->
+      <div class="fly-panel" data-panel="feature">
+        <div class="fly-head">特征工具 · 布尔运算</div>
+        <div class="fly-hint">选中实体 A，按住 Shift 点选 B，再点运算</div>
+        <button class="tool mitem booltool" data-bool="add" title="并集 A∪B">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg><span>并集 ∪</span></button>
+        <button class="tool mitem booltool" data-bool="sub" title="差集 A−B">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6" stroke-dasharray="2.4 2.4"/></svg><span>差集 −</span></button>
+        <button class="tool mitem booltool" data-bool="int" title="交集 A∩B">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="6" stroke-dasharray="2.4 2.4"/><circle cx="15" cy="12" r="6" stroke-dasharray="2.4 2.4"/><path d="M12 6a6 6 0 0 1 0 12 6 6 0 0 1 0-12z" fill="currentColor" stroke="none" opacity=".55"/></svg><span>交集 ∩</span></button>
+      </div>
+
+      <!-- 智能工具 -->
+      <div class="fly-panel" data-panel="smart">
+        <div class="fly-head">智能工具</div>
+        <div class="fly-hint">选中实体 → 再点一次选面 → 拉伸出新特征。可在右侧面板精确输入尺寸。</div>
+        <button class="tool mitem" data-tool="select" title="选择实体后选面拉伸">
+          <svg viewBox="0 0 24 24"><path d="M5 3l6.6 16.2 2.3-6.4 6.4-2.3z"/></svg><span>选面拉伸</span></button>
+      </div>
+
+      <!-- 测量 -->
+      <div class="fly-panel" data-panel="measure">
+        <div class="fly-head">测量</div>
+        <div class="fly-hint">选中实体后，右侧「尺寸 (mm)」显示精确参数；属性面板可编辑位置与尺寸。</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ============ 中央视口 ============ -->
+  <main id="viewport">
+    <div class="viewchip">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></span>
+      <span><b>Sketch3D</b> · 建模视口</span>
+    </div>
+    <div class="firstrun" id="firstRun">
+      <b>从左侧工具栏开始建模</b>
+      选择「预设模型」里的 8 种基本体，在地面拖拽放置
+    </div>
+    <div class="hintbar" id="hintbar"></div>
+
+    <!-- 尺寸编辑 gizmo：3D One 式箭头 + 可点击数值标签（仅刚放置、未确定时显示） -->
+    <div class="dimlayer" id="dimLayer" aria-hidden="true">
+      <svg class="dimsvg" id="dimSvg"></svg>
+      <div class="dimlabels" id="dimLabels"></div>
+      <div class="dim-confirm" id="dimConfirm" title="确定尺寸，之后选中不再显示标注">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg><span>确定</span>
+      </div>
+    </div>
+
+    <!-- 线段长度：绘制中实时提示，成线后可输入精确长度 -->
+    <div class="seglayer" id="segLayer" aria-hidden="true">
+      <div class="dim-tag seg-tag" id="segLenTag"></div>
+      <div class="dim-confirm seg-confirm" id="segConfirm" title="确定线段长度">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+      </div>
+    </div>
+
+    <!-- 草图绘制选项：正多边形边数 -->
+    <div class="sk-opt" id="skOpt">
+      <span>边数</span>
+      <input id="polyN" type="number" min="3" max="12" step="1" value="6">
+      <span>边</span>
+    </div>
+
+    <!-- 选面后浮出的小菜单（3D One 式） -->
+    <div class="face-menu" id="faceMenu" style="left:-9999px;top:-9999px">
+      <button class="fm-btn" data-fm="extrude" title="从该面向外（或向内）拉出实体">
+        <svg viewBox="0 0 24 24">
+          <rect x="4.5" y="14" width="9" height="6" rx="1"/>
+          <path d="M9 11.4V3.8M9 3.8L6.3 6.6M9 3.8l2.7 2.8"/>
+          <path d="M16.5 17h3.2" opacity=".5"/>
+        </svg>
+        拉伸
+        <span class="k">E</span>
+      </button>
+    </div>
+
+    <!-- 拉伸设置面板：高度 + 4 张运算卡片 -->
+    <div class="ex-pop" id="exPop">
+      <div class="ex-head">
+        <div class="t">
+          <svg viewBox="0 0 24 24"><rect x="4.5" y="13.5" width="9" height="6.5" rx="1"/><path d="M9 11V4M9 4L6.4 6.6M9 4l2.6 2.6"/></svg>
+          拉伸
+        </div>
+        <button class="ex-close" id="exClose" title="关闭 (Esc)">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="ex-body">
+        <div class="ex-row">
+          <label>高度</label>
+          <input class="num" id="exH" type="number" step="1" min="0.5" value="10">
+          <span class="unit2">mm</span>
+          <div class="ex-dir" id="exDir">
+            <button data-dir="1" class="on" title="沿法向向外">正向</button>
+            <button data-dir="-1" title="反向（向内挖）">反向</button>
+          </div>
+        </div>
+
+        <div class="ex-row" id="exDirRow">
+          <label>方向</label>
+          <button type="button" class="ex-dbtn" id="exPickDir" title="点击实体的一条边或一条线段，以其方向作为拉伸方向">拾取方向</button>
+          <button type="button" class="ex-dbtn on" id="exDefaultDir" title="恢复默认方向：地面竖直向上 / 空间沿平面法向 / 实体沿面法向">默认</button>
+          <span class="ex-dinfo" id="exDirInfo">系统默认</span>
+        </div>
+
+        <div class="ex-row" id="exVecRow">
+          <label>向量</label>
+          <input class="num" id="dvX" type="number" step="0.1" placeholder="X" title="拉伸方向 X 分量">
+          <input class="num" id="dvY" type="number" step="0.1" placeholder="Y" title="拉伸方向 Y 分量">
+          <input class="num" id="dvZ" type="number" step="0.1" placeholder="Z" title="拉伸方向 Z 分量">
+          <span class="unit2">方向</span>
+        </div>
+
+        <div class="ex-modes" id="exModes">
+          <button class="ex-mode on" data-op="new">
+            <svg viewBox="0 0 24 24"><path d="M12 3.6l7 4v8.8l-7 4-7-4V7.6z"/><path d="M5 7.6l7 4 7-4M12 11.6V20"/></svg>
+            新建实体
+          </button>
+          <button class="ex-mode" data-op="add">
+            <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg>
+            加运算
+          </button>
+          <button class="ex-mode" data-op="sub">
+            <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5" stroke-dasharray="2.4 2.4"/></svg>
+            减运算
+          </button>
+          <button class="ex-mode" data-op="int">
+            <svg viewBox="0 0 24 24">
+              <circle cx="9" cy="12" r="5" stroke-dasharray="2.4 2.4"/>
+              <circle cx="15" cy="12" r="5" stroke-dasharray="2.4 2.4"/>
+              <path d="M12 7.6a6 6 0 0 1 0 8.8 6 6 0 0 1 0-8.8z" fill="currentColor" stroke="none" opacity=".6"/>
+            </svg>
+            交运算
+          </button>
+        </div>
+
+        <div class="ex-tip" id="exTip">沿面的法向拉出新的独立实体</div>
+
+        <div class="ex-foot">
+          <button class="btn" id="exCancel">取消</button>
+          <button class="btn primary" id="exOk">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="statusbar" id="statusbar">0 个对象</div>
+    <div class="toast" id="toast"></div>
+  </main>
+
+  <!-- ============ 右属性面板 ============ -->
+  <aside class="panel" id="panel">
+    <div class="panel-head">
+      <div class="t">属性</div>
+      <span class="badge muted" id="pBadge">未选择</span>
+    </div>
+
+    <div class="empty" id="pEmpty">
+      <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+      <p>未选择对象</p>
+      <p>在视口中点击模型或草图<br>查看并编辑参数</p>
+    </div>
+
+    <div id="pBody" hidden>
+      <section class="group">
+        <div class="gtitle">对象</div>
+        <div class="row"><label>类型</label><div class="val" id="pType">—</div></div>
+        <div class="row"><label>位置 X</label><input class="num" id="posX" type="number" step="1"></div>
+        <div class="row"><label>位置 Y</label><input class="num" id="posY" type="number" step="1"></div>
+        <div class="row"><label>位置 Z</label><input class="num" id="posZ" type="number" step="1"></div>
+      </section>
+
+      <section class="group" id="gColor">
+        <div class="gtitle">颜色</div>
+        <div class="swatches" id="swatches"></div>
+      </section>
+
+      <section class="group" id="gSize">
+        <div class="gtitle">尺寸 (mm)</div>
+        <div id="sizeRows"></div>
+      </section>
+
+      <section class="group" id="gSketch" hidden>
+        <div class="gtitle" id="skTitle">草图 → 实体</div>
+        <div class="hint" id="skHint">闭合轮廓</div>
+        <div class="row"><label>高度 H</label><input class="num" id="skT" type="number" value="10" min="0.5" step="1"></div>
+        <div class="hint" style="margin:8px 0 0">输入即实时预览，点按钮生成</div>
+        <button class="btn primary" id="btnSk" style="margin-top:6px">拉伸成实体</button>
+      </section>
+
+      <section class="group" id="gFace" hidden>
+        <div class="gtitle">选中面</div>
+        <div class="hint" id="faceHint">在模型上再次点击，选择一个面</div>
+        <button class="btn primary" id="btnFaceExtrude" style="margin-top:4px" disabled>拉伸此面</button>
+        <div class="hint" style="margin:8px 0 0">选中面时视口里也会浮出「拉伸」菜单</div>
+      </section>
+    </div>
+
+    <div class="panel-foot">
+      <div><span>左侧</span> 选基本体 · <span>拖拽</span> 放置 · <span>点标签</span> 改尺寸</div>
+      <div><span>Del</span> 删除 · <span>Ctrl+Z</span> 撤销 · <span>Esc</span> 取消</div>
+    </div>
+  </aside>
+</div>
+
+<!-- ============ CDN 依赖映射：Three.js 核心 / OrbitControls / 布尔运算（全走公网 CDN） ============ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js",
+    "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.17/build/index.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* 布尔运算库（three-bvh-csg）单独动态加载：
+   万一 CDN 抽风，基础建模仍然可用，只是「加 / 减 / 交」会提示不可用。 */
+let CSG = null;
+try {
+  CSG = await import('three-bvh-csg');
+} catch (err) {
+  console.warn('[Sketch3D] 布尔运算库加载失败，加/减/交运算不可用：', err);
+}
+const csgEvaluator = CSG ? new CSG.Evaluator() : null;
+if (csgEvaluator) csgEvaluator.attributes = ['position', 'normal'];
+
+/* ============================================================================
+   01 · 全局状态与常量
+   ========================================================================== */
+const SNAP = 5;              // 地面吸附步距（mm）
+const MIN_SIZE = 0.5;        // 尺寸下限，避免退化
+const ACCENT = 0x2f6fed;     // 选中主色
+const FACE_C = 0xf5871f;     // 面选中色（橙）
+const SKETCH_C = 0x1e90ff;   // 草图线色：3D One 网页版同款亮蓝细笔触
+const SKETCH_NODE_C = 0x1a1a99; // 草图端点：深蓝实心小圆点
+const SKETCH_FILL_C = 0x8ec5ff;   // 闭合草图的浅蓝半透明填充面
+const WELD = 0.02;           // 拉伸体与母体之间的微量重叠，避免布尔运算遇到共面
+const FACE_OFF = 0.12;       // 面高亮沿法向的抬升量（防 z-fighting）
+
+/**
+ * 实体配色：明亮糖果色（替代原来的灰），按创建顺序轮换，多个实体也能区分。
+ * fill = 面填充色，line = 轮廓线色（比填充稍深），dot = 属性面板色板圆点（还原截图饱和色），name = 悬停名。
+ * 五色顺序对齐截图色板：蓝 / 绿 / 红 / 紫 / 橙。
+ */
+const BODY_PALETTE = [
+  { fill: 0x4fc6e0, line: 0x2f9bbd, dot: 0x3bbcd9, name: '青蓝' },
+  { fill: 0x8fe0b4, line: 0x32966a, dot: 0x22c55e, name: '翠绿' },
+  { fill: 0xf7a8a8, line: 0xc94f4f, dot: 0xef4444, name: '珊瑚红' },
+  { fill: 0xc9b6f7, line: 0x7d63c9, dot: 0x8b5cf6, name: '淡紫' },
+  { fill: 0xffcf8c, line: 0xc98526, dot: 0xf59e0b, name: '暖橙' }
+];
+
+const TYPE_LABEL = {
+  box: '六面体', sphere: '球体', torus: '圆环体', cylinder: '圆柱体', cone: '圆锥体',
+  ellipsoid: '椭球体', pyramid: '棱锥体', frustum: '圆台体',
+  plate: '拉伸实体', extrude: '拉伸实体', solid: '复合实体', sheet: '拉伸面', sketch: '草图'
+};
+/* 8 种基本体：放置尺寸 → desc 参数 / 包围盒尺寸 / 预览几何 / 属性面板行 */
+const PRIMITIVES = {
+  box: { label: '六面体', spec: [['w', '宽 W'], ['h', '高 H'], ['d', '深 D']] },
+  sphere: { label: '球体', spec: [['r', '半径 R']] },
+  torus: { label: '圆环体', spec: [['R', '主半径'], ['r', '管半径']] },
+  cylinder: { label: '圆柱体', spec: [['r', '半径 R'], ['h', '高 H']] },
+  cone: { label: '圆锥体', spec: [['r', '半径 R'], ['h', '高 H']] },
+  ellipsoid: { label: '椭球体', spec: [['a', '半轴 A'], ['b', '半轴 B'], ['c', '半轴 C']] },
+  pyramid: { label: '棱锥体', spec: [['r', '底面半径'], ['h', '高 H']] },
+  frustum: { label: '圆台体', spec: [['r1', '下半径'], ['r2', '上半径'], ['h', '高 H']] }
+};
+const PRIM_KINDS = Object.keys(PRIMITIVES);
+const isPrimitive = (k) => Object.prototype.hasOwnProperty.call(PRIMITIVES, k);
+const SKETCH_TOOLS = ['sketch', 'sketch-rect', 'sketch-circle', 'sketch-ellipse', 'sketch-poly'];
+const SKETCH_TOOL_HINT = {
+  sketch: '逐点点击绘线 · 回到起点闭合',
+  'sketch-rect': '对角线拖拽绘制矩形',
+  'sketch-circle': '从圆心拖出半径',
+  'sketch-ellipse': '从中心拖出长短轴',
+  'sketch-poly': '从中心拖出外接圆（等边等角的正多边形）'
+};
+
+/** 交互状态机 */
+const state = {
+  mode: 'object',      // 'object' 物体模式 | 'sketch' 草图模式
+  tool: 'select',      // 'select' | 'box' | 'cylinder' | 'sketch*'
+  selected: null,      // 选中对象 A（Object3D）
+  selectedB: null,     // 布尔运算的第二选中对象 B（Shift 加选）
+  face: null,          // 选中面 { normal:Vector3, point:Vector3, loop:[Vector3] }
+  faceHit: null,       // 命中信息（重算高亮用）
+  draft: null,         // 草图草稿 { type, points:[[x,y],...] }（绘制平面局部坐标）
+  closeReady: false,   // 是否已回到起点，可以闭合
+  placing: null,       // 正在拖拽放置的基础实体
+  shade: 'solid',      // 'solid' | 'wire'
+  polyN: 6,            // 正多边形边数
+  ex: { open: false, h: 10, dir: 1, op: 'new', dirVec: null, picking: false },  // 拉伸面板状态（dirVec=用户拾取的拉伸方向）
+  sketchStage: 'plane',   // 草图两段式：'plane' 选绘制平面 | 'draw' 开始绘制
+  sketchPlane: null       // 已锁定的绘制平面（见 lockSketchPlane）
+};
+
+let drag = null;                 // 当前指针拖拽会话
+let editBase = null;             // 撤销快照的事务起点
+const undoStack = [];            // 撤销栈（存整个场景快照）
+
+const $ = (id) => document.getElementById(id);
+const viewport = $('viewport');
+const round1 = (v) => Math.round(v * 10) / 10;
+const snap = (v) => Math.round(v / SNAP) * SNAP;
+
+/* ============================================================================
+   02 · 渲染器 / 场景 / 相机 / 轨道控制器
+   ==========================================================================
+   坐标系约定（对齐 3D One / 传统 CAD）：Z 轴朝上。
+   · 网格地面 = XY 平面（z = 0），拉伸沿 ±Z，面板里「位置 Z」是高度；
+   · 相机 up 向量设为 (0,0,1)。
+   ========================================================================== */
+let renderer;
+try {
+  /* alpha:true —— 让 CSS 的明亮纯色透出来当背景 */
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (err) {
+  $('firstRun').innerHTML = '<b>当前浏览器不支持 WebGL</b>请使用新版 Chrome / Edge 打开';
+  throw err;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;        // 正确的 sRGB 输出，颜色更通透
+renderer.toneMapping = THREE.ACESFilmicToneMapping;      // 高光柔和过渡，接近 3D One 的塑料质感
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = false;   // 不渲染实体投影
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = null;
+
+const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+camera.up.set(0, 0, 1);                       // Z 朝上
+camera.position.set(190, -235, 165);
+
+/* 轨道控制器：左键旋转 / 中键平移 / 滚轮缩放；右键完全禁用（防浏览器手势干扰） */
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT: null                   // 右键不绑定任何行为
+};
+controls.target.set(0, 0, 12);
+controls.enableDamping = true;
+controls.dampingFactor = 0.09;
+controls.minDistance = 25;
+controls.maxDistance = 1800;
+controls.maxPolarAngle = Math.PI - 0.04;    // 允许转到物体下方看底面（ViewCube 需要）
+controls.zoomSpeed = 0.9;
+
+/* ============================================================================
+   03 · 灯光 / 地面网格 / 参照轴
+   ========================================================================== */
+/* 灯光：顶亮底暗的柔和渐变（顶白、底淡蓝），无硬阴影，3D One 式塑料观感 */
+scene.add(new THREE.HemisphereLight(0xffffff, 0xc4d6ea, 1.05));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
+keyLight.position.set(90, -120, 200);
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xdcecff, 0.5);
+fillLight.position.set(-140, 80, 90);
+scene.add(fillLight);
+
+/* 环境反射：用 RoomEnvironment 程序生成室内环境贴图（PMREM），
+   让 MeshStandardMaterial 有真实的高光与明暗过渡 —— 这是「逼真」感的主要来源。
+   纯程序生成、无外部资源；加载失败则退回原来的纯灯光方案。 */
+import('three/addons/environments/RoomEnvironment.js').then(({ RoomEnvironment }) => {
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new RoomEnvironment();
+    const envRT = pmrem.fromScene(envScene, 0.05);
+    scene.environment = envRT.texture;
+    scene.traverse((o) => {
+      if (o.isMesh && o.material && (o.material.isMeshStandardMaterial || o.material.isMeshPhysicalMaterial)) {
+        o.material.envMapIntensity = 0.34;
+        o.material.needsUpdate = true;
+      }
+    });
+    envScene.dispose && envScene.dispose();
+    pmrem.dispose();
+  } catch (e) { /* 环境贴图失败不影响功能，保留原灯光 */ }
+}).catch(() => {});
+
+/* 地面网格：XY 平面（z=0），5 mm × 5 mm 方格，3D One 网页版顶面视图同款密度。
+   原生 GridHelper 的 linewidth 在多数 WebGL 实现里恒为 1px，无法加粗；
+   改用着色器平面：线宽按屏幕像素精确控制（原 1px 加粗一倍 = 2px），颜色沿用原浅灰。 */
+const GRID_STEP = 5;               // 每格 5 mm，与吸附步距 SNAP 一致
+const grid = new THREE.Mesh(
+  new THREE.PlaneGeometry(500, 500),
+  new THREE.ShaderMaterial({
+    uniforms: {
+      uStep: { value: GRID_STEP },
+      uWidth: { value: 0.5 },      // 格线半宽 0.5px → 总宽约 1px
+      uColor: { value: new THREE.Color(0xc9d1db) },
+      uOpacity: { value: 0.55 }
+    },
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    extensions: { derivatives: true },
+    vertexShader: `
+      varying vec2 vGrid;
+      void main() {
+        vGrid = position.xy;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying vec2 vGrid;
+      uniform float uStep, uWidth, uOpacity;
+      uniform vec3 uColor;
+      void main() {
+        vec2 c = vGrid / uStep;
+        vec2 w = max(fwidth(c), vec2(1e-6));
+        vec2 d = abs(fract(c + 0.5) - 0.5) / w;
+        float m = min(d.x, d.y);
+        float a = 1.0 - smoothstep(uWidth - 0.28, uWidth + 0.28, m);
+        /* 远处格线过密时淡出，避免摩尔纹；顶面正交视图不受影响 */
+        a *= 1.0 - smoothstep(0.30, 0.75, max(w.x, w.y));
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(uColor, a * uOpacity);
+      }`
+  })
+);
+grid.position.z = -0.02;           // 略低于模型底面，避免深度闪烁
+grid.renderOrder = -1;
+scene.add(grid);
+
+/* 分组：模型 / 覆盖层（面高亮 · 放置预览 · 草图草稿） */
+const modelGroup = new THREE.Group();
+const overlayGroup = new THREE.Group();
+const faceGroup = new THREE.Group();
+const ghostGroup = new THREE.Group();
+const draftGroup = new THREE.Group();
+overlayGroup.add(faceGroup, ghostGroup, draftGroup);
+scene.add(modelGroup, overlayGroup);
+
+/* 地面射线检测用的数学平面（z = 0，Z 朝上约定） */
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const raycaster = new THREE.Raycaster();
+raycaster.params.Line.threshold = 1.6;   // 草图线更容易点中
+const pointer = new THREE.Vector2();
+
+/* ============================================================================
+   04 · 几何构建（全部参数化，撤销与重建都靠描述对象还原）
+   ========================================================================== */
+/**
+ * 布尔结果（三角形汤）专用平滑法线：
+ *   · 按空间位置把重合顶点归组；
+ *   · 组内若法线方向一致（夹角 < crease）→ 平均成一条平滑法线（圆柱侧面因此连续光滑）；
+ *   · 组内若法线分歧（如侧面与顶盖 90°）→ 判定为硬边，各顶点保留自己的面法线（棱角清晰）。
+ * 这样侧面不再是一条条硬边矩形，同时顶/底盖的硬边被保留。
+ */
+function smoothSolidNormals(geo, creaseDeg = 30) {
+  const pos = geo.attributes.position;
+  if (!pos || pos.count < 3) return;
+  const n = pos.count;
+  const idx = geo.index;
+  const keyOf = (i) => `${Math.round(pos.getX(i) * 100)},${Math.round(pos.getY(i) * 100)},${Math.round(pos.getZ(i) * 100)}`;
+
+  /* 每个顶点的面法线 */
+  const faceN = new Array(n).fill(null);
+  const triCount = idx ? Math.floor(idx.count / 3) : Math.floor(n / 3);
+  for (let t = 0; t < triCount; t++) {
+    const a = idx ? idx.getX(t * 3) : t * 3;
+    const b = idx ? idx.getX(t * 3 + 1) : t * 3 + 1;
+    const c = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+    const ax = pos.getX(a), ay = pos.getY(a), az = pos.getZ(a);
+    const ux = pos.getX(b) - ax, uy = pos.getY(b) - ay, uz = pos.getZ(b) - az;
+    const vx = pos.getX(c) - ax, vy = pos.getY(c) - ay, vz = pos.getZ(c) - az;
+    let fx = uy * vz - uz * vy, fy = uz * vx - ux * vz, fz = ux * vy - uy * vx;
+    const fl = Math.hypot(fx, fy, fz) || 1;
+    fx /= fl; fy /= fl; fz /= fl;
+    faceN[a] = [fx, fy, fz]; faceN[b] = [fx, fy, fz]; faceN[c] = [fx, fy, fz];
+  }
+
+  /* 按位置分组 */
+  const groups = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = keyOf(i);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(i);
+  }
+
+  const cosT = Math.cos(creaseDeg * Math.PI / 180);
+  const out = new Float32Array(n * 3);
+  for (const ids of groups.values()) {
+    /* 找最大的同向法线簇 */
+    let best = [];
+    for (const i of ids) {
+      const cand = faceN[i];
+      if (!cand) continue;
+      const clump = ids.filter((j) => {
+        const f = faceN[j];
+        return f && f[0] * cand[0] + f[1] * cand[1] + f[2] * cand[2] >= cosT;
+      });
+      if (clump.length > best.length) best = clump;
+    }
+    if (!best.length) { for (const i of ids) out[i * 3 + 2] = 1; continue; }
+    if (best.length >= ids.length) {
+      /* 单一平滑簇：平均 */
+      let sx = 0, sy = 0, sz = 0;
+      for (const i of best) { sx += faceN[i][0]; sy += faceN[i][1]; sz += faceN[i][2]; }
+      const l = Math.hypot(sx, sy, sz) || 1; sx /= l; sy /= l; sz /= l;
+      for (const i of ids) { out[i * 3] = sx; out[i * 3 + 1] = sy; out[i * 3 + 2] = sz; }
+    } else {
+      /* 硬边：各顶点保留面法线 */
+      for (const i of ids) {
+        const f = faceN[i] || [0, 0, 1];
+        out[i * 3] = f[0]; out[i * 3 + 1] = f[1]; out[i * 3 + 2] = f[2];
+      }
+    }
+  }
+  geo.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+}
+
+/** 用一组线段坐标建 LineSegments（几何可替换） */
+function makeEdgeLines(coords, desc) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(coords), 3));
+  const edges = new THREE.LineSegments(g, edgeMaterial(desc));
+  edges.userData.isEdge = true;
+  edges.raycast = () => {};
+  return edges;
+}
+
+/** 依据描述对象生成几何体 */
+function makeGeometry(desc) {
+  const p = desc.params || {};
+
+  if (desc.kind === 'box') {
+    /* w=X 宽，d=Y 深，h=Z 高（Z 朝上约定） */
+    return new THREE.BoxGeometry(p.w, p.d, p.h);
+  }
+
+  if (desc.kind === 'cylinder') {
+    /* CylinderGeometry 默认轴向是 Y，转 90° 让轴向变成 Z（顶/底面在 ±Z） */
+    /* 径向 128 段：接近真圆，侧面在光照下连续过渡，不再是可见的小矩形拼面 */
+    const g = new THREE.CylinderGeometry(p.r, p.r, p.h, 128, 1);
+    g.rotateX(Math.PI / 2);
+    return g;
+  }
+
+  if (desc.kind === 'sphere') {
+    return new THREE.SphereGeometry(p.r, 96, 64);
+  }
+  if (desc.kind === 'torus') {
+    /* 圆环默认在 XY 面（孔轴 Z），正好贴合 Z-up 场景 */
+    return new THREE.TorusGeometry(p.R, p.r, 32, 128);
+  }
+  if (desc.kind === 'cone') {
+    const g = new THREE.ConeGeometry(p.r, p.h, 128, 1);
+    g.rotateX(Math.PI / 2);          // 轴 Y → Z
+    return g;
+  }
+  if (desc.kind === 'ellipsoid') {
+    const g = new THREE.SphereGeometry(1, 96, 64);
+    g.scale(p.a, p.b, p.c);
+    return g;
+  }
+  if (desc.kind === 'pyramid') {
+    /* 正四棱锥：ConeGeometry 4 段，绕 Z 转 45° 让棱对齐 XY 轴 */
+    const g = new THREE.ConeGeometry(p.r, p.h, 4, 1);
+    g.rotateX(Math.PI / 2);
+    g.rotateZ(Math.PI / 4);
+    return g;
+  }
+  if (desc.kind === 'frustum') {
+    const g = new THREE.CylinderGeometry(p.r2, p.r1, p.h, 128, 1);
+    g.rotateX(Math.PI / 2);
+    return g;
+  }
+
+  if (desc.kind === 'plate') {
+    /* 轮廓点在 XY 平面上（z=0）：Shape 直接用 (x, y)，
+       ExtrudeGeometry 沿 Shape 的 +Z 挤出 → 世界 +Z，底面正好落在 z = 0。 */
+    const prof = desc.profile || [];
+    if (prof.length < 3) return new THREE.BufferGeometry();
+    const shape = new THREE.Shape();
+    prof.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)));
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: p.depth, bevelEnabled: false, curveSegments: 8 });
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  if (desc.kind === 'extrude') {
+    /* 任意方向的拉伸体：2D 轮廓（相对质心）+ 平面基 (u,v,n)，n 即拉伸方向 */
+    const pts = desc.pts2d || [];
+    if (pts.length < 3) return new THREE.BufferGeometry();
+    const shape = new THREE.Shape();
+    pts.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)));
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: p.depth, bevelEnabled: false, curveSegments: 8 });
+    const b = desc.basis;
+    geo.applyMatrix4(new THREE.Matrix4().makeBasis(
+      new THREE.Vector3().fromArray(b.u),
+      new THREE.Vector3().fromArray(b.v),
+      new THREE.Vector3().fromArray(b.n)
+    ));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  if (desc.kind === 'sheet') {
+    /* 开放线条沿平面法向拉伸出的「面」：一条无厚度的带状平面。
+       轮廓 (x, y) 是平面局部坐标，高度沿局部 +Z，再经 basis 映到世界。 */
+    const prof = desc.profile || [];
+    if (prof.length < 2) return new THREE.BufferGeometry();
+    const h = p.height;
+    const pos = [];
+    for (let i = 0; i < prof.length - 1; i++) {
+      const [ax, ay] = prof[i];
+      const [bx, by] = prof[i + 1];
+      pos.push(ax, ay, 0, bx, by, 0, bx, by, h);
+      pos.push(ax, ay, 0, bx, by, h, ax, ay, h);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    const b = desc.basis || { u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+    g.applyMatrix4(new THREE.Matrix4().makeBasis(
+      new THREE.Vector3().fromArray(b.u),
+      new THREE.Vector3().fromArray(b.v),
+      new THREE.Vector3().fromArray(b.n)
+    ));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  if (desc.kind === 'solid') {
+    /* 布尔运算结果：直接存顶点表（可 JSON 序列化，撤销能还原） */
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(desc.geo.p), 3));
+    if (desc.geo.i && desc.geo.i.length) g.setIndex(desc.geo.i);
+    if (desc.geo.n && desc.geo.n.length === desc.geo.p.length) {
+      /* 优先用 CSG 原始平滑法线：曲面渐变、切面一致，既光滑又能被曲面判定识别。
+         老存档没有 n 字段时回退到按位置焊接重算。 */
+      g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(desc.geo.n), 3));
+    } else {
+      smoothSolidNormals(g, 30);
+    }
+    return g;
+  }
+
+  return new THREE.BufferGeometry();
+}
+
+/** 取一个对象应该用的配色（按 tone 轮换） */
+function toneOf(desc) {
+  const t = desc && desc.tone != null ? desc.tone : 0;
+  return BODY_PALETTE[t % BODY_PALETTE.length];
+}
+
+/** 实体材质（3D One 式浅色塑料：柔和哑光 + 极弱清漆 + 环境反射，明亮通透） */
+function bodyMaterial(desc) {
+  return new THREE.MeshPhysicalMaterial({
+    color: toneOf(desc).fill,
+    roughness: 0.34,
+    metalness: 0.015,
+    clearcoat: 0.10,
+    clearcoatRoughness: 0.55,
+    transparent: true,
+    opacity: 0.97,
+    depthWrite: true,
+    envMapIntensity: 0.34,
+    side: desc && desc.kind === 'sheet' ? THREE.DoubleSide : THREE.FrontSide
+  });
+}
+/** 放置后未点「确定」的预览色：3D One 式透明浅绿，可透见下方网格 */
+const PENDING_FILL = 0x74d99a;
+const PENDING_EDGE = 0x3fae6b;
+/** 根据 dimPending 统一应用实体外观：待确定=透明浅绿，已确定=正式配色。
+    集中在一处，避免 build/update/highlight 各路覆盖导致颜色闪烁。 */
+function applyBodyAppearance(obj) {
+  const d = obj && obj.userData.desc;
+  if (!d || d.kind === 'sketch' || !obj.material || !obj.material.color) return;
+  const pending = d.dimPending === true;
+  const tone = toneOf(d);
+  obj.material.color.setHex(pending ? PENDING_FILL : tone.fill);
+  obj.material.opacity = pending ? 0.5 : 0.97;
+  obj.material.depthWrite = !pending;
+  const e = obj.children.find((c) => c.userData.isEdge);
+  if (e) {
+    e.material.color.setHex(pending ? PENDING_EDGE : tone.line);
+    e.material.opacity = pending ? 0.95 : 0.85;
+  }
+}
+
+function edgeMaterial(desc) {
+  return new THREE.LineBasicMaterial({
+    color: toneOf(desc).line,
+    transparent: true,
+    opacity: 0.9
+  });
+}
+
+/** 取草图所属绘制平面的基（未记录 plane 时按默认地面处理，兼容旧数据） */
+function sketchBasis(desc) {
+  const pl = desc.plane || { u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+  return {
+    u: new THREE.Vector3().fromArray(pl.u),
+    v: new THREE.Vector3().fromArray(pl.v),
+    n: new THREE.Vector3().fromArray(pl.n)
+  };
+}
+
+/** 草图可视化部件：线段 + 顶点（闭合时附加蓝色半透明填充面 = 这个平面） */
+/** 草图笔触：WebGL 的 lineWidth 多数平台恒为 1px，用窄面片做出均匀的细蓝线 */
+function sketchStroke(pts, n, width = 1.2) {
+  const pos = [], idx = [];
+  let k = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const d = b.clone().sub(a);
+    if (d.lengthSq() < 1e-9) continue;
+    const side = new THREE.Vector3().crossVectors(d.normalize(), n).normalize().multiplyScalar(width / 2);
+    pos.push(
+      a.x + side.x, a.y + side.y, a.z + side.z,
+      a.x - side.x, a.y - side.y, a.z - side.z,
+      b.x + side.x, b.y + side.y, b.z + side.z,
+      b.x - side.x, b.y - side.y, b.z - side.z
+    );
+    idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+    k += 4;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color: SKETCH_C, side: THREE.DoubleSide, depthWrite: false
+  }));
+  m.renderOrder = 2;
+  return m;
+}
+
+/** 草图端点：线段/矩形这类低点数轮廓画深蓝实心圆点；圆/椭圆的高密度采样点不画 */
+function sketchNodes(pts, n, radius = 1.8) {
+  const g = new THREE.Group();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n.clone().normalize());
+  pts.forEach((p) => {
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(radius, 14),
+      new THREE.MeshBasicMaterial({ color: SKETCH_NODE_C, side: THREE.DoubleSide, depthWrite: false })
+    );
+    dot.position.copy(p).addScaledVector(n, 0.012);
+    dot.quaternion.copy(q);
+    dot.renderOrder = 3;
+    dot.userData.isNode = true;
+    g.add(dot);
+  });
+  return g;
+}
+
+function makeSketchParts(desc, lift = 0.06) {
+  const { u, v, n } = sketchBasis(desc);
+  const at = (x, y) => new THREE.Vector3()
+    .addScaledVector(u, x).addScaledVector(v, y).addScaledVector(n, lift);
+  const pts = desc.points.map(([x, y]) => at(x, y));
+  const loop = desc.closed && pts.length ? [...pts, pts[0].clone()] : pts;
+  const line = sketchStroke(loop, n);
+  const parts = [line];
+  /* 线段 / 矩形端点画深蓝实心圆点；圆、椭圆的高密度采样点不画（避免锯齿颗粒） */
+  if (pts.length <= 12) parts.push(sketchNodes(pts, n));
+
+  /* 闭合轮廓 → 蓝色阴影平面：草图画完就已经「是一个面」，直接可拉伸 */
+  if (desc.closed && pts.length >= 3) {
+    const fill = new THREE.Mesh(
+      polygonGeometry(pts, n, 0.02),
+      new THREE.MeshBasicMaterial({
+        color: SKETCH_FILL_C, transparent: true, opacity: 0.36,
+        side: THREE.DoubleSide, depthWrite: false
+      })
+    );
+    fill.userData.isFill = true;
+    fill.renderOrder = 1;
+    parts.unshift(fill);
+  }
+  return parts;
+}
+
+let uidSeq = 0;                 // 对象稳定 id（布尔母体引用 / 目标定位用）
+/** 按描述构建对象并加入模型分组 */
+function buildObject(desc) {
+  if (desc.uid == null) desc.uid = ++uidSeq;   // 分配稳定 id（撤销/重开随 desc 一起还原）
+  let obj;
+  if (desc.kind === 'sketch') {
+    obj = new THREE.Group();
+    makeSketchParts(desc).forEach((c) => obj.add(c));
+  } else {
+    /* 默认统一青蓝（3D One 同款），色板仍可手动为每个实体单独换色 */
+    if (desc.tone == null) desc.tone = 0;
+    obj = new THREE.Mesh(makeGeometry(desc), bodyMaterial(desc));
+    /* 布尔复合体不画边线：CSG 切割会把平面切成扇形三角汤，任何基于边的过滤都会残留
+       放射状碎边（蛛网）。靠平滑法线 + 环境反射塑形，视觉最干净。普通实体用 EdgesGeometry。 */
+    if (desc.kind !== 'solid') {
+      const edges = makeEdgeLines(new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array, desc);
+      obj.add(edges);
+    }
+    if (state.shade === 'wire') obj.material.wireframe = true;
+  }
+  obj.userData.desc = desc;
+  obj.position.set(desc.pos[0], desc.pos[1], desc.pos[2]);
+  modelGroup.add(obj);
+  return obj;
+}
+
+/** 参数变化后原地重建几何（保持对象身份，选中态不丢） */
+function updateObject(obj) {
+  const desc = obj.userData.desc;
+  if (desc.kind === 'sketch') {
+    obj.clear();
+    makeSketchParts(desc).forEach((c) => obj.add(c));
+  } else {
+    const old = obj.geometry;
+    obj.geometry = makeGeometry(desc);
+    old.dispose();
+    const edges = obj.children.find((c) => c.userData.isEdge);
+    /* 几何变了，重建轮廓线。solid 不画边线（见 buildObject 注释）；
+       对象由普通实体转为 solid 时要移除旧边线。 */
+    if (desc.kind === 'solid') {
+      if (edges) {
+        obj.remove(edges);
+        edges.geometry.dispose();
+        edges.material.dispose();
+      }
+    } else {
+      const ec = Array.from(new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array);
+      if (edges) {
+        edges.geometry.dispose();
+        edges.geometry = new THREE.BufferGeometry();
+        edges.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ec), 3));
+      } else {
+        obj.add(makeEdgeLines(ec, desc));
+      }
+    }
+    /* 尺寸 / 复合运算后颜色保持一致；未确定的预览体仍是透明浅绿 */
+    applyBodyAppearance(obj);
+  }
+  obj.position.set(desc.pos[0], desc.pos[1], desc.pos[2]);
+}
+
+/** 递归释放几何 / 材质 */
+function disposeObject(obj) {
+  obj.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      Array.isArray(o.material) ? o.material.forEach((m) => m.dispose()) : o.material.dispose();
+    }
+  });
+}
+
+/** 清空一个分组并释放资源 */
+function clearGroup(g) {
+  for (let i = g.children.length - 1; i >= 0; i--) {
+    const c = g.children[i];
+    g.remove(c);
+    disposeObject(c);
+  }
+}
+
+/* ============================================================================
+   05 · 撤销栈（快照式：整个场景可序列化 → 重建）
+   ========================================================================== */
+function serializeScene() {
+  /* dimPending 是「放置后未确定」的临时 UI 状态，不写入快照：
+     撤销 / 存档恢复后模型已是确定态，不会重新冒出尺寸箭头。 */
+  return JSON.stringify(modelGroup.children.map((o) => {
+    const d = { ...o.userData.desc };
+    delete d.dimPending;
+    return d;
+  }));
+}
+
+function restoreScene(json) {
+  select(null);
+  [...modelGroup.children].forEach((o) => { modelGroup.remove(o); disposeObject(o); });
+  JSON.parse(json).forEach((d) => { d.dimPending = false; buildObject(d); });
+  updateFirstRun();
+  updateStatus();
+  syncPanel();
+}
+
+/** 事务起点：记录当前场景 */
+function beginEdit() {
+  editBase = serializeScene();
+}
+/** 事务结束：有变化才入栈 */
+function commitEdit() {
+  if (!editBase) return;
+  if (editBase !== serializeScene()) {
+    undoStack.push(editBase);
+    if (undoStack.length > 60) undoStack.shift();
+    updateUndoBtn();
+  }
+  editBase = null;
+}
+
+function undo() {
+  if (!undoStack.length) return toast('没有可撤销的操作');
+  restoreScene(undoStack.pop());
+  updateUndoBtn();
+  toast('已撤销');
+}
+
+function deleteSelected() {
+  const obj = state.selected;
+  if (!obj) return toast('未选中对象');
+  beginEdit();
+  select(null);
+  modelGroup.remove(obj);
+  disposeObject(obj);
+  commitEdit();
+  updateFirstRun();
+  updateStatus();
+  toast('已删除');
+}
+
+/* ============================================================================
+   06 · 拾取（Raycaster）：地面点 / 模型 / 面
+   ========================================================================== */
+function setRay(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+}
+
+/** 与地面 z=0 的交点 */
+function groundPoint(e) {
+  setRay(e);
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(groundPlane, p) ? p : null;
+}
+
+/** 与「当前绘制平面」的交点（草图输入专用；未锁定平面时 = 地面） */
+function planePoint(e) {
+  const sp = state.sketchPlane;
+  const mathPlane = sp ? sp.mathPlane : groundPlane;
+  setRay(e);
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(mathPlane, p) ? p : null;
+}
+
+/** 世界点 → 绘制平面局部 2D 坐标 */
+function worldToPlane2D(p) {
+  const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0] };
+  const o = new THREE.Vector3().fromArray(sp.o);
+  const u = new THREE.Vector3().fromArray(sp.u);
+  const v = new THREE.Vector3().fromArray(sp.v);
+  const d = p.clone().sub(o);
+  return [d.dot(u), d.dot(v)];
+}
+
+/** 拾取模型（只认带 desc 的根对象） */
+function pick(e) {
+  setRay(e);
+  const hits = raycaster.intersectObjects(modelGroup.children, true);
+  for (const h of hits) {
+    const root = rootOf(h.object);
+    if (root) return { hit: h, root };
+  }
+  return null;
+}
+
+/** 向上找到带 desc 的根对象 */
+function rootOf(o) {
+  let cur = o;
+  while (cur && !cur.userData.desc) cur = cur.parent;
+  return cur && cur.userData.desc ? cur : null;
+}
+
+/** 把局部法向转成世界法向 */
+function worldNormal(obj, face) {
+  return face.normal.clone()
+    .applyMatrix3(new THREE.Matrix3().getNormalMatrix(obj.matrixWorld))
+    .normalize();
+}
+
+/* ============================================================================
+   07 · 选中 / 高亮 / 面识别
+   ----------------------------------------------------------------------------
+   面识别是「通用」的：从命中的三角形出发，收集所有与之共面的三角形，
+   再提取这组三角形的边界环 —— 这个环就是整个面的轮廓。
+   高亮用它，拉伸的轮廓也用它，所以「高亮出来的面」和「实际拉伸的面」永远一致。
+   立方体 / 圆柱 / 拉伸体 / 布尔运算结果（任意网格）走的是同一套代码。
+   ========================================================================== */
+function setHighlight(obj, on, asB) {
+  if (!obj) return;
+  const hi = on ? (asB ? FACE_C : ACCENT) : 0x000000;   // A 蓝色高亮，B 橙色高亮
+  if (obj.isMesh) {
+    obj.material.emissive.setHex(hi);
+    obj.material.emissiveIntensity = on ? 0.12 : 0;
+    const e = obj.children.find((c) => c.userData.isEdge);
+    if (e) {
+      e.material.color.setHex(on ? hi : toneOf(obj.userData.desc).line);
+      e.material.opacity = on ? 1 : 0.85;
+    }
+  } else {
+    obj.traverse((c) => {
+      if (!c.material || !c.material.color) return;
+      if (c.userData.isNode) {
+        /* 端点圆点始终保持深蓝，选中时略提亮 */
+        c.material.color.setHex(on ? ACCENT : SKETCH_NODE_C);
+        return;
+      }
+      if (c.userData.isFill) {
+        /* 蓝色阴影面：平时浅蓝，选中加深 */
+        c.material.color.setHex(on ? hi : SKETCH_FILL_C);
+        c.material.opacity = on ? 0.45 : 0.36;
+        return;
+      }
+      c.material.color.setHex(on ? hi : SKETCH_C);
+    });
+  }
+}
+
+/** 设置布尔运算的第二选中实体 B（Shift 加选），不影响 A 的高亮 */
+function selectB(obj) {
+  if (state.selectedB && state.selectedB !== obj) setHighlight(state.selectedB, false, true);
+  state.selectedB = obj || null;
+  if (obj) setHighlight(obj, true, true);
+  updateBoolButtons();
+  updateStatus();
+}
+
+/** 刷新左侧布尔三卡片的可用态：A、B 均为不同实体时点亮 */
+function updateBoolButtons() {
+  const a = state.selected, b = state.selectedB;
+  const ready = !!(a && b && a !== b && a.userData.desc && b.userData.desc
+    && a.userData.desc.kind !== 'sketch' && b.userData.desc.kind !== 'sketch'
+    && a.userData.desc.kind !== 'sheet' && b.userData.desc.kind !== 'sheet');
+  document.querySelectorAll('.booltool').forEach((el) => el.classList.toggle('ready', ready));
+  return ready;
+}
+
+function select(obj) {
+  autoConfirmDim();   // 切换对象时，上一个未确定的模型视为已确定
+  if (obj !== segObj) clearSegOverlay();
+  if (state.selected && state.selected !== obj) setHighlight(state.selected, false);
+  if (state.selectedB && state.selectedB !== obj) { setHighlight(state.selectedB, false, true); state.selectedB = null; }
+  state.selected = obj || null;
+  state.face = null;
+  state.faceHit = null;
+  closeExtrudePanel(true);
+  clearGroup(faceGroup);
+  clearGroup(ghostGroup);
+  hideFaceMenu();
+  if (obj) setHighlight(obj, true);
+  syncPanel();
+  updateStatus();
+  updateBoolButtons();
+}
+
+/** 点选一个面：识别整面 → 橙色高亮 + 浮出「拉伸」菜单 */
+function pickFace(obj, hit) {
+  const boundary = faceBoundary(obj, hit);
+  /* 曲面 / 孔沿 / 碎片窄条：静默忽略，不画高亮、不弹菜单（3D One 式，不打扰建模） */
+  if (!boundary) return;
+  clearGroup(faceGroup);
+  state.face = { normal: boundary.normal.clone(), point: hit.point.clone(), loop: boundary.loop, center: boundary.center };
+  state.faceHit = hit;
+  buildFaceHighlight(boundary.loop, boundary.normal, boundary.loopsWorld, boundary.fillCoords);
+  syncFaceHint();
+  showFaceMenu();
+}
+
+function faceFillMat() {
+  return new THREE.MeshBasicMaterial({
+    color: FACE_C, transparent: true, opacity: 0.34,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+}
+
+/**
+ * 从共面三角片提取「干净的外轮廓环」——栅格化 + 边界追踪，一劳永逸消除碎片线。
+ *
+ * 背景：CSG 求差/求交输出的顶面是三角形汤，孔沿与矩形边之间存在大量 T 型结点与
+ * 共面扇射三角。任何基于「三角边出现次数」的方法都会被 T 结点/浮点误差欺骗，
+ * 把内部三角边当成边界，画出从孔沿放射到顶点的橙色碎线。
+ * 本方法不依赖三角拓扑：把所有共面三角投影到面的局部 2D 坐标系，光栅化成占用网格，
+ * 再用「摩尔邻域追踪」提取外边界——只认「被填充格子 ↔ 空格子」的交界，
+ * 内部三角剖分完全不影响结果。孔会自动成为内环。
+ */
+function rasterFaceLoops(picked, vx, vy, vz, mw, normal) {
+  const { u, v } = planeBasis(normal);
+  // 1) 把共面三角的顶点投到面局部 2D（以第一个顶点为原点）
+  const o = new THREE.Vector3(vx(picked[0]), vy(picked[0]), vz(picked[0])).applyMatrix4(mw);
+  const proj = [];
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const uvOf = (i) => {
+    const w = new THREE.Vector3(vx(i), vy(i), vz(i)).applyMatrix4(mw).sub(o);
+    return [w.dot(u), w.dot(v)];
+  };
+  for (let j = 0; j < picked.length; j += 3) {
+    const a = uvOf(picked[j]), b = uvOf(picked[j + 1]), c = uvOf(picked[j + 2]);
+    proj.push([a, b, c]);
+    for (const p of [a, b, c]) {
+      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+    }
+  }
+  // 2) 光栅化：格子边长 ≈ 面最大跨度的 1/160，兼顾精度与速度（大面也不超过 160×160）
+  const span = Math.max(maxX - minX, maxY - minY);
+  if (span < 1e-6) return null;
+  const N = 160, cell = span / N;
+  const W = Math.min(N + 2, 200), H = Math.min(N + 2, 200);
+  const pad = 2;
+  const gx = (x) => Math.min(W - 1, Math.max(0, Math.floor((x - minX) / cell) + pad));
+  const gy = (y) => Math.min(H - 1, Math.max(0, Math.floor((y - minY) / cell) + pad));
+  const mask = new Uint8Array(W * H);
+  const idx2 = (i, j) => j * W + i;
+  const sign = (ax, ay, bx, by, px, py) => (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+  for (const [a, b, c] of proj) {
+    const i0 = gx(Math.min(a[0], b[0], c[0])), i1 = gx(Math.max(a[0], b[0], c[0]));
+    const j0 = gy(Math.min(a[1], b[1], c[1])), j1 = gy(Math.max(a[1], b[1], c[1]));
+    for (let j = j0; j <= j1; j++) {
+      const py = minY + (j - pad + 0.5) * cell;
+      for (let i = i0; i <= i1; i++) {
+        const px = minX + (i - pad + 0.5) * cell;
+        const d1 = sign(a[0], a[1], b[0], b[1], px, py);
+        const d2 = sign(b[0], b[1], c[0], c[1], px, py);
+        const d3 = sign(c[0], c[1], a[0], a[1], px, py);
+        if ((d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0)) mask[idx2(i, j)] = 1;
+      }
+    }
+  }
+  // 3) 边界追踪：只在「填充格 ↔ 空格」之间走，得到完整闭合环（含孔环）
+  const key = (i, j) => i + ',' + j;
+  const filled = (i, j) => i >= 0 && j >= 0 && i < W && j < H && mask[idx2(i, j)] === 1;
+  const loops = [];
+  const visited = new Set();
+  // 每个填充格的四条边：只在邻居为空时登记为有向边（面内部顺时针）
+  const edgeMap = new Map();
+  const addDir = (a, b) => {
+    const k = key(a[0], a[1]);
+    let l = edgeMap.get(k); if (!l) { l = []; edgeMap.set(k, l); }
+    l.push(b);
+  };
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    if (!filled(i, j)) continue;
+    if (!filled(i, j - 1)) addDir([i, j], [i + 1, j]);          // 底边 →
+    if (!filled(i + 1, j)) addDir([i + 1, j], [i + 1, j + 1]);  // 右边 ↑
+    if (!filled(i, j + 1)) addDir([i + 1, j + 1], [i, j + 1]);  // 顶边 ←
+    if (!filled(i - 1, j)) addDir([i, j + 1], [i, j]);          // 左边 ↓
+  }
+  for (const [start, nexts] of edgeMap) {
+    for (const first of nexts) {
+      const ekey = start + '>' + key(first[0], first[1]);
+      if (visited.has(ekey)) continue;
+      const chain = [start];
+      let cur = first;
+      let guard = 0;
+      while (guard++ < edgeMap.size * 2) {
+        const curKey = key(cur[0], cur[1]);
+        chain.push(curKey);
+        if (curKey === start) break;
+        const outs = edgeMap.get(curKey) || [];
+        let nxt = null, chosen = null;
+        for (const candidate of outs) {
+          const ek = curKey + '>' + key(candidate[0], candidate[1]);
+          if (!visited.has(ek)) { nxt = candidate; chosen = ek; break; }
+        }
+        if (!nxt) break;
+        visited.add(chosen);
+        cur = nxt;
+      }
+      if (chain.length >= 4) loops.push(chain);
+    }
+  }
+  // 4) 格子坐标 → 世界坐标；再抽稀（每 2 格取一点，去掉共线点），减少描边顶点
+  const worldLoops = loops.map((chain) => {
+    const pts = [];
+    for (const k of chain) {
+      const [i, j] = k.split(',').map(Number);
+      const px = minX + (i - pad + 0.5) * cell;
+      const py = minY + (j - pad + 0.5) * cell;
+      pts.push(o.clone().addScaledVector(u, px).addScaledVector(v, py));
+    }
+    // 去重 + 去共线
+    const clean = [];
+    for (const p of pts) {
+      if (clean.length && clean[clean.length - 1].distanceToSquared(p) < 1e-8) continue;
+      clean.push(p);
+    }
+    // RDP 抽稀（闭合环先找距首点最远的点拆成两段），可靠保留矩形四角与圆孔轮廓
+    const perp = (p, a, b) => {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const l = Math.hypot(dx, dy) || 1;
+      return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / l;
+    };
+    const rdp = (pts, eps) => {
+      if (pts.length <= 2) return pts.slice();
+      let far = 0, idx = 0;
+      for (let i = 1; i < pts.length - 1; i++) {
+        const d = perp(pts[i], pts[0], pts[pts.length - 1]);
+        if (d > far) { far = d; idx = i; }
+      }
+      if (far <= eps) return [pts[0], pts[pts.length - 1]];
+      const left = rdp(pts.slice(0, idx + 1), eps);
+      const right = rdp(pts.slice(idx), eps);
+      return left.slice(0, -1).concat(right);
+    };
+    let split = 1;
+    for (let i = 1; i < clean.length; i++) {
+      if (clean[i].distanceToSquared(clean[0]) > clean[split].distanceToSquared(clean[0])) split = i;
+    }
+    const eps = cell * 0.9;
+    let simp = rdp(clean.slice(0, split + 1), eps).slice(0, -1)
+      .concat(rdp(clean.slice(split).concat([clean[0]]), eps).slice(0, -1));
+    if (simp.length < 3) simp = clean.slice();
+    return simp.length >= 3 ? simp : clean;
+  }).filter((l) => l.length >= 3);
+  // 去掉栅格化残留的单格碎片环（周长 < 8 格）——它们不是真实边界，是三角片擦过格子中心产生的
+  const filtered = worldLoops.filter((lp) => {
+    let per = 0;
+    for (let i = 0; i < lp.length; i++) per += lp[i].distanceTo(lp[(i + 1) % lp.length]);
+    return per > cell * 8;
+  });
+  if (!filtered.length) return null;
+  // 外环 = 包围面积最大的那条
+  let best = filtered[0], bestBox = -1;
+  for (const lp of filtered) {
+    let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+    lp.forEach((p) => { mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x); mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y); });
+    const box = (mxx - mnx) * (mxy - mny);
+    if (box > bestBox) { bestBox = box; best = lp; }
+  }
+  return { loops: filtered, best };
+}
+
+/**
+ * 从命中面提取「整个面」：局部坐标里做共面三角形聚类 + 边界环提取，
+ * 返回值全部为世界坐标。
+ */
+function faceBoundary(obj, hit) {
+  const geo = obj.geometry;
+  const pos = geo && geo.attributes && geo.attributes.position;
+  if (!pos || !hit.face) return null;
+
+  const arr = pos.array;
+  const idx = geo.index;
+  const triCount = idx ? Math.floor(idx.count / 3) : Math.floor(pos.count / 3);
+  if (!triCount) return null;
+
+  const vx = (i) => arr[i * 3];
+  const vy = (i) => arr[i * 3 + 1];
+  const vz = (i) => arr[i * 3 + 2];
+
+  /* 基准三角形的法向与平面常量 */
+  const ia = hit.face.a;
+  const ax = vx(ia), ay = vy(ia), az = vz(ia);
+  const e1x = vx(hit.face.b) - ax, e1y = vy(hit.face.b) - ay, e1z = vz(hit.face.b) - az;
+  const e2x = vx(hit.face.c) - ax, e2y = vy(hit.face.c) - ay, e2z = vz(hit.face.c) - az;
+  let nx = e1y * e2z - e1z * e2y;
+  let ny = e1z * e2x - e1x * e2z;
+  let nz = e1x * e2y - e1y * e2x;
+  const nl = Math.hypot(nx, ny, nz);
+  if (nl < 1e-9) return null;
+  nx /= nl; ny /= nl; nz /= nl;
+  const planeD = nx * ax + ny * ay + nz * az;
+
+  /* 曲面判定①（通用，原生几何）：命中三角三顶点的「平滑顶点法线」若沿面渐变，
+     说明这是圆柱侧面的一小片而非平面。box 等平面体顶点法线纯轴向一致，不受影响。 */
+  const nAttrA = geo.attributes.normal;
+  if (nAttrA) {
+    const nvA = (i) => [nAttrA.getX(i), nAttrA.getY(i), nAttrA.getZ(i)];
+    const v0 = nvA(ia), v1 = nvA(hit.face.b), v2 = nvA(hit.face.c);
+    const d01 = v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2];
+    const d02 = v0[0] * v2[0] + v0[1] * v2[1] + v0[2] * v2[2];
+    const d12 = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+    if (d01 < 0.99995 || d02 < 0.99995 || d12 < 0.99995) return null;
+  }
+
+  /* 一步到位：收集所有与基准三角形共面的三角形 */
+  const COS_TOL = 0.9995;   // 约 1.8° 以内视为同向
+  const DIST_TOL = 0.03;    // mm
+  const picked = [];
+  for (let t = 0; t < triCount; t++) {
+    let i0, i1, i2;
+    if (idx) {
+      i0 = idx.getX(t * 3); i1 = idx.getX(t * 3 + 1); i2 = idx.getX(t * 3 + 2);
+    } else {
+      i0 = t * 3; i1 = t * 3 + 1; i2 = t * 3 + 2;
+    }
+    const x0 = vx(i0), y0 = vy(i0), z0 = vz(i0);
+    if (Math.abs(nx * x0 + ny * y0 + nz * z0 - planeD) > DIST_TOL) continue;
+
+    const ux = vx(i1) - x0, uy = vy(i1) - y0, uz = vz(i1) - z0;
+    const wx = vx(i2) - x0, wy = vy(i2) - y0, wz = vz(i2) - z0;
+    const cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+    const cl = Math.hypot(cx, cy, cz);
+    if (cl < 1e-9) continue;
+    if ((cx * nx + cy * ny + cz * nz) / cl < COS_TOL) continue;
+    picked.push(i0, i1, i2);
+  }
+  if (picked.length < 3) return null;
+
+  /* —— 碎片/窄条拒绝③（通用）——
+     孔沿、相贯线、圆角过渡处常被聚类出「面积很小的一窄条」共面三角，
+     看起来像一段悬空的橙色碎弧 + 箭头 = 用户反感的「界面碎片」。
+     真正的可拉伸平面（顶盖、底面、立方体各面）面积都不会小；
+     这里用「面片面积占物体表面积的比例」+「细长比」双重门槛剔除碎片。 */
+  {
+    const totalTri = triCount;
+    // 估算整个网格表面积（取绝对值之和，含内表面，够用）
+    let wholeArea = 0;
+    for (let t = 0; t < totalTri; t++) {
+      const i0 = idx ? idx.getX(t * 3) : t * 3;
+      const i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1;
+      const i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+      const ux = vx(i1) - vx(i0), uy = vy(i1) - vy(i0), uz = vz(i1) - vz(i0);
+      const wx = vx(i2) - vx(i0), wy = vy(i2) - vy(i0), wz = vz(i2) - vz(i0);
+      const cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+      wholeArea += 0.5 * Math.hypot(cx, cy, cz);
+    }
+    // 选中面片面积
+    let patchArea = 0;
+    for (let i = 0; i < picked.length; i += 3) {
+      const i0 = picked[i], i1 = picked[i + 1], i2 = picked[i + 2];
+      const ux = vx(i1) - vx(i0), uy = vy(i1) - vy(i0), uz = vz(i1) - vz(i0);
+      const wx = vx(i2) - vx(i0), wy = vy(i2) - vy(i0), wz = vz(i2) - vz(i0);
+      const cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+      patchArea += 0.5 * Math.hypot(cx, cy, cz);
+    }
+    const areaRatio = wholeArea > 0 ? patchArea / wholeArea : 0;
+    if (areaRatio < 0.012) return null;   // 选中片不足整体表面积 1.2% → 判为碎片窄条
+  }
+
+  /* —— 曲面片拒绝②（仅布尔复合体 solid）——
+     solid 是三角形汤：同一小片的顶点法线被平滑成一致，判定①无效。
+     实测：圆柱侧面每片仅 2 个共面三角，顶盖有 268 个。
+     故用「共面片很小 + 存在小角度渐变邻面」识别曲面小片；
+     原生几何（box 等）走判定①，不进这里，避免窄面被误伤。 */
+  const descKind = obj.userData && obj.userData.desc && obj.userData.desc.kind;
+  const coTri = picked.length / 3;
+  if (descKind === 'solid' && coTri <= 3) {
+    const pickedSet = new Set();
+    for (let k = 0; k < picked.length; k++) pickedSet.add(picked[k]);
+    let smoothNeighbor = false;
+    for (let t = 0; t < triCount; t++) {
+      const i0 = idx ? idx.getX(t * 3) : t * 3;
+      const i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1;
+      const i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+      if (pickedSet.has(i0) && pickedSet.has(i1) && pickedSet.has(i2)) continue;  // 跳过本片
+      const ux2 = vx(i1) - vx(i0), uy2 = vy(i1) - vy(i0), uz2 = vz(i1) - vz(i0);
+      const wx2 = vx(i2) - vx(i0), wy2 = vy(i2) - vy(i0), wz2 = vz(i2) - vz(i0);
+      let cx = uy2 * wz2 - uz2 * wy2, cy = uz2 * wx2 - ux2 * wz2, cz = ux2 * wy2 - uy2 * wx2;
+      const cl = Math.hypot(cx, cy, cz);
+      if (cl < 1e-9) continue;
+      const d = (cx * nx + cy * ny + cz * nz) / cl;
+      if (d > 0.94 && d < 0.999) { smoothNeighbor = true; break; }  // 小角度渐变邻面 = 曲面
+    }
+    if (smoothNeighbor) return null;
+  }
+
+  /* —— 干净轮廓：栅格化 + 摩尔邻域追踪 ——
+     不再按三角边出现次数找边界：CSG 三角汤里的 T 结点会把内部扇射三角边
+     误判为边界，从孔沿向顶点放射出橙色碎片线（反复出现的历史 bug）。
+     改为把共面三角投影到面局部 2D 光栅化，只追「填充格↔空格」的交界，
+     内部三角剖分完全不影响结果，孔自动成为内环。一劳永逸。 */
+  obj.updateMatrixWorld();
+  const mw = obj.matrixWorld;
+  const worldNormal = new THREE.Vector3(nx, ny, nz)
+    .applyMatrix3(new THREE.Matrix3().getNormalMatrix(mw)).normalize();
+  const traced = rasterFaceLoops(picked, vx, vy, vz, mw, worldNormal);
+  if (!traced) return null;
+  const loop = traced.best;
+  const loopsWorld = traced.loops;
+
+  const fillCoords = [];
+  for (let j = 0; j < picked.length; j += 3) {
+    for (let k = 0; k < 3; k++) {
+      const vi = picked[j + k];
+      const w = new THREE.Vector3(vx(vi), vy(vi), vz(vi)).applyMatrix4(mw);
+      fillCoords.push(w.x, w.y, w.z);
+    }
+  }
+  const normal = new THREE.Vector3(nx, ny, nz)
+    .applyMatrix3(new THREE.Matrix3().getNormalMatrix(mw))
+    .normalize();
+  const center = new THREE.Vector3();
+  loop.forEach((p) => center.add(p));
+  center.multiplyScalar(1 / loop.length);
+
+  return { loop, normal, center, loopsWorld, fillCoords };
+}
+
+/** 以法向为 z 轴建立正交平面基 */
+function planeBasis(normal) {
+  const n = normal.clone().normalize();
+  const ref = Math.abs(n.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const u = new THREE.Vector3().crossVectors(ref, n);
+  if (u.lengthSq() < 1e-9) u.set(1, 0, 0);
+  u.normalize();
+  const v = new THREE.Vector3().crossVectors(n, u).normalize();
+  return { u, v, n };
+}
+
+/** 任意 3D 平面多边形 → 网格（ShapeGeometry 三角剖分后贴回原平面） */
+function polygonGeometry(loopWorld, normal, offset = 0) {
+  if (loopWorld.length < 3) return new THREE.BufferGeometry();
+  const { u, v, n } = planeBasis(normal);
+  const c = new THREE.Vector3();
+  loopWorld.forEach((p) => c.add(p));
+  c.multiplyScalar(1 / loopWorld.length).addScaledVector(n, offset);
+  const pts = loopWorld.map((p) => {
+    const d = p.clone().sub(c);
+    return new THREE.Vector2(d.dot(u), d.dot(v));
+  });
+  const geo = new THREE.ShapeGeometry(new THREE.Shape(pts));
+  geo.applyMatrix4(new THREE.Matrix4().makeBasis(u, v, n).setPosition(c));
+  return geo;
+}
+
+/** 整面高亮：铺满所有共面三角 + 描出所有边界环（沿法向抬一点防闪烁） */
+function buildFaceHighlight(loopWorld, normal, loopsWorld, fillCoords) {
+  clearGroup(faceGroup);
+  const off = FACE_OFF;
+  // 1) 面填充：优先用所有共面三角整片铺满（CSG 拆成多片时也能选中整个面）
+  if (fillCoords && fillCoords.length >= 9) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(fillCoords, 3));
+    g.computeVertexNormals();
+    const fill = new THREE.Mesh(g, faceFillMat());
+    fill.position.addScaledVector(normal, off);
+    fill.renderOrder = 3;
+    faceGroup.add(fill);
+  } else {
+    const fill = new THREE.Mesh(polygonGeometry(loopWorld, normal, off), faceFillMat());
+    fill.renderOrder = 3;
+    faceGroup.add(fill);
+  }
+  // 2) 边界描边：把每个闭合环都描出来（整个面的真实轮廓）
+  const rings = (loopsWorld && loopsWorld.length) ? loopsWorld : [loopWorld];
+  rings.forEach((ring) => {
+    if (!ring || ring.length < 3) return;
+    const lp = ring.map((p) => p.clone().addScaledVector(normal, off));
+    lp.push(lp[0].clone());
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(lp),
+      new THREE.LineBasicMaterial({ color: FACE_C })
+    );
+    line.renderOrder = 4;
+    faceGroup.add(line);
+  });
+  /* 不再画法向小箭头：它是「界面碎片」观感的主要来源，3D One 也不在面上插箭头 */
+}
+
+/* ============================================================================
+   08 · 草图绘制（线段 / 矩形 / 圆 / 椭圆 / 正多边形）
+   ----------------------------------------------------------------------------
+   · 线段：逐点点击绘线，回到起点（或按 Enter）闭合
+   · 矩形 / 圆 / 椭圆 / 正多边形：按住左键拖出尺寸，松开即生成
+   不管用哪种工具，结果都是同一件事：XZ 平面上一组闭合的轮廓点，
+   所以后面的「线 → 面 → 体」拉伸流程对它们完全通用。
+   ========================================================================== */
+function renderDraft() {
+  clearGroup(draftGroup);
+  const d = state.draft;
+  if (!d || !d.points.length) return;
+  const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+  const u = new THREE.Vector3().fromArray(sp.u);
+  const v = new THREE.Vector3().fromArray(sp.v);
+  const n = new THREE.Vector3().fromArray(sp.n);
+  const o = new THREE.Vector3().fromArray(sp.o || [0, 0, 0]);
+  /* 关键：补上平面原点 o —— 否则草稿以世界原点为基准，确认后才 obj.position=o 跳到所选平面 */
+  const at = (x, y) => o.clone()
+    .addScaledVector(u, x).addScaledVector(v, y).addScaledVector(n, 0.08);
+  const pts = d.points.map(([x, y]) => at(x, y));
+  const isLine = (d.type || 'line') === 'line';
+  const lineMat = new THREE.LineBasicMaterial({ color: SKETCH_C });
+
+  if (isLine) {
+    if (pts.length > 1) {
+      draftGroup.add(sketchStroke(pts, n));
+      draftGroup.add(sketchNodes(pts, n));
+    }
+    /* 橡皮筋：最后一点 → 自动吸附到 5mm 格点的落点（带锚定提示） */
+    if (state.hoverPoint && !state.closeReady) {
+      const last = pts[pts.length - 1];
+      const [hx, hy] = worldToPlane2D(state.hoverPoint);
+      const gx = snap(hx), gy = snap(hy);
+      const hp = at(gx, gy);
+      state.segHoverLocal = [gx, gy];
+      if (last.distanceTo(hp) > 0.5) {
+        const lastLocal = d.points[d.points.length - 1];
+        const ortho = lastLocal[0] === gx || lastLocal[1] === gy;
+        const rubber = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([last, hp]),
+          new THREE.LineDashedMaterial({
+            color: ortho ? 0x8b5cf6 : ACCENT, dashSize: 3, gapSize: 3,
+            transparent: true, opacity: 0.9
+          })
+        );
+        rubber.computeLineDistances();
+        draftGroup.add(rubber);
+
+        /* 格点锚定提示：小圆环准星；与起点水平/垂直时变紫并延长虚线 */
+        const marker = new THREE.Mesh(
+          new THREE.RingGeometry(1.5, 2.5, 20),
+          new THREE.MeshBasicMaterial({
+            color: ortho ? 0x8b5cf6 : ACCENT, transparent: true, opacity: 0.95,
+            side: THREE.DoubleSide, depthWrite: false
+          })
+        );
+        marker.position.copy(hp).addScaledVector(n, 0.03);
+        marker.lookAt(n);
+        draftGroup.add(marker);
+        if (ortho) {
+          const ext = at(gx + (lastLocal[0] === gx ? 0 : 6), gy + (lastLocal[1] === gy ? 0 : 6));
+          const guide = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([hp, ext]),
+            new THREE.LineDashedMaterial({ color: 0x8b5cf6, dashSize: 2.5, gapSize: 2.5, transparent: true, opacity: 0.75 })
+          );
+          guide.computeLineDistances();
+          draftGroup.add(guide);
+        }
+      }
+    } else {
+      state.segHoverLocal = null;
+    }
+    /* 不渲染采样顶点：线段轮廓只保留连线，起点闭合提示环保留 */
+    /* 起点闭合提示 */
+    if (pts.length >= 3) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(2.4, 3.6, 26),
+        new THREE.MeshBasicMaterial({
+          color: state.closeReady ? FACE_C : ACCENT,
+          transparent: true, opacity: state.closeReady ? 0.95 : 0.3,
+          depthWrite: false, side: THREE.DoubleSide
+        })
+      );
+      ring.lookAt(n);   // 圆环立到绘制平面上
+      ring.position.copy(pts[0]).addScaledVector(n, 0.02);
+      draftGroup.add(ring);
+    }
+    return;
+  }
+
+  /* —— 拖拽类形状：闭合折线 + 半透明填充 —— */
+  if (pts.length < 3) return;
+  const loop = [...pts, pts[0].clone()];
+  draftGroup.add(sketchStroke(loop, n));
+  if (pts.length <= 12) draftGroup.add(sketchNodes(pts, n));
+  const fill = new THREE.Mesh(
+    polygonGeometry(pts, n, 0.01),
+    new THREE.MeshBasicMaterial({ color: SKETCH_FILL_C, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false })
+  );
+  draftGroup.add(fill);
+}
+
+/** 逐点绘制时追加一个点（仅线段工具）：世界点 → 绘制平面局部坐标 */
+function addSketchPoint(worldP) {
+  const [px, py] = worldToPlane2D(worldP);
+  const x = snap(px);
+  const y = snap(py);
+  if (!state.draft || state.draft.type !== 'line') state.draft = { type: 'line', points: [] };
+  const pts = state.draft.points;
+
+  /* 回到起点 → 闭合 */
+  if (pts.length >= 3) {
+    const [fx, fy] = pts[0];
+    if (Math.hypot(x - fx, y - fy) < 1e-6) { closeSketch(); return; }
+  }
+  /* 去重 */
+  const last = pts[pts.length - 1];
+  if (last && last[0] === x && last[1] === y) return;
+
+  pts.push([x, y]);
+  state.closeReady = false;
+  renderDraft();
+  /* 两点即成线：第二点落下就结束绘制，提交为开放线段（无需双击） */
+  if (pts.length === 2) {
+    const linePts = pts.map((p) => [...p]);
+    state.draft = null;
+    clearGroup(draftGroup);
+    commitSketch(linePts, null, false);
+    updateFirstRun();
+  }
+}
+
+/**
+ * 由「起点 + 当前点」算出形状的轮廓点集
+ * 矩形：对角两点；圆：圆心+半径；椭圆：中心+长短轴；正多边形：中心+外接圆
+ */
+function shapePoints(type, sx, sz, cx, cz, sides) {
+  const dx = cx - sx, dz = cz - sz;
+  const out = [];
+
+  if (type === 'sketch-rect') {
+    const w = Math.abs(dx), d = Math.abs(dz);
+    if (w < 1 || d < 1) return [];
+    const x0 = Math.min(sx, cx), x1 = Math.max(sx, cx);
+    const z0 = Math.min(sz, cz), z1 = Math.max(sz, cz);
+    return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  }
+
+  if (type === 'sketch-circle') {
+    const r = Math.max(2, Math.round(Math.hypot(dx, dz) / SNAP) * SNAP);
+    const seg = 160;   // 高密度采样，视觉上光滑（无明显折线感）
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      out.push([round1(sx + Math.cos(a) * r), round1(sz + Math.sin(a) * r)]);
+    }
+    return out;
+  }
+
+  if (type === 'sketch-ellipse') {
+    const rx = Math.max(2, Math.round(Math.abs(dx) / SNAP) * SNAP);
+    const rz = Math.max(2, Math.round(Math.abs(dz) / SNAP) * SNAP);
+    const seg = 160;   // 高密度采样，视觉上光滑
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      out.push([round1(sx + Math.cos(a) * rx), round1(sz + Math.sin(a) * rz)]);
+    }
+    return out;
+  }
+
+  if (type === 'sketch-poly') {
+    const r = Math.max(2, Math.round(Math.hypot(dx, dz) / SNAP) * SNAP);
+    const k = Math.max(3, Math.min(12, sides || 6));
+    const a0 = Math.atan2(dz, dx);          // 让一个顶点朝向鼠标
+    for (let i = 0; i < k; i++) {
+      const a = a0 + (i / k) * Math.PI * 2;
+      out.push([round1(sx + Math.cos(a) * r), round1(sz + Math.sin(a) * r)]);
+    }
+    return out;
+  }
+
+  return out;
+}
+
+/** 拖拽类形状：按下 */
+function startShapeSketch(e) {
+  const p = planePoint(e);
+  if (!p) return;
+  const [x, y] = worldToPlane2D(p);
+  state.draft = { type: state.tool, points: [], start: [snap(x), snap(y)] };
+  renderDraft();
+}
+
+/** 拖拽类形状：移动中（实时预览） */
+function updateShapeSketch(e) {
+  const d = state.draft;
+  if (!d || !d.start) return;
+  const p = planePoint(e);
+  if (!p) return;
+  const [x, y] = worldToPlane2D(p);
+  const pts = shapePoints(d.type, d.start[0], d.start[1], snap(x), snap(y), state.polyN);
+  d.points = pts;
+  renderDraft();
+}
+
+/** 拖拽类形状：松开 → 生成闭合草图 */
+function finishShapeSketch() {
+  const d = state.draft;
+  if (!d || !d.start) { cancelDraft(); return; }
+  if (!d.points || d.points.length < 3) {
+    cancelDraft();
+    toast('拖拽范围太小，再拖大一点');
+    return;
+  }
+  commitSketch(d.points);
+}
+
+/** 生成草图对象（所有草图工具的公共出口）：点集存绘制平面局部坐标 */
+function commitSketch(points, tip, closed = true) {
+  if (!points || points.length < (closed ? 3 : 2)) {
+    return toast(closed ? '至少需要 3 个点才能闭合' : '至少需要 2 个点才能成线');
+  }
+  beginEdit();
+  const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], isGround: true };
+  const desc = {
+    kind: 'sketch',
+    pos: [...sp.o],
+    points: points.map((p) => [...p]),
+    closed,
+    plane: { o: [...sp.o], u: [...sp.u], v: [...sp.v], n: [...sp.n], isGround: !!sp.isGround },
+    hostUid: sp.hostUid == null ? null : sp.hostUid   /* 草图画在实体表面时，记住母体（供加/减/交用） */
+  };
+  state.draft = null;
+  state.closeReady = false;
+  clearGroup(draftGroup);
+  const obj = buildObject(desc);
+  setMode('object');
+  clearSegOverlay();
+  select(obj);
+  commitEdit();
+  if (!closed) segObj = obj;   // 线段：显示长度标签，可输入精确值 / 绿勾确定
+  updateFirstRun();
+  updateStatus();
+  toast(tip || (closed
+    ? '闭合草图已成面（蓝色阴影）：点它或右侧面板都能拉伸成实体'
+    : '线段已生成：选中它，可拉伸成面'));
+}
+
+function closeSketch() {
+  const pts = state.draft && state.draft.points;
+  if (!pts || pts.length < 3) return toast('至少需要 3 个点才能闭合');
+  commitSketch(pts);
+}
+
+function cancelDraft() {
+  state.draft = null;
+  state.closeReady = false;
+  state.segHoverLocal = null;
+  clearGroup(draftGroup);
+}
+
+/* ============================================================================
+   08.5 · 线段长度浮层
+   · 绘制中：橡皮筋中点显示实时长度（端点已吸附 5mm 格点）
+   · 成线后：点白色标签可输入精确长度，点绿色对勾确定
+   ========================================================================== */
+const segLayer = $('segLayer'), segLenTag = $('segLenTag'), segConfirm = $('segConfirm');
+let segObj = null;          // 刚生成、还没点绿勾的线段
+let segEditing = false;
+
+function planeLocalWorld(sp, x, y, lift = 0) {
+  return new THREE.Vector3().fromArray(sp.o || [0, 0, 0])
+    .addScaledVector(new THREE.Vector3().fromArray(sp.u), x)
+    .addScaledVector(new THREE.Vector3().fromArray(sp.v), y)
+    .addScaledVector(new THREE.Vector3().fromArray(sp.n || [0, 0, 1]), lift);
+}
+
+function clearSegOverlay() {
+  segObj = null;
+  segEditing = false;
+  segLenTag.classList.remove('editing');
+  segLayer.classList.remove('show');
+}
+
+/** 每帧跟随相机更新长度标签位置与数值 */
+function updateSegOverlay() {
+  if (segEditing) { segLayer.classList.add('show'); return; }
+  let a = null, b = null, editable = false;
+  if (segObj) {
+    if (state.selected !== segObj || state.mode !== 'object') { clearSegOverlay(); }
+    else {
+      const d = segObj.userData.desc;
+      const sp = d.plane || { o: d.pos, u: [1,0,0], v: [0,1,0], n: [0,0,1] };
+      a = planeLocalWorld(sp, d.points[0][0], d.points[0][1]);
+      b = planeLocalWorld(sp, d.points[1][0], d.points[1][1]);
+      editable = true;
+    }
+  }
+  if (!a && state.mode === 'sketch' && state.draft && state.draft.type === 'line'
+      && state.draft.points.length === 1 && state.segHoverLocal && state.hoverPoint) {
+    const sp = state.sketchPlane || { o: [0,0,0], u: [1,0,0], v: [0,1,0], n: [0,0,1] };
+    a = planeLocalWorld(sp, state.draft.points[0][0], state.draft.points[0][1]);
+    b = planeLocalWorld(sp, state.segHoverLocal[0], state.segHoverLocal[1]);
+  }
+  if (!a || !b) { segLayer.classList.remove('show'); return; }
+  const sa = projectToScreen(a), sb = projectToScreen(b);
+  const len = a.distanceTo(b);
+  segLenTag.style.left = ((sa.x + sb.x) / 2) + 'px';
+  segLenTag.style.top = ((sa.y + sb.y) / 2 - 18) + 'px';
+  segLenTag.innerHTML = len.toFixed(1) + '<span class="u"> mm</span>';
+  segLenTag._len = len;
+  segConfirm.style.left = (sb.x + 24) + 'px';
+  segConfirm.style.top = (sb.y - 6) + 'px';
+  segConfirm.style.display = editable ? '' : 'none';
+  segLayer.classList.add('show');
+}
+
+segLenTag.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!segObj || segEditing) return;
+  segEditing = true;
+  segConfirm.style.display = 'none';
+  segLenTag.innerHTML = `<input type="number" step="1" min="1" value="${round1(segLenTag._len || 1)}">`;
+  const input = segLenTag.querySelector('input');
+  input.focus(); input.select();
+  const finish = (commit) => {
+    if (!segEditing) return;
+    const v = commit ? parseFloat(input.value) : NaN;
+    segEditing = false;
+    if (isFinite(v) && v > 0 && segObj) {
+      const d = segObj.userData.desc;
+      const [x0, y0] = d.points[0], [x1, y1] = d.points[1];
+      const dx = x1 - x0, dy = y1 - y0;
+      const old = Math.hypot(dx, dy);
+      if (old > 0) {
+        beginEdit();
+        d.points[1] = [round1(x0 + dx / old * v), round1(y0 + dy / old * v)];
+        updateObject(segObj);
+        commitEdit();
+        syncPanel();
+        toast('线段长度已改为 ' + round1(v) + ' mm');
+      }
+    }
+    updateSegOverlay();
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+});
+
+segConfirm.addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearSegOverlay();
+  toast('线段长度已确定');
+});
+
+/* ============================================================================
+   09 · 基础实体拖拽放置
+   ========================================================================== */
+function startPlacement(e) {
+  const p = groundPoint(e);
+  if (!p) return;
+  state.placing = {
+    kind: state.tool,
+    start: new THREE.Vector3(snap(p.x), snap(p.y), 0),
+    size: 20
+  };
+  updateGhost();
+}
+
+function updatePlacement(e) {
+  const p = groundPoint(e);
+  const pl = state.placing;
+  if (!p || !pl) return;
+  const dist = Math.hypot(p.x - pl.start.x, p.y - pl.start.y) * 2;
+  pl.size = Math.max(5, snap(dist));
+  updateGhost();
+}
+
+/** 由工具类型 + 拖拽尺寸 s 生成基本体的 desc（放置与预览共用，保证形状一致） */
+function primitiveDesc(kind, s, pos) {
+  const r = round1(s / 2);
+  switch (kind) {
+    case 'box': return { kind: 'box', pos, params: { w: s, h: s, d: s } };
+    case 'sphere': return { kind: 'sphere', pos, params: { r } };
+    case 'torus': return { kind: 'torus', pos, params: { R: round1(s * 0.36), r: round1(s * 0.14) } };
+    case 'cone': return { kind: 'cone', pos, params: { r, h: s } };
+    case 'ellipsoid': return { kind: 'ellipsoid', pos, params: { a: r, b: r, c: round1(s * 0.32) } };
+    case 'pyramid': return { kind: 'pyramid', pos, params: { r: round1(s * 0.7), h: s } };
+    case 'frustum': return { kind: 'frustum', pos, params: { r1: r, r2: round1(s * 0.28), h: s } };
+    default: return { kind: 'cylinder', pos, params: { r, h: s } };
+  }
+}
+
+/** 拖拽过程中的半透明预览 */
+function updateGhost() {
+  clearGroup(ghostGroup);
+  const pl = state.placing;
+  if (!pl) return;
+  const s = pl.size;
+  const desc = primitiveDesc(pl.kind, s, [pl.start.x, pl.start.y, s / 2]);
+  const geo = makeGeometry(desc);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: ACCENT, transparent: true, opacity: 0.16, depthWrite: false
+  }));
+  mesh.position.set(pl.start.x, pl.start.y, s / 2);
+  ghostGroup.add(mesh);
+
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 24),
+    new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.85 })
+  );
+  edge.position.copy(mesh.position);
+  ghostGroup.add(edge);
+}
+
+function finishPlacement() {
+  const pl = state.placing;
+  state.placing = null;
+  clearGroup(ghostGroup);
+  if (!pl) return;
+
+  const s = Math.max(5, pl.size);
+  const pos = [pl.start.x, pl.start.y, round1(s / 2)];
+  const desc = primitiveDesc(pl.kind, s, pos);
+
+  beginEdit();
+  const obj = buildObject(desc);
+  select(obj);
+  commitEdit();
+  setTool('select');   // 放完一个自动退回选择模式，避免后续单击连续冒出新实体
+  desc.dimPending = true;   // 本次放置待确定：显示箭头/标签，点「确定」后永久收起
+  applyBodyAppearance(obj);   // 待确定期间用透明浅绿预览
+  updateFirstRun();
+  updateStatus();
+  toast('已放置' + (PRIMITIVES[pl.kind] ? PRIMITIVES[pl.kind].label : '实体'));
+}
+
+/* ============================================================================
+   10 · 拉伸：线 → 面 / 面 → 体（含加 / 减 / 交运算）
+   ----------------------------------------------------------------------------
+   「面 → 体」的完整链路：
+     1. faceBoundary() 把整个面识别成一条闭合轮廓（世界坐标）
+     2. faceExtrudeDesc() 把轮廓转成平面局部坐标，生成沿法向的拉伸描述
+     3. 按用户选的运算方式落地：
+          new（新建实体）→ 直接生成一个新实体
+          add（加运算）  → 与原实体做并集，合并成一个
+          sub（减运算）  → 从原实体里挖掉
+          int（交运算）  → 只保留重叠部分
+   ========================================================================== */
+/** 草图 → 实体（薄板→柱体）：闭合轮廓沿绘制平面法向挤出 depth */
+function sketchToPlate(sketchDesc, thickness) {
+  const pts = sketchDesc.points;
+  let cx = 0, cy = 0;
+  pts.forEach(([x, y]) => { cx += x; cy += y; });
+  cx /= pts.length; cy /= pts.length;
+  const { u, v, n } = sketchBasis(sketchDesc);
+  const o = new THREE.Vector3().fromArray(sketchDesc.pos || [0, 0, 0])
+    .addScaledVector(u, cx).addScaledVector(v, cy);
+  return {
+    kind: 'plate',
+    pos: [round1(o.x), round1(o.y), round1(o.z)],
+    params: { depth: thickness },
+    profile: pts.map(([x, y]) => [round1(x - cx), round1(y - cy)]),
+    tone: sketchDesc.tone
+  };
+}
+
+/**
+ * 开放线条 → 面：折线沿给定方向扫掠出高度，得到一张无厚度的带状平面。
+ * 基准边始终贴在草图平面上，沿方向向量 D 平移得到另一条边 ——
+ * 每一段都是「基准点 / 基准点+D·h」构成的平行四边形，必然共面，
+ * 所以即使 D 不垂直于草图平面（用户拾取的任意方向）几何也有效。
+ * @param dirSign  1 = 正向 / -1 = 反向
+ * @param dirVec   用户拾取的方向（世界坐标，可空 = 默认沿草图平面法向）
+ */
+function linesToSheetDir(sketchDesc, height, dirSign, dirVec) {
+  const pts = sketchDesc.points;
+  let cx = 0, cy = 0;
+  pts.forEach(([x, y]) => { cx += x; cy += y; });
+  cx /= pts.length; cy /= pts.length;
+  const { u, v, n } = sketchBasis(sketchDesc);
+  const D = (dirVec ? dirVec.clone() : n.clone()).normalize();
+  if (dirSign < 0) D.negate();
+  const o = new THREE.Vector3().fromArray(sketchDesc.pos || [0, 0, 0])
+    .addScaledVector(u, cx).addScaledVector(v, cy);
+  return {
+    kind: 'sheet',
+    pos: [round1(o.x), round1(o.y), round1(o.z)],
+    params: { height: Math.max(MIN_SIZE, height) },
+    profile: pts.map(([x, y]) => [round1(x - cx), round1(y - cy)]),
+    basis: { u: u.toArray(), v: v.toArray(), n: [round1(D.x), round1(D.y), round1(D.z)] },
+    hostUid: sketchDesc.hostUid == null ? null : sketchDesc.hostUid,
+    tone: sketchDesc.tone
+  };
+}
+
+/** 兼容旧调用：默认沿草图平面法向正向拉伸 */
+function linesToSheet(sketchDesc, height) {
+  return linesToSheetDir(sketchDesc, height, 1, null);
+}
+
+/** 草图实时预览：闭合轮廓出实体预览，开放线条出带状面预览 */
+function previewSketchGhost(sketchDesc, height) {
+  clearGroup(ghostGroup);
+  const target = sketchDesc.closed
+    ? sketchToPlate(sketchDesc, Math.max(MIN_SIZE, height))
+    : linesToSheet(sketchDesc, height);
+  const geo = makeGeometry(target);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: ACCENT, transparent: true, opacity: 0.16, depthWrite: false,
+    side: THREE.DoubleSide
+  }));
+  mesh.position.set(target.pos[0], target.pos[1], target.pos[2]);
+  ghostGroup.add(mesh);
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 24),
+    new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.85 })
+  );
+  edge.position.copy(mesh.position);
+  ghostGroup.add(edge);
+}
+
+/** 去掉环里重复的相邻点（CSG 后的顶点常有重合点） */
+function dedupeRing(pts) {
+  const out = [];
+  for (const p of pts) {
+    const last = out[out.length - 1];
+    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) > 1e-3) out.push(p);
+  }
+  if (out.length > 1) {
+    const a = out[0], b = out[out.length - 1];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) <= 1e-3) out.pop();
+  }
+  return out;
+}
+
+/**
+ * 由「选中面」生成沿法向的拉伸描述
+ * @param height   高度（正值，方向由 dir 决定）
+ * @param dir      1 = 正向（沿法向），-1 = 反向（扎进去）
+ * @param weld     是否与母体轻微重叠（布尔运算前必须，避免共面导致的破面）
+ * @param customDir 用户拾取的拉伸方向（世界坐标，可空 = 默认沿面法向）
+ */
+function faceExtrudeDesc(boundary, height, dir, weld, customDir) {
+  const n = (customDir ? customDir.clone() : boundary.normal.clone()).normalize();
+  const { u, v } = planeBasis(n);
+  const c = boundary.center.clone();
+
+  let pts = boundary.loop.map((p) => {
+    const d = p.clone().sub(c);
+    return [d.dot(u), d.dot(v)];
+  });
+  pts = dedupeRing(pts);
+  if (pts.length < 3) return null;
+
+  /* 统一成逆时针：ExtrudeGeometry 的挤出方向才等于 +n */
+  let area = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+  if (area < 0) pts.reverse();
+
+  const thickness = Math.max(MIN_SIZE, Math.abs(height));
+  const back = dir < 0 ? -thickness : 0;        // 反向：底面挪到法向的另一侧
+  const weldOff = weld ? -WELD : 0;             // 焊接：整体再往母体里压一点点
+  const origin = c.clone().addScaledVector(n, back + weldOff);
+
+  return {
+    kind: 'extrude',
+    pos: [origin.x, origin.y, origin.z],
+    params: { depth: thickness + (weld ? WELD : 0) },
+    basis: { u: u.toArray(), v: v.toArray(), n: n.toArray() },
+    pts2d: pts.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]),
+    tone: (state.selected && state.selected.userData.desc.tone) || 0
+  };
+}
+
+/** 拉伸体预览（半透明蓝色） */
+function previewExtrudeGhost(desc) {
+  clearGroup(ghostGroup);
+  if (!desc) return;
+  const geo = makeGeometry(desc);
+  if (!geo.attributes.position) return;
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: ACCENT, transparent: true, opacity: 0.2, depthWrite: false, roughness: 0.4
+  }));
+  mesh.position.fromArray(desc.pos);
+  ghostGroup.add(mesh);
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 24),
+    new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+  );
+  edge.position.copy(mesh.position);
+  ghostGroup.add(edge);
+}
+
+/* ---------- 布尔运算（three-bvh-csg） ---------- */
+/** 把描述对象实例化成「世界坐标」几何 */
+function worldGeometryOf(desc) {
+  const g = makeGeometry(desc);
+  g.applyMatrix4(new THREE.Matrix4().makeTranslation(desc.pos[0], desc.pos[1], desc.pos[2]));
+  return g;
+}
+
+/**
+ * 草图布尔的母体（规则A）：
+ *   1) 画在实体表面 → 用记录的宿主实体 uid
+ *   2) 画在地面网格 → 取场景中距离草图最近的实体
+ *   3) 场景没有可用实体 → 返回 null（调用方一步到位退化为「新建实体」）
+ */
+function findSketchBooleanHost(sketchObj, sDesc) {
+  const candidates = modelGroup.children.filter((o) =>
+    o !== sketchObj && o.userData.desc &&
+    o.userData.desc.kind !== 'sketch' && o.userData.desc.kind !== 'sheet');
+  if (!candidates.length) return null;
+  if (sDesc.hostUid != null) {
+    const host = candidates.find((o) => o.userData.desc.uid === sDesc.hostUid);
+    if (host) return host;
+  }
+  const p = new THREE.Vector3().fromArray(sDesc.pos || [0, 0, 0]);
+  const c = new THREE.Vector3();
+  let best = null, bd = Infinity;
+  candidates.forEach((o) => {
+    new THREE.Box3().setFromObject(o).getCenter(c);
+    const d = c.distanceToSquared(p);
+    if (d < bd) { bd = d; best = o; }
+  });
+  return best;
+}
+
+/**
+ * 用 descB 对 objA 做布尔运算，返回可序列化的几何（objA 局部坐标）
+ * 结果保存成顶点表，所以撤销 / 重开都能原样还原。
+ */
+function booleanWith(objA, descB, op) {
+  if (!CSG || !csgEvaluator) throw new Error('布尔运算库未加载（需联网）');
+
+  objA.updateMatrixWorld();
+  const geoA = objA.geometry.clone();
+  geoA.applyMatrix4(objA.matrixWorld);
+  const geoB = worldGeometryOf(descB);
+
+  const mat = new THREE.MeshStandardMaterial();
+  const brushA = new CSG.Brush(geoA, mat);
+  brushA.updateMatrixWorld();
+  const brushB = new CSG.Brush(geoB, mat);
+  brushB.updateMatrixWorld();
+
+  const opConst = op === 'add' ? CSG.ADDITION : op === 'sub' ? CSG.SUBTRACTION : CSG.INTERSECTION;
+  const result = csgEvaluator.evaluate(brushA, brushB, opConst);
+  const g = result.geometry;
+  const posAttr = g.attributes && g.attributes.position;
+  if (!posAttr || posAttr.count < 3) throw new Error('运算结果为空');
+
+  /* 世界坐标 → objA 局部坐标（本工具的实体只有平移） */
+  const ox = objA.position.x, oy = objA.position.y, oz = objA.position.z;
+  const p = [];
+  for (let i = 0; i < posAttr.count; i++) {
+    p.push(
+      Math.round((posAttr.getX(i) - ox) * 100) / 100,
+      Math.round((posAttr.getY(i) - oy) * 100) / 100,
+      Math.round((posAttr.getZ(i) - oz) * 100) / 100
+    );
+  }
+  const i = g.index ? Array.from(g.index.array) : null;
+
+  /* 保留 CSG 自带的平滑顶点法线：圆柱侧面法线沿圆周连续渐变（点积≈0.9988），
+     切面/端盖法线一致。曲面判定①靠它识别曲面小片；渲染也更光滑。
+     法线是方向（平移不影响），保留 4 位精度即可。 */
+  const nAttr = g.attributes && g.attributes.normal;
+  let n = null;
+  if (nAttr && nAttr.count === posAttr.count) {
+    n = [];
+    for (let k = 0; k < nAttr.count; k++) {
+      n.push(
+        Math.round(nAttr.getX(k) * 10000) / 10000,
+        Math.round(nAttr.getY(k) * 10000) / 10000,
+        Math.round(nAttr.getZ(k) * 10000) / 10000
+      );
+    }
+  }
+
+  geoA.dispose();
+  geoB.dispose();
+  return { p, i, n };
+}
+
+/**
+ * 实体间布尔运算（左工具栏三卡片）：A 为母体，B 为运算工具，结果替换 A、消耗 B。
+ * op: add=并集 A∪B / sub=差集 A−B / int=交集 A∩B
+ */
+function entityBoolean(op) {
+  if (!CSG || !csgEvaluator) return toast('布尔运算库未加载（需联网）');
+  const a = state.selected, b = state.selectedB;
+  const ok = a && b && a !== b && a.userData.desc && b.userData.desc
+    && a.userData.desc.kind !== 'sketch' && b.userData.desc.kind !== 'sketch'
+    && a.userData.desc.kind !== 'sheet' && b.userData.desc.kind !== 'sheet';
+  if (!ok) return toast('请先点选实体 A，再按住 Shift 点选实体 B（两者须为不同实体）');
+
+  beginEdit();
+  try {
+    const geo = booleanWith(a, b.userData.desc, op);
+    const ad = a.userData.desc;
+    a.userData.desc = {
+      kind: 'solid', uid: ad.uid, pos: [...ad.pos], tone: ad.tone || 0,
+      hostUid: ad.hostUid, geo
+    };
+    modelGroup.remove(b);
+    disposeObject(b);
+    state.selectedB = null;
+    state.face = null;
+    clearGroup(faceGroup);
+    updateObject(a);
+    select(a);
+    toast(op === 'add' ? '并集完成：A∪B 已合并为一个实体'
+        : op === 'sub' ? '差集完成：已从 A 中减去 B'
+        : '交集完成：仅保留 A 与 B 的重叠部分');
+  } catch (err) {
+    restoreScene(editBase);
+    state.selectedB = null;
+    commitEdit();
+    return toast('运算失败：' + (err.message || err));
+  }
+  commitEdit();
+  updateFirstRun();
+  updateStatus();
+}
+
+/** 执行拉伸（确定按钮） */
+function applyExtrude() {
+  const obj = state.selected;
+  if (!obj || !state.face) return toast('请先选择一个面');
+  const desc0 = obj.userData.desc;
+
+  const h = Math.max(MIN_SIZE, parseFloat($('exH').value) || state.ex.h);
+  state.ex.h = h;
+  const op = state.ex.op;
+
+  /* —— 草图拉伸：new=独立实体；加/减/交=作用于宿主实体，草图生成后消耗 —— */
+  if (desc0.kind === 'sketch') {
+    if (!desc0.closed) {
+      /* 开放线段 → 拉伸成面：默认方向 = 地面竖直向上 / 空间沿绘制平面法向，可拾取自定义方向 */
+      if (desc0.points.length < 2) return toast('线段至少要 2 个点，无法拉伸');
+      const sDesc = linesToSheetDir(desc0, h, state.ex.dir, state.ex.dirVec);
+      beginEdit();
+      const created = buildObject(sDesc);
+      modelGroup.remove(obj);
+      disposeObject(obj);
+      state.selected = null;
+      state.face = null;
+      clearGroup(faceGroup);
+      hideFaceMenu();
+      select(created);
+      commitEdit();
+      updateFirstRun();
+      updateStatus();
+      closeExtrudePanel();
+      toast('已把线段拉伸成面：面也可以继续选面拉伸或做布尔运算');
+      return;
+    }
+
+    /* 加/减/交的母体按规则A自动确定：宿主实体 → 最近实体；都没有则退化为「新建实体」 */
+    let host = null, useOp = op;
+    if (op !== 'new') {
+      if (!CSG) return toast('布尔运算库未加载（需联网），仅可使用「新建实体」');
+      host = findSketchBooleanHost(obj, desc0);
+      if (!host) {
+        useOp = 'new';   // 场景无其它实体 → 一步到位拉伸成独立实体，不拦截
+        toast('场景中暂无其它实体可运算，已直接拉伸为独立实体');
+      }
+    }
+
+    const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir, useOp !== 'new', state.ex.dirVec);
+    if (!bDesc) return toast('轮廓无效，无法拉伸');
+
+    beginEdit();
+    try {
+      if (useOp === 'new') {
+        const created = buildObject(bDesc);
+        modelGroup.remove(obj);
+        disposeObject(obj);
+        state.selected = null;
+        state.face = null;
+        clearGroup(faceGroup);
+        hideFaceMenu();
+        select(created);
+        if (op === 'new') toast('已从草图拉伸出新的独立实体');
+      } else {
+        /* 母体做布尔；草图被消耗 */
+        const geo = booleanWith(host, bDesc, useOp);
+        host.userData.desc = { kind: 'solid', uid: host.userData.desc.uid, pos: [...host.userData.desc.pos], tone: host.userData.desc.tone || 0, geo };
+        updateObject(host);
+        modelGroup.remove(obj);
+        disposeObject(obj);
+        state.selected = null;
+        state.face = null;
+        clearGroup(faceGroup);
+        hideFaceMenu();
+        select(host);
+        toast(useOp === 'add' ? '已把草图拉伸体合并进母体（加运算）'
+            : useOp === 'sub' ? '已用草图拉伸体从母体切除（减运算）'
+            : '已只保留与草图拉伸体重叠的部分（交运算）');
+      }
+    } catch (err) {
+      restoreScene(editBase);         // 整体回滚（母体几何 + 草图都在快照里）
+      commitEdit();
+      return toast('运算失败：' + (err.message || err));
+    }
+    commitEdit();
+    updateFirstRun();
+    updateStatus();
+    closeExtrudePanel();
+    return;
+  }
+
+  const isSheet = desc0.kind === 'sheet';
+  /* sheet（无厚度的面）做布尔时，必须以宿主/最近实体为母体，面自身没有体积不能当母体 */
+  let sheetHost = null, useOp = op;
+  if (isSheet && op !== 'new') {
+    if (!CSG) return toast('布尔运算库未加载（需联网），仅可使用「新建实体」');
+    sheetHost = findSketchBooleanHost(obj, desc0);
+    if (!sheetHost) {
+      useOp = 'new';
+      toast('场景中暂无实体可合并，已直接把面拉伸成独立实体');
+    }
+  }
+  const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir,
+    useOp !== 'new', state.ex.dirVec);   // 与母体布尔 → 焊接重叠，保证真实合并
+  if (!bDesc) return toast('这个面的轮廓不闭合，无法拉伸');
+
+  beginEdit();
+  try {
+    if (useOp === 'new') {
+      const created = buildObject(bDesc);
+      if (isSheet) {                       // 面被消耗
+        modelGroup.remove(obj);
+        disposeObject(obj);
+      }
+      select(created);
+      toast(useOp === 'new' && isSheet ? '已把面拉伸成独立实体' : '已拉伸出新的独立实体');
+    } else if (isSheet) {
+      /* 面拉伸体与母体做布尔：母体转成复合实体，面被消耗 */
+      const geo = booleanWith(sheetHost, bDesc, useOp);
+      sheetHost.userData.desc = { kind: 'solid', uid: sheetHost.userData.desc.uid,
+        pos: [...sheetHost.userData.desc.pos], tone: sheetHost.userData.desc.tone || 0, geo };
+      updateObject(sheetHost);
+      modelGroup.remove(obj);
+      disposeObject(obj);
+      state.face = null;
+      select(sheetHost);
+      toast(useOp === 'add' ? '已把面拉伸体真正合并进实体（加运算）'
+          : useOp === 'sub' ? '已用面拉伸体从实体切除（减运算）'
+          : '已只保留重叠部分（交运算）');
+    } else {
+      const geo = booleanWith(obj, bDesc, op);
+      obj.userData.desc = { kind: 'solid', uid: desc0.uid, pos: [...desc0.pos], tone: desc0.tone || 0, geo };
+      state.face = null;               // 几何已变，原面失效
+      updateObject(obj);
+      select(obj);
+      toast(op === 'add' ? '已合并为一个实体（加运算）'
+          : op === 'sub' ? '已从实体中切除（减运算）'
+          : '已只保留重叠部分（交运算）');
+    }
+  } catch (err) {
+    restoreScene(editBase);              // 整体回滚（母体几何 + 面/实体都在快照里）
+    commitEdit();
+    return toast('运算失败：' + (err.message || err));
+  }
+  commitEdit();
+  updateStatus();
+  closeExtrudePanel();
+}
+
+/* ============================================================================
+   10.5 · 选面浮出菜单 + 拉伸面板（3D One 式即时操作）
+   ========================================================================== */
+const faceMenuEl = $('faceMenu');
+const exPopEl = $('exPop');
+
+function showFaceMenu() {
+  if (!state.face || state.ex.open) return;
+  faceMenuEl.classList.add('show');
+  positionFaceUI();
+}
+
+function hideFaceMenu() {
+  faceMenuEl.classList.remove('show');
+}
+
+/** 把浮层贴到「面的中心」在屏幕上的投影位置，越界自动翻转 */
+function positionFaceUI() {
+  if (!state.face) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  if (!rect.width || !rect.height) return;
+
+  const anchor = state.face.center.clone().addScaledVector(state.face.normal, FACE_OFF);
+  const p = anchor.project(camera);
+  const sx = (p.x * 0.5 + 0.5) * rect.width;
+  const sy = (-p.y * 0.5 + 0.5) * rect.height;
+
+  const place = (el, gapX, gapY) => {
+    if (!el.classList.contains('show')) return;
+    const w = el.offsetWidth, hh = el.offsetHeight;
+    let x = sx + gapX;
+    let y = sy + gapY;
+    if (x + w > vw - 8) x = sx - w - gapX;
+    if (y + hh > vh - 8) y = sy - hh - gapY;
+    x = Math.max(8, Math.min(x, Math.max(8, vw - w - 8)));
+    y = Math.max(8, Math.min(y, Math.max(8, vh - hh - 8)));
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+  };
+
+  place(faceMenuEl, 16, 8);
+  place(exPopEl, 16, 8);
+}
+
+function openExtrudePanel() {
+  if (!state.selected || !state.face) return toast('请先在模型上选一个面');
+  state.ex.open = true;
+  state.ex.dirVec = null;          // 每次打开回到默认方向
+  state.ex.picking = false;
+  hideFaceMenu();
+  exPopEl.classList.add('show');
+  $('exH').value = state.ex.h;
+  syncExUI();
+  positionFaceUI();
+  refreshExtrudePreview();
+  setTimeout(() => { const el = $('exH'); el.focus(); el.select(); }, 30);
+}
+
+function closeExtrudePanel(silent) {
+  if (!state.ex.open) return;
+  state.ex.open = false;
+  state.ex.picking = false;
+  viewport.style.cursor = '';
+  exPopEl.classList.remove('show');
+  clearGroup(ghostGroup);
+  clearGroup(draftGroup);
+  if (!silent && state.face && state.selected) showFaceMenu();
+}
+
+/** 同步拉伸面板里的方向 / 运算卡片 / 提示文案 */
+function syncExUI() {
+  const d0 = state.selected && state.selected.userData.desc;
+  const isSketch = !!d0 && d0.kind === 'sketch';
+  document.querySelectorAll('#exDir button').forEach((b) => {
+    b.classList.toggle('on', Number(b.dataset.dir) === state.ex.dir);
+  });
+  document.querySelectorAll('#exModes .ex-mode').forEach((b) => {
+    b.classList.toggle('on', b.dataset.op === state.ex.op);
+  });
+  let tip;
+  if (isSketch && d0.closed) {
+    tip = CSG
+      ? '加/交/减自动作用到宿主实体或最近的实体，一步完成；无其它实体时直接拉伸成独立实体'
+      : '布尔运算库未加载（需联网），仅可使用「新建实体」';
+  } else if (isSketch) tip = '把线段沿方向扫掠成一张面（默认：地面竖直向上 / 空间沿平面法向）';
+  else {
+    const tips = {
+      new: '沿面的法向拉出新的独立实体',
+      add: '拉出的部分与原实体合并成一体',
+      sub: '把拉出的部分从原实体里挖掉（可配合「反向」做镂空）',
+      int: '只保留拉出部分与原实体重叠的公共部分'
+    };
+    tip = CSG ? tips[state.ex.op] : '布尔运算库未加载（需要联网），仅可使用「新建实体」';
+  }
+  $('exTip').textContent = tip;
+  /* 运算卡片：草图同样可用可点击（画在实体表面时加/减/交作用于母体）；仅 CSG 未加载才禁用 */
+  document.querySelectorAll('#exModes .ex-mode').forEach((b) => {
+    const dis = b.dataset.op !== 'new' && !CSG;
+    b.style.opacity = dis ? '.45' : '';
+    b.style.pointerEvents = dis ? 'none' : '';
+  });
+  /* 拉伸方向行：默认 / 已拾取 / 拾取中 */
+  const dv = state.ex.dirVec;
+  $('exDefaultDir').classList.toggle('on', !dv);
+  $('exDirInfo').textContent = state.ex.picking
+    ? '请点击一条边…'
+    : dv ? `自定义 (${dv.x.toFixed(2)}, ${dv.y.toFixed(2)}, ${dv.z.toFixed(2)})`
+         : '系统默认';
+  if (document.activeElement !== $('dvX')) $('dvX').value = dv ? round1(dv.x) : '';
+  if (document.activeElement !== $('dvY')) $('dvY').value = dv ? round1(dv.y) : '';
+  if (document.activeElement !== $('dvZ')) $('dvZ').value = dv ? round1(dv.z) : '';
+}
+
+function refreshExtrudePreview() {
+  if (!state.ex.open || !state.selected || !state.face) return;
+  const h = Math.max(MIN_SIZE, parseFloat($('exH').value) || state.ex.h);
+  state.ex.h = h;
+  const d0 = state.selected.userData.desc;
+  if (d0.kind === 'sketch' && !d0.closed) {
+    /* 开放线段：沿方向扫掠成带状面的预览 */
+    previewExtrudeGhost(linesToSheetDir(d0, h, state.ex.dir, state.ex.dirVec));
+    return;
+  }
+  previewExtrudeGhost(faceExtrudeDesc(
+    state.face, h, state.ex.dir,
+    d0.kind !== 'sketch' && state.ex.op !== 'new',   // 草图无母体，不需要焊接
+    state.ex.dirVec
+  ));
+}
+
+/* ---------- 浮层事件绑定 ---------- */
+faceMenuEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-fm]');
+  if (btn && btn.dataset.fm === 'extrude') openExtrudePanel();
+});
+
+$('exClose').addEventListener('click', () => closeExtrudePanel());
+$('exCancel').addEventListener('click', () => closeExtrudePanel());
+$('exOk').addEventListener('click', applyExtrude);
+
+$('exH').addEventListener('input', refreshExtrudePreview);
+$('exH').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); applyExtrude(); }
+  if (e.key === 'Escape') { e.preventDefault(); closeExtrudePanel(); }
+});
+
+$('exDir').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-dir]');
+  if (!b) return;
+  state.ex.dir = Number(b.dataset.dir);
+  syncExUI();
+  refreshExtrudePreview();
+});
+
+/* ---------- 拉伸方向：拾取一条边 / 恢复默认 ---------- */
+$('exPickDir').addEventListener('click', () => {
+  state.ex.picking = true;
+  viewport.style.cursor = 'crosshair';
+  syncExUI();
+  toast('请点击实体的一条边或一条线段作为拉伸方向（Esc 取消）');
+});
+
+$('exDefaultDir').addEventListener('click', () => {
+  state.ex.dirVec = null;
+  syncExUI();
+  refreshExtrudePreview();
+});
+
+/* 手动输入方向向量：X/Y/Z 分量，归一化后作为拉伸方向 */
+['dvX', 'dvY', 'dvZ'].forEach((id) => {
+  $(id).addEventListener('input', () => {
+    const x = parseFloat($('dvX').value), y = parseFloat($('dvY').value), z = parseFloat($('dvZ').value);
+    const v = new THREE.Vector3(isFinite(x) ? x : 0, isFinite(y) ? y : 0, isFinite(z) ? z : 0);
+    if (v.lengthSq() < 1e-8) return;
+    state.ex.dirVec = v.normalize();
+    syncExUI();
+    refreshExtrudePreview();
+  });
+});
+
+/**
+ * 找鼠标所指的「边」：返回世界坐标 {a, b}。
+ * · 网格：取命中三角形的三条边里，屏幕距离鼠标最近的一条
+ * · 线段草图：直接取被点中的那段线的两个端点
+ */
+function findExtrudeDirEdge(e) {
+  setRay(e);
+  const hits = raycaster.intersectObjects(modelGroup.children, true);
+  for (const h of hits) {
+    if (!rootOf(h.object)) continue;
+    if (h.object.isLine && h.index != null) {
+      const pos = h.object.geometry.attributes.position;
+      if (!pos || pos.count < 2) continue;
+      const i0 = h.index, i1 = Math.min(i0 + 1, pos.count - 1);
+      return {
+        a: new THREE.Vector3().fromBufferAttribute(pos, i0),
+        b: new THREE.Vector3().fromBufferAttribute(pos, i1)
+      };
+    }
+    if (!h.face) continue;
+    const pos = h.object.geometry.attributes.position;
+    if (!pos) continue;
+    const v = [h.face.a, h.face.b, h.face.c].map((i) =>
+      new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(h.object.matrixWorld));
+    const rect = renderer.domElement.getBoundingClientRect();
+    const toScreen = (p) => {
+      const q = p.clone().project(camera);
+      return { x: (q.x * 0.5 + 0.5) * rect.width + rect.left, y: (-q.y * 0.5 + 0.5) * rect.height + rect.top };
+    };
+    const segDist = (p, A, B) => {
+      const vx = B.x - A.x, vy = B.y - A.y;
+      const wx = p.x - A.x, wy = p.y - A.y;
+      const L2 = vx * vx + vy * vy;
+      const t = L2 ? Math.max(0, Math.min(1, (wx * vx + wy * vy) / L2)) : 0;
+      return Math.hypot(p.x - (A.x + t * vx), p.y - (A.y + t * vy));
+    };
+    let best = null, bd = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const A = v[i], B = v[(i + 1) % 3];
+      const d = segDist({ x: e.clientX, y: e.clientY }, toScreen(A), toScreen(B));
+      if (d < bd) { bd = d; best = [A, B]; }
+    }
+    return best ? { a: best[0], b: best[1] } : null;
+  }
+  return null;
+}
+
+/** 拾取方向时的悬停反馈：把候选边高亮成橙色 */
+function hoverExtrudeDir(e) {
+  clearGroup(draftGroup);
+  const ed = findExtrudeDirEdge(e);
+  if (!ed || ed.a.distanceTo(ed.b) < 1e-6) return;
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([ed.a, ed.b]),
+    new THREE.LineBasicMaterial({ color: 0xf59e0b })
+  );
+  line.renderOrder = 5;
+  draftGroup.add(line);
+}
+
+/** 点击确认方向 */
+function pickExtrudeDir(e) {
+  const ed = findExtrudeDirEdge(e);
+  if (!ed || ed.a.distanceTo(ed.b) < 1e-6) {
+    toast('请点击实体的一条边或一条线段来确定方向');
+    return;
+  }
+  state.ex.dirVec = ed.b.clone().sub(ed.a).normalize();
+  state.ex.picking = false;
+  viewport.style.cursor = '';
+  clearGroup(draftGroup);
+  syncExUI();
+  refreshExtrudePreview();
+  toast('已拾取拉伸方向（可点「默认」恢复）');
+}
+
+$('exModes').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-op]');
+  if (!b) return;
+  /* 草图同样可用加/交/减：母体由规则A自动确定（宿主实体或最近实体），无需在此拦截 */
+  if (b.dataset.op !== 'new' && !CSG) return toast('布尔运算库未加载（需联网）');
+  state.ex.op = b.dataset.op;
+  syncExUI();
+  refreshExtrudePreview();
+});
+
+/* 相机一转，浮层跟着面走 */
+controls.addEventListener('change', positionFaceUI);
+
+/* ============================================================================
+   11 · 属性面板
+   ========================================================================== */
+const SIZE_SPEC = {
+  box: [['w', '宽 W'], ['h', '高 H'], ['d', '深 D']],
+  sphere: [['r', '半径 R']],
+  torus: [['R', '主半径'], ['r', '管半径']],
+  cylinder: [['r', '半径 R'], ['h', '高 H']],
+  cone: [['r', '半径 R'], ['h', '高 H']],
+  ellipsoid: [['a', '半轴 A'], ['b', '半轴 B'], ['c', '半轴 C']],
+  pyramid: [['r', '底面半径'], ['h', '高 H']],
+  frustum: [['r1', '下半径'], ['r2', '上半径'], ['h', '高 H']],
+  plate: [['depth', '厚度 T']],
+  extrude: [['depth', '拉伸长'], ],
+  sheet: [['height', '高 H']]
+};
+
+/** 渲染属性面板的实体颜色色板（点击改选中实体颜色，可撤销） */
+function renderSwatches(desc) {
+  const box = $('swatches');
+  if (!box) return;
+  if (box.dataset.ready !== '1') {
+    box.dataset.ready = '1';
+    box.innerHTML = BODY_PALETTE.map((c, i) =>
+      `<button class="swatch" type="button" data-tone="${i}" title="${c.name}" aria-label="${c.name}"></button>`
+    ).join('');
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('.swatch');
+      if (!b) return;
+      const obj = state.selected;
+      const d = obj && obj.userData.desc;
+      if (!d || d.kind === 'sketch' || d.kind === 'sheet') return;  // 草图/面不着实体色
+      const tone = parseInt(b.dataset.tone, 10);
+      if (d.tone === tone) return;
+      beginEdit();
+      setEntityTone(obj, tone);
+      commitEdit();
+      renderSwatches(d);
+      toast('已改为「' + BODY_PALETTE[tone].name + '」');
+    });
+  }
+  const cur = desc && desc.tone != null ? desc.tone : 0;
+  box.querySelectorAll('.swatch').forEach((b, i) => {
+    const hex = '#' + BODY_PALETTE[i].dot.toString(16).padStart(6, '0');
+    b.style.background = hex;
+    b.classList.toggle('on', i === cur);
+  });
+}
+
+/** 原地改一个实体的配色（填充 + 轮廓线），保持选中高亮态 */
+function setEntityTone(obj, tone) {
+  const desc = obj.userData.desc;
+  desc.tone = tone;
+  const pal = toneOf(desc);
+  if (obj.material && obj.material.color) obj.material.color.setHex(pal.fill);
+  const e = obj.children && obj.children.find((c) => c.userData.isEdge);
+  if (e && e.material) {
+    const on = state.selected === obj;
+    e.material.color.setHex(on ? ACCENT : pal.line);
+    e.material.opacity = on ? 1 : 0.85;
+  }
+}
+
+function syncPanel() {
+  if (!$('pBody')) return;
+  const obj = state.selected;
+  const desc = obj && obj.userData.desc;
+  $('pEmpty').hidden = !!desc;
+  $('pBody').hidden = !desc;
+
+  const badge = $('pBadge');
+  badge.textContent = desc ? TYPE_LABEL[desc.kind] : '未选择';
+  badge.classList.toggle('muted', !desc);
+  if (!desc) { hideFaceMenu(); return; }
+
+  $('pType').textContent = TYPE_LABEL[desc.kind];
+
+  const isSketch = desc.kind === 'sketch';
+  const canTone = !isSketch && desc.kind !== 'sheet';
+  $('gColor').hidden = !canTone;
+  if (canTone) renderSwatches(desc);
+
+  ['posX', 'posY', 'posZ'].forEach((id, i) => {
+    const inp = $(id);
+    inp.disabled = isSketch;          // 草图坐标即轮廓绝对坐标，不做整体平移
+    inp.value = round1(desc.pos[i]);
+  });
+
+  renderSizeRows(desc);
+  $('gSketch').hidden = !isSketch;
+  $('gFace').hidden = isSketch;
+
+  if (isSketch) {
+    /* 闭合 = 已是蓝色平面，直接拉伸成实体；开放线条也能拉伸成面 */
+    const closed = !!desc.closed;
+    $('gSketch').hidden = false;
+    $('skTitle').textContent = closed ? '草图 → 实体' : '线 → 面';
+    $('btnSk').textContent = closed ? '拉伸成实体' : '拉伸成面';
+    $('skT').value = 10;
+    $('skHint').textContent = closed
+      ? `闭合轮廓 · ${desc.points.length} 个顶点 · 已是蓝色平面`
+      : `开放线段 · ${desc.points.length} 个顶点 · 沿竖直方向拉出高度成面`;
+    clearGroup(ghostGroup);
+  } else {
+    syncFaceHint();
+    if (state.face) showFaceMenu(); else hideFaceMenu();
+  }
+}
+
+/** 按类型动态渲染尺寸输入行（布尔结果没有参数，整组隐藏） */
+function renderSizeRows(desc) {
+  const spec = SIZE_SPEC[desc.kind];
+  const box = $('sizeRows');
+  $('gSize').hidden = !spec || !spec.length;
+  if (!spec) { box.innerHTML = ''; box.dataset.kind = ''; return; }
+
+  if (box.dataset.kind !== desc.kind) {
+    box.dataset.kind = desc.kind;
+    box.innerHTML = spec
+      .map(([k, label]) => `<div class="row"><label>${label}</label><input class="num" data-k="${k}" type="number" min="0.5" step="1"></div>`)
+      .join('');
+    box.querySelectorAll('input').forEach(bindSizeInput);
+  }
+  spec.forEach(([k]) => {
+    const inp = box.querySelector(`[data-k="${k}"]`);
+    if (inp && document.activeElement !== inp) inp.value = round1(desc.params[k]);
+  });
+}
+
+function bindSizeInput(inp) {
+  inp.addEventListener('focus', beginEdit);
+  inp.addEventListener('input', () => {
+    const obj = state.selected;
+    const desc = obj && obj.userData.desc;
+    if (!desc) return;
+    const v = parseFloat(inp.value);
+    if (!isFinite(v)) return;
+    desc.params[inp.dataset.k] = Math.max(MIN_SIZE, v);
+    updateObject(obj);            // 实时生效
+    state.face = null;
+    clearGroup(faceGroup);
+    hideFaceMenu();
+    syncFaceHint();
+  });
+  inp.addEventListener('change', commitEdit);
+}
+
+/** 右面板里的「选中面」提示 */
+function syncFaceHint() {
+  const desc = state.selected && state.selected.userData.desc;
+  const hint = $('faceHint');
+  const btn = $('btnFaceExtrude');
+  if (!hint || !desc || desc.kind === 'sketch') return;
+
+  if (state.face) {
+    const n = state.face.normal;
+    hint.textContent = `已选面 · 法向 (${n.x.toFixed(2)}, ${n.y.toFixed(2)}, ${n.z.toFixed(2)})`;
+    hint.classList.add('face');
+    btn.disabled = false;
+  } else {
+    hint.textContent = '在模型上再次点击，选择要拉伸的面';
+    hint.classList.remove('face');
+    btn.disabled = true;
+  }
+}
+
+/* ---------- 位置输入 ---------- */
+['posX', 'posY', 'posZ'].forEach((id, i) => {
+  const inp = $(id);
+  inp.addEventListener('focus', beginEdit);
+  inp.addEventListener('input', () => {
+    const obj = state.selected;
+    const desc = obj && obj.userData.desc;
+    if (!desc) return;
+    const v = parseFloat(inp.value);
+    if (!isFinite(v)) return;
+    desc.pos[i] = v;
+    obj.position.set(desc.pos[0], desc.pos[1], desc.pos[2]);
+    state.face = null;
+    clearGroup(faceGroup);
+    hideFaceMenu();
+  });
+  inp.addEventListener('change', commitEdit);
+});
+
+/* ---------- 草图 → 面 ---------- */
+$('skT').addEventListener('input', () => {
+  const desc = state.selected && state.selected.userData.desc;
+  if (!desc || desc.kind !== 'sketch') return;
+  const t = parseFloat($('skT').value);
+  previewSketchGhost(desc, isFinite(t) ? t : 10);
+});
+
+$('btnSk').addEventListener('click', () => {
+  const obj = state.selected;
+  const desc = obj && obj.userData.desc;
+  if (!desc || desc.kind !== 'sketch') return;
+  if (desc.points.length < 2) return toast('轮廓点不足，无法拉伸');
+
+  const t = Math.max(MIN_SIZE, parseFloat($('skT').value) || 10);
+  beginEdit();
+  const target = desc.closed ? sketchToPlate(desc, t) : linesToSheet(desc, t);
+  modelGroup.remove(obj);
+  disposeObject(obj);
+  state.selected = null;
+  const created = buildObject(target);
+  select(created);
+  commitEdit();
+  updateStatus();
+  toast(desc.closed
+    ? '已生成实体：在顶面点一下，可继续拉伸或做布尔运算'
+    : '已生成面：面也可以继续拉伸或做布尔运算');
+});
+
+/* ---------- 面 → 体：右面板入口（与浮层菜单同一个面板） ---------- */
+$('btnFaceExtrude').addEventListener('click', openExtrudePanel);
+
+/* ============================================================================
+   12 · 工具栏 / 模式切换 / 快捷键
+   ========================================================================== */
+function syncToolUI() {
+  document.querySelectorAll('#toolbar [data-tool]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.tool === state.tool);
+  });
+  document.querySelectorAll('#modeSwitch [data-mode]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === state.mode);
+  });
+  const toolActive = state.mode === 'sketch' || isPrimitive(state.tool);
+  viewport.classList.toggle('cross', toolActive);
+  if (!toolActive) renderer.domElement.style.cursor = 'default';
+  /* 正多边形边数设置只在多边形工具下露出 */
+  $('skOpt').classList.toggle('show', state.mode === 'sketch' && state.tool === 'sketch-poly');
+  updateHints();
+}
+
+function setMode(m) {
+  autoConfirmDim();
+  clearSegOverlay();
+  const prev = state.mode;
+  state.mode = m;
+
+  if (m === 'sketch') {
+    /* 进入草图模式：保留已选的草图工具，否则默认线段；先选绘制平面 */
+    if (state.selectedB) { setHighlight(state.selectedB, false, true); state.selectedB = null; updateBoolButtons(); }
+    if (!SKETCH_TOOLS.includes(state.tool)) state.tool = 'sketch';
+    if (prev !== 'sketch') {
+      state.sketchStage = 'plane';
+      state.sketchPlane = null;
+      cancelDraft();
+      clearGroup(faceGroup);
+      toast('草图模式：先点一次选择绘制平面（地面或实体表面）');
+    }
+  } else if (SKETCH_TOOLS.includes(state.tool)) {
+    state.tool = 'select';
+    state.sketchStage = 'plane';
+    state.sketchPlane = null;
+    cancelDraft();
+    clearGroup(faceGroup);
+  }
+
+  syncToolUI();
+  updateFirstRun();
+}
+
+function setTool(t) {
+  autoConfirmDim();
+  clearSegOverlay();
+  if (SKETCH_TOOLS.includes(t)) {
+    state.tool = t;
+    state.mode = 'sketch';
+    if (state.sketchStage !== 'draw') {
+      state.sketchStage = 'plane';
+      state.sketchPlane = null;
+      clearGroup(faceGroup);
+    }
+    cancelDraft();
+    syncToolUI();
+    updateFirstRun();
+    const tip = {
+      sketch: '线段：点起点→点终点，端点自动吸附格点，标签可填长度，点✓确定',
+      'sketch-rect': '矩形：按住左键对角线拖出',
+      'sketch-circle': '圆：从圆心往外拖出半径',
+      'sketch-ellipse': '椭圆：从中心拖出长短轴',
+      'sketch-poly': '正多边形：从中心拖出外接圆（右下角可改边数）'
+    }[t];
+    if (tip && state.sketchStage === 'draw') toast(tip);
+    return;
+  }
+  state.tool = t;
+  state.mode = 'object';
+  state.sketchStage = 'plane';
+  state.sketchPlane = null;
+  cancelDraft();
+  clearGroup(faceGroup);
+  syncToolUI();
+  updateFirstRun();
+}
+
+function toggleShade() {
+  state.shade = state.shade === 'solid' ? 'wire' : 'solid';
+  const wire = state.shade === 'wire';
+  modelGroup.traverse((o) => {
+    if (o.isMesh && o.userData.desc) o.material.wireframe = wire;
+  });
+  const btn = $('btnShade');
+  btn.classList.toggle('on', wire);
+  btn.querySelector('span').textContent = wire ? '实体' : '线框';
+  btn.title = wire ? '切换为实体着色' : '切换为线框显示';
+}
+
+$('toolbar').addEventListener('click', (e) => {
+  const cat = e.target.closest('.cat');
+  if (cat) {
+    document.querySelectorAll('.cat').forEach((c) => c.classList.toggle('on', c === cat));
+    document.querySelectorAll('.fly-panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === cat.dataset.cat));
+    return;
+  }
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.dataset.tool) setTool(btn.dataset.tool);
+  else if (btn.dataset.bool) entityBoolean(btn.dataset.bool);
+  else if (btn.dataset.act === 'undo') undo();
+  else if (btn.dataset.act === 'delete') deleteSelected();
+  else if (btn.dataset.act === 'shade') toggleShade();
+});
+
+$('modeSwitch').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mode]');
+  if (b) setMode(b.dataset.mode);
+});
+
+/* 正多边形边数 */
+$('polyN').addEventListener('change', () => {
+  const v = parseInt($('polyN').value, 10);
+  state.polyN = Math.max(3, Math.min(12, isFinite(v) ? v : 6));
+  $('polyN').value = state.polyN;
+});
+
+window.addEventListener('keydown', (e) => {
+  /* 输入框内只处理 Esc / Enter */
+  if (e.target.tagName === 'INPUT') {
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    undo();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (state.ex.picking) {
+      state.ex.picking = false;
+      viewport.style.cursor = '';
+      clearGroup(draftGroup);
+      syncExUI();
+      return toast('已取消拾取方向');
+    }
+    if (state.ex.open) { closeExtrudePanel(); return; }
+    if (state.draft) { cancelDraft(); return toast('已取消绘制'); }
+    if (state.mode === 'sketch' && state.sketchStage === 'draw') {
+      backToPickPlane();          // 从绘制状态退回「选平面」
+      return;
+    }
+    setTool('select');
+    return;
+  }
+  if (e.key === 'Enter' && state.ex.open) { applyExtrude(); return; }
+  if (e.key === 'Enter' && state.draft && state.draft.type === 'line') { closeSketch(); return; }
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    if (state.draft && state.draft.type === 'line' && state.draft.points.length) {
+      state.draft.points.pop();
+      renderDraft();
+    } else {
+      deleteSelected();
+    }
+    return;
+  }
+
+  const k = e.key.toLowerCase();
+  if (k === 'v') setTool('select');
+  if (k === 'b') setTool('box');
+  if (k === 'c') setTool('cylinder');
+  if (k === 's') setTool('sketch');
+  if (k === 'r') setTool('sketch-rect');
+  if (k === 'o') setTool('sketch-circle');
+  if (k === 'l') setTool('sketch-ellipse');
+  if (k === 'p') setTool('sketch-poly');
+  if (k === 'e' && state.face && !state.ex.open) openExtrudePanel();
+});
+
+/* ============================================================================
+   13 · 指针交互（对齐 3D One 的手感）
+   · 物体模式：按在实体上 = 选中并可直接拖动移动；按在空白 = 旋转视角
+   · 草图模式两段式：第一次点击选绘制平面（地面或实体面），第二次起才开始绘制
+   · 中键拖动 = 平移视图；右键完全禁用（防浏览器前进/后退手势干扰）
+   · 视口左下角 ViewCube 区域的指针事件归视角立方体处理
+   ========================================================================== */
+/* 全页面彻底禁用右键：菜单 + 浏览器「按住右键拖拽 = 前进/后退」手势。
+   关键：手势由 mousedown 触发，必须在捕获阶段拦掉，仅在 contextmenu 阶段拦来不及。 */
+document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
+document.addEventListener('auxclick', (e) => { if (e.button !== 0) e.preventDefault(); }, true);
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 2 || e.button === 3 || e.button === 4) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+document.addEventListener('dragstart', (e) => {
+  const b = e.button;
+  if (b === 2 || b === 3 || b === 4) e.preventDefault();
+}, true);
+
+viewport.addEventListener('pointerdown', (e) => {
+  /* 右键 / 侧键：一律禁用，不弹菜单、不触发前进后退、不产生任何建模动作 */
+  if (e.button !== 0) {                 // 中键/右键/侧键都不是建模左键
+    if (e.button !== 1) e.preventDefault();   // 中键(1)放行给 OrbitControls 平移，其余拦截默认行为
+    return;
+  }
+  if (e.target.closest('.face-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm')) return;  // 浮层上的点击按 DOM 处理
+
+  /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
+  if (inViewCube(e)) {
+    e.preventDefault();
+    e.stopPropagation();
+    startViewCubeDrag(e);
+    return;
+  }
+
+  /* Shift + 左键：物体模式下加选第二实体 B（布尔用）；点空白仍放行给 OrbitControls 旋转 */
+  if (e.shiftKey) {
+    if (state.mode === 'object' && state.tool === 'select') {
+      const sh = pick(e);
+      if (sh && sh.root && sh.root !== state.selected) {
+        e.preventDefault();
+        e.stopPropagation();
+        selectB(sh.root);
+        return;
+      }
+    }
+    return;
+  }
+
+  /* 拉伸面板的「拾取方向」模式：这次点击用来确定拉伸方向 */
+  if (state.ex.picking) {
+    e.preventDefault();
+    e.stopPropagation();
+    pickExtrudeDir(e);
+    return;
+  }
+
+  const toolActive = state.mode === 'sketch' || isPrimitive(state.tool);
+
+  if (!toolActive) {
+    const hit = pick(e);
+    if (!hit) {
+      drag = { kind: 'click', x: e.clientX, y: e.clientY };   // 空白处：交给控制器旋转
+      return;
+    }
+    /* 命中实体：拦下左键 → 选中 + 进入拖动移动 */
+    e.preventDefault();
+    e.stopPropagation();
+    const wasSelected = state.selected === hit.root;
+    if (!wasSelected) select(hit.root);
+
+    beginEdit();
+    const grabZ = hit.hit.point.z;
+    const g = groundPointAt(e, grabZ);
+    const kd = hit.root.userData.desc.kind;
+    drag = {
+      kind: 'move',
+      x: e.clientX, y: e.clientY,
+      moved: false,
+      root: hit.root,
+      faceHit: hit.hit,
+      wasSelected,
+      grabZ,
+      origin: hit.root.userData.desc.pos.slice(),
+      startXZ: g ? [g.x, g.y] : null,
+      sketchOrigin: null,
+      planeLocked: kd === 'sketch' && !(hit.root.userData.desc.plane || {}).isGround
+    };
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();            // 关键：工具操作期间不把左键事件传给 OrbitControls
+
+  if (state.mode === 'sketch') {
+    if (state.sketchStage === 'plane') {
+      /* 第一段：这次点击用来选绘制平面，不落笔 */
+      drag = { kind: 'pickplane', x: e.clientX, y: e.clientY, moved: false };
+      return;
+    }
+    if (state.tool === 'sketch') {
+      drag = { kind: 'sketch', x: e.clientX, y: e.clientY, moved: false };
+    } else {
+      drag = { kind: 'shape', x: e.clientX, y: e.clientY, moved: false };
+      startShapeSketch(e);
+    }
+  } else {
+    drag = { kind: 'place', x: e.clientX, y: e.clientY, moved: false };
+    startPlacement(e);
+  }
+}, true);
+
+/** 沿「抓住点所在高度」的水平面求交点，拖动时光标与实体贴合得更准 */
+function groundPointAt(e, h) {
+  setRay(e);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -h);
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(plane, p) ? p : null;
+}
+
+window.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
+  if (drag.kind === 'vcube' && drag.moved) {
+    rotateCubePreview(e.clientX - drag.x, e.clientY - drag.y);   // 直接旋转主视图
+    drag.x = e.clientX; drag.y = e.clientY;
+    return;
+  }
+  if (drag.kind === 'place' && drag.moved) updatePlacement(e);
+  if (drag.kind === 'shape' && drag.moved) updateShapeSketch(e);
+  if (drag.kind === 'move' && drag.moved) moveByDrag(e);
+});
+
+/** 拖动移动：地面平移量按 5mm 吸附，实体改 pos，地面草图整体平移原点 */
+function moveByDrag(e) {
+  const d = drag;
+  if (!d || !d.startXZ) return;
+  if (d.planeLocked) return;   // 附着在实体面上的草图不允许拖动
+  const p = groundPointAt(e, d.grabZ);
+  if (!p) return;
+
+  const dx = snap(p.x - d.startXZ[0]);
+  const dy = snap(p.y - d.startXZ[1]);
+  const desc = d.root.userData.desc;
+
+  if (desc.kind === 'sketch') {
+    if (!d.sketchOrigin) d.sketchOrigin = [...desc.pos];
+    desc.pos = [d.sketchOrigin[0] + dx, d.sketchOrigin[1] + dy, desc.pos[2]];
+    if (desc.plane) desc.plane.o = [...desc.pos];
+  } else {
+    desc.pos[0] = d.origin[0] + dx;
+    desc.pos[1] = d.origin[1] + dy;
+  }
+  updateObject(d.root);
+  clearGroup(faceGroup);
+  state.face = null;
+  hideFaceMenu();
+  $('posX').value = round1(desc.pos[0]);
+  $('posY').value = round1(desc.pos[1]);
+}
+
+window.addEventListener('pointerup', (e) => {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+
+  if (d.kind === 'vcube') {
+    controls.enabled = true;    // 松手恢复主视图控制
+    /* 点击（无位移）= 跳转到该面的标准视角；拖动过 = 保持在当前角度（不回弹） */
+    if (!d.moved) viewCubeClick(e);
+  } else if (d.kind === 'click') {
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
+      /* 空白处单击 → 取消选择 */
+      select(null);
+    }
+  } else if (d.kind === 'pickplane') {
+    if (!d.moved) chooseSketchPlane(e);
+  } else if (d.kind === 'sketch') {
+    if (!d.moved) {
+      const p = planePoint(e);
+      if (p) addSketchPoint(p);
+    }
+  } else if (d.kind === 'shape') {
+    if (d.moved) finishShapeSketch();
+    else { cancelDraft(); toast('按住左键拖出形状尺寸'); }
+  } else if (d.kind === 'place') {
+    finishPlacement();
+  } else if (d.kind === 'move') {
+    if (d.moved) {
+      commitEdit();
+      updateStatus();
+      toast('已移动');
+    } else {
+      /* 没有位移 = 一次单击：已选中的对象再点一次 → 选面（闭合草图 = 蓝色平面本身） */
+      if (d.wasSelected && d.faceHit.face) {
+        const kd = d.root.userData.desc.kind;
+        if (kd === 'sketch') pickSketchFace(d.root);
+        else pickFace(d.root, d.faceHit);
+      }
+      commitEdit();   // 无实际变化时不会入撤销栈
+    }
+  }
+});
+
+/* 双击 = 结束线段绘制，保留【开放】线段（可拉伸成面）；回到起点才是闭合 */
+viewport.addEventListener('dblclick', (e) => {
+  if (state.mode !== 'sketch' || !state.draft || state.draft.type !== 'line') return;
+  e.preventDefault();
+  const pts = state.draft.points;
+  state.draft = null;
+  clearGroup(draftGroup);
+  if (pts.length >= 2) commitSketch(pts, null, false);
+  else toast('至少点击 2 个点再结束');
+});
+
+/* ============================================================================
+   13.5 · 草图两段式：先选绘制平面，再绘制
+   ========================================================================== */
+
+/** 第一次点击：选定绘制平面（命中实体面 = 该表面；命中草图 = 沿用其平面；空白 = 地面网格） */
+function chooseSketchPlane(e) {
+  const hit = pick(e);
+  if (hit) {
+    const kd = hit.root.userData.desc.kind;
+    if (kd === 'sketch') {
+      /* 点在已有草图上：地面草图 = 地面；空间草图 = 直接沿用它所在的平面 */
+      const pl = hit.root.userData.desc.plane;
+      if (pl && !pl.isGround) {
+        const d = hit.root.userData.desc;
+        const u = new THREE.Vector3().fromArray(pl.u);
+        const v = new THREE.Vector3().fromArray(pl.v);
+        const n = new THREE.Vector3().fromArray(pl.n);
+        const o = new THREE.Vector3().fromArray(d.pos || [0, 0, 0]);
+        lockSketchPlane({
+          normal: n.clone(),
+          center: o.clone(),
+          loop: d.points.map(([x, y]) => new THREE.Vector3()
+            .addScaledVector(u, x).addScaledVector(v, y).add(o))
+        });
+      } else {
+        lockSketchPlane(null);
+      }
+      return;
+    }
+    const b = faceBoundary(hit.root, hit.hit);
+    if (b) { lockSketchPlane(b, hit.root.userData.desc.uid); return; }
+    /* 关键修复：识别失败绝不静默画到地面网格上 —— 提示并保持「选平面」状态 */
+    toast('未能识别这个表面（曲面暂不支持），请点击更平坦的面或空白处选地面');
+    return;
+  }
+  lockSketchPlane(null);   // 点在空白处 = 地面
+}
+
+/** 锁定绘制平面：face 为 null 表示地面，否则用识别出的实体面；hostUid = 宿主实体（供草图布尔用） */
+function lockSketchPlane(face, hostUid) {
+  clearGroup(faceGroup);
+  cancelDraft();
+  if (!face) {
+    state.sketchPlane = {
+      o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1],
+      isGround: true, hostUid: null, mathPlane: groundPlane
+    };
+    state.sketchStage = 'draw';
+    updateHints();
+    toast('已选择地面为绘制平面：开始绘制（Esc 重新选平面）');
+    return;
+  }
+  const { u, v } = planeBasis(face.normal);
+  state.sketchPlane = {
+    o: [face.center.x, face.center.y, face.center.z],
+    u: u.toArray(), v: v.toArray(), n: face.normal.toArray(),
+    isGround: false, hostUid: hostUid == null ? null : hostUid,
+    mathPlane: new THREE.Plane().setFromNormalAndCoplanarPoint(face.normal, face.center)
+  };
+  state.sketchStage = 'draw';
+
+  /* 选中的绘制平面做持久高亮（橙色半透明 + 描边），绘制期间保留 */
+  const fill = new THREE.Mesh(polygonGeometry(face.loop, face.normal, FACE_OFF), faceFillMat());
+  fill.renderOrder = 3;
+  faceGroup.add(fill);
+  const lp = face.loop.map((p) => p.clone().addScaledVector(face.normal, FACE_OFF));
+  lp.push(lp[0].clone());
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(lp),
+    new THREE.LineBasicMaterial({ color: FACE_C })
+  );
+  line.renderOrder = 4;
+  faceGroup.add(line);
+
+  updateHints();
+  toast('已选择实体表面为绘制平面：草图会画在这个高度上（Esc 重新选平面）');
+}
+
+/** Esc：从绘制状态退回选平面状态 */
+function backToPickPlane() {
+  state.sketchStage = 'plane';
+  state.sketchPlane = null;
+  state.hoverPoint = null;
+  cancelDraft();
+  clearGroup(faceGroup);
+  clearGroup(ghostGroup);
+  updateHints();
+  toast('重新选择绘制平面：点击地面或实体表面');
+}
+
+/** 选平面阶段的悬停预览：鼠标悬在哪个实体面上，就淡橙色预览哪个面 */
+function renderPlaneHover(hit) {
+  clearGroup(draftGroup);
+  if (!hit || hit.root.userData.desc.kind === 'sketch') return;
+  const b = faceBoundary(hit.root, hit.hit);
+  if (!b) return;
+  const fill = new THREE.Mesh(
+    polygonGeometry(b.loop, b.normal, FACE_OFF),
+    new THREE.MeshBasicMaterial({
+      color: FACE_C, transparent: true, opacity: 0.14,
+      side: THREE.DoubleSide, depthWrite: false
+    })
+  );
+  fill.renderOrder = 3;
+  draftGroup.add(fill);
+}
+
+/** 单击闭合草图（蓝色平面）→ 视口浮出「拉伸」菜单（与实体选面一致） */
+function pickSketchFace(root) {
+  const desc = root.userData.desc;
+
+  /* 开放线段：同样弹出拉伸菜单，拉伸的含义是「扫掠成带状面」 */
+  if (!desc.closed) {
+    if (desc.points.length < 2) { toast('线段至少要 2 个点才能拉伸'); return; }
+    const { u, v, n } = sketchBasis(desc);
+    const o = new THREE.Vector3().fromArray(desc.pos || [0, 0, 0]);
+    const worldPts = desc.points.map(([x, y]) => new THREE.Vector3()
+      .addScaledVector(u, x).addScaledVector(v, y).add(o));
+    const center = new THREE.Vector3();
+    worldPts.forEach((p) => center.add(p));
+    center.multiplyScalar(1 / worldPts.length);
+    state.face = {
+      normal: n.clone(), point: center.clone(), center: center.clone(),
+      loop: worldPts, isLine: true
+    };
+    clearGroup(faceGroup);
+    const hl = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(worldPts),
+      new THREE.LineBasicMaterial({ color: FACE_C })
+    );
+    hl.renderOrder = 4;
+    faceGroup.add(hl);
+    syncFaceHint();
+    showFaceMenu();
+    return;
+  }
+
+  if (desc.points.length < 3) { toast('轮廓点不足，无法拉伸'); return; }
+  const { u, v, n } = sketchBasis(desc);
+  const o = new THREE.Vector3().fromArray(desc.pos);
+  const loop = desc.points.map(([x, y]) => new THREE.Vector3()
+    .addScaledVector(u, x).addScaledVector(v, y).add(o));
+  const center = new THREE.Vector3();
+  loop.forEach((p) => center.add(p));
+  center.multiplyScalar(1 / loop.length);
+  const normal = n.clone();
+  state.face = { normal, point: center.clone(), loop, center: center.clone() };
+  buildFaceHighlight(loop, normal);
+  syncFaceHint();
+  showFaceMenu();
+}
+
+/* 悬停：选平面阶段预览可平面；线段工具更新橡皮筋与闭合提示；物体模式换指针样式 */
+viewport.addEventListener('pointermove', (e) => {
+  if (drag) return;
+  if (state.ex.picking) { hoverExtrudeDir(e); return; }   // 拾取方向：高亮候选边
+  if (state.mode === 'sketch' && state.sketchStage === 'plane') {
+    renderPlaneHover(pick(e));
+    return;
+  }
+  const p = state.mode === 'sketch' ? planePoint(e) : groundPoint(e);
+  state.hoverPoint = p;
+
+  if (state.mode === 'sketch' && state.draft && state.draft.type === 'line') {
+    state.closeReady = false;
+    if (p && state.draft.points.length >= 3) {
+      const [fx, fy] = state.draft.points[0];
+      const [px, py] = worldToPlane2D(p);
+      state.closeReady = Math.hypot(px - fx, py - fy) <= 3;
+    }
+    renderDraft();
+    return;
+  }
+
+  if (state.mode === 'object' && state.tool === 'select') {
+    renderer.domElement.style.cursor = pick(e) ? 'move' : 'default';
+  }
+});
+
+/* ============================================================================
+   14 · 界面文案 / 状态刷新
+   ========================================================================== */
+function updateHints() {
+  const dots = '<span class="dot"></span>';
+  let html = '';
+
+  if (state.mode === 'sketch') {
+    if (state.sketchStage === 'plane') {
+      html = `<b>第 1 步 · 选择绘制平面</b>${dots}点击【地面网格】或某个【实体表面】作为草图平面${dots}悬停可预览${dots}<kbd>Esc</kbd> 退出`;
+    } else if (state.tool === 'sketch') {
+      html = `<b>第 2 步 · 线段</b>${dots}左键点起点、再点终点即成线${dots}端点自动吸附 5mm 格点并高亮${dots}点白色标签可填长度、点绿勾确定${dots}<b>双击</b> 结束开放线段${dots}<kbd>Enter</kbd> 闭合并退出`;
+    } else {
+      html = `<b>第 2 步 · ${SKETCH_TOOL_HINT[state.tool] || '拖拽绘制'}</b>${dots}按住左键在所选平面上拖出尺寸${dots}松开生成草图${dots}<kbd>Esc</kbd> 重新选平面`;
+    }
+  } else if (isPrimitive(state.tool)) {
+    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>Shift</kbd>+左键 旋转视角${dots}<kbd>Esc</kbd> 取消`;
+  } else if (state.face) {
+    html = `<b>已选面</b>${dots}点浮出的「<b>拉伸</b>」或按 <kbd>E</kbd>${dots}可选 新建 / 加 / 减 / 交 运算${dots}<kbd>Esc</kbd> 取消`;
+  } else {
+    html = `<b>拖动实体</b> 移动${dots}单击选定，再点一次 <b>选面</b>${dots}<b>左键</b>（空白处）旋转${dots}<b>中键按住</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
+  }
+  $('hintbar').innerHTML = html;
+}
+
+function updateStatus() {
+  const n = modelGroup.children.length;
+  const desc = state.selected && state.selected.userData.desc;
+  $('statusbar').textContent = desc
+    ? `${n} 个对象 · 已选中 ${TYPE_LABEL[desc.kind]}${state.selectedB ? ' + B（可布尔运算）' : ' · Shift 点第二个实体做布尔'}`
+    : `${n} 个对象`;
+  updateFirstRun();   // 任何状态刷新都同步首帧引导的显隐，避免残留
+}
+
+function updateFirstRun() {
+  const empty = modelGroup.children.length === 0;
+  $('firstRun').style.display = (empty && state.mode === 'object') ? '' : 'none';
+}
+
+function updateUndoBtn() {
+  $('btnUndo').disabled = undoStack.length === 0;
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1900);
+}
+
+/* ============================================================================
+   14.5 · ViewCube 视角立方体（仿 3D One，视口左下角）
+   ----------------------------------------------------------------------------
+   · 常驻左下角，随主视图旋转同步转动，六个面 = 前 / 后 / 左 / 右 / 顶 / 底
+   · 棱边带倒角过渡（12 条棱的圆角圆柱 + 8 个角的圆球）
+   · 点击某个面 → 主视图平滑转到该面的标准视角
+   · 在立方体上按住拖动 → 只旋转魔方本身做预览，主视图不动；
+     松手后魔方回弹吸附回当前视角（若相机在标准方位即吸附到标准方位）
+   ========================================================================== */
+const VC_SIZE = 96;      // 立方体区域边长（CSS px）
+const VC_PAD = 12;       // 距视口左下角的边距（CSS px）
+
+const vcubeScene = new THREE.Scene();
+const vcubeCam = new THREE.PerspectiveCamera(42, 1, 0.1, 10);
+/* 小视口相机固定朝 -Z：up 用 Y 才是标准正交基（用 Z 会与视线平行导致 lookAt 退化、魔方整体偏 90°） */
+vcubeCam.up.set(0, 1, 0);
+vcubeCam.position.set(0, 0, 3.0);
+vcubeCam.lookAt(0, 0, 0);
+
+/** 面标签贴图：浅色面 + 高饱和彩色描边与文字（方案 B） */
+function vcubeFaceTexture(text, edge, ink) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  /* 极浅渐变白底，让面更亮 */
+  const g = ctx.createLinearGradient(0, 0, 128, 128);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(1, '#f3f7ff');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = 9;
+  ctx.strokeRect(5, 5, 118, 118);
+  ctx.fillStyle = ink;
+  ctx.font = 'bold 56px "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 64, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/* BoxGeometry 材质顺序：+X 右 / -X 左 / +Y 后 / -Y 前 / +Z 顶 / -Z 底 */
+const vcube = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  [
+    vcubeFaceTexture('右', '#ff8f4d', '#e2641a'),   // 暖橙
+    vcubeFaceTexture('左', '#38b6ff', '#1476c4'),   // 天蓝
+    vcubeFaceTexture('后', '#3fc79a', '#12865f'),   // 薄荷绿
+    vcubeFaceTexture('前', '#ff6f8d', '#d63a5f'),   // 珊瑚粉
+    vcubeFaceTexture('顶', '#ffc44d', '#c0840b'),   // 明黄
+    vcubeFaceTexture('底', '#a98cf5', '#6e45c9')    // 淡紫
+  ].map((t) => new THREE.MeshBasicMaterial({ map: t }))
+);
+vcubeScene.add(vcube);
+
+/* 棱边倒角：12 条棱各放一根圆角圆柱、8 个角各放一颗圆球（略凸出表面形成过渡） */
+const VC_R = 0.07;
+(function addVcubeChamfer() {
+  const mat = new THREE.MeshBasicMaterial({ color: 0xf2f6fd });
+  /* CylinderGeometry 轴向是 Y：沿 X 的棱转 Z 90°，沿 Z 的棱转 X 90° */
+  const cylGeo = {
+    x: new THREE.CylinderGeometry(VC_R, VC_R, 1 - 2 * VC_R, 14, 1, true),
+    y: new THREE.CylinderGeometry(VC_R, VC_R, 1 - 2 * VC_R, 14, 1, true),
+    z: new THREE.CylinderGeometry(VC_R, VC_R, 1 - 2 * VC_R, 14, 1, true)
+  };
+  cylGeo.x.rotateZ(Math.PI / 2);
+  cylGeo.z.rotateX(Math.PI / 2);
+  const sphGeo = new THREE.SphereGeometry(VC_R, 14, 10);
+  for (const axis of ['x', 'y', 'z']) {
+    for (const a of [-0.5, 0.5]) {
+      for (const b of [-0.5, 0.5]) {
+        const cyl = new THREE.Mesh(cylGeo[axis], mat);
+        if (axis === 'x') cyl.position.set(0, a, b);
+        else if (axis === 'y') cyl.position.set(a, 0, b);
+        else cyl.position.set(a, b, 0);
+        vcube.add(cyl);
+      }
+    }
+  }
+  for (const sx of [-0.5, 0.5]) {
+    for (const sy of [-0.5, 0.5]) {
+      for (const sz of [-0.5, 0.5]) {
+        const sph = new THREE.Mesh(sphGeo, mat);
+        sph.position.set(sx, sy, sz);
+        vcube.add(sph);
+      }
+    }
+  }
+})();
+
+/* Z 朝上的球坐标工具（Three 内置 Spherical 是 Y 朝上的，不能用） */
+function sphericalZUp(v) {
+  const r = v.length();
+  return {
+    r,
+    phi: Math.acos(THREE.MathUtils.clamp(v.z / r, -1, 1)),
+    theta: Math.atan2(v.y, v.x)
+  };
+}
+function vectorFromSphericalZUp(s) {
+  return new THREE.Vector3(
+    s.r * Math.sin(s.phi) * Math.cos(s.theta),
+    s.r * Math.sin(s.phi) * Math.sin(s.theta),
+    s.r * Math.cos(s.phi)
+  );
+}
+
+/* 视角平滑过渡动画 */
+let viewAnim = null;
+/* 相机 up 稳定：Z 朝上体系里，顶/底正交视角的视线与 up=(0,0,1) 平行会退化，
+   网格变歪。接近极点时临时把 up 切到世界 Y 轴，保证网格横平竖直。 */
+function stabilizeCameraUp() {
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  if (Math.abs(dir.z) > 0.99995) camera.up.set(0, 1, 0);   // 顶/底视图：用 Y 作 up
+  else camera.up.set(0, 0, 1);                              // 其余：恢复 Z 朝上
+}
+function animateView(dir) {
+  const cur = sphericalZUp(camera.position.clone().sub(controls.target));
+  /* 顶面/底面避开数学极点（phi=0/π），留极小倾角，配合 stabilizeCameraUp 得到规整正交网格 */
+  let phi = Math.acos(THREE.MathUtils.clamp(dir.z, -1, 1));
+  const EPS = 0.0002;
+  if (phi < EPS) phi = EPS;
+  if (phi > Math.PI - EPS) phi = Math.PI - EPS;
+  let theta = Math.atan2(dir.y, dir.x);
+  if (Math.abs(dir.z) > 0.999) theta = cur.theta;        // 顶/底视图不转动方位角
+  let dth = theta - cur.theta;
+  dth = ((dth + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  viewAnim = {
+    t0: performance.now(), dur: 480, r: cur.r,
+    from: { phi: cur.phi, theta: cur.theta },
+    to: { phi, theta: cur.theta + dth }
+  };
+}
+function stepViewAnim() {
+  const k0 = Math.min(1, (performance.now() - viewAnim.t0) / viewAnim.dur);
+  const k = k0 < 0.5 ? 2 * k0 * k0 : 1 - Math.pow(-2 * k0 + 2, 2) / 2;
+  const phi = THREE.MathUtils.lerp(viewAnim.from.phi, viewAnim.to.phi, k);
+  const theta = THREE.MathUtils.lerp(viewAnim.from.theta, viewAnim.to.theta, k);
+  camera.position.copy(controls.target).add(vectorFromSphericalZUp({ r: viewAnim.r, phi, theta }));
+  stabilizeCameraUp();
+  camera.lookAt(controls.target);
+  if (k0 >= 1) viewAnim = null;
+}
+
+/* —— 拖拽魔方：直接旋转主视图，拖到哪停到哪（不回弹）——
+   用一份持续累积的球坐标，每帧直接写到主相机；松手不做任何吸附。 */
+const IDENTITY_Q = new THREE.Quaternion();
+let vcubeQOffset = new THREE.Quaternion();   // 恒为单位四元数（保留给探针/兼容，不再产生预览偏移）
+let vcubeDragS = null;    // 本次拖拽的累积球坐标 { r, phi, theta }
+
+/** 拖动魔方：按鼠标位移直接旋转主视图（累积，不回弹） */
+function rotateCubePreview(dx, dy) {
+  if (!vcubeDragS) vcubeDragS = sphericalZUp(camera.position.clone().sub(controls.target));
+  vcubeDragS.theta -= dx * 0.010;
+  vcubeDragS.phi = THREE.MathUtils.clamp(vcubeDragS.phi - dy * 0.010, 0.02, Math.PI - 0.02);
+  camera.position.copy(controls.target).add(vectorFromSphericalZUp(vcubeDragS));
+  stabilizeCameraUp();
+  camera.lookAt(controls.target);
+  controls.update();
+}
+
+/** ViewCube 屏幕区域（DOM 坐标） */
+function viewCubeRect() {
+  const h = viewport.clientHeight || 1;
+  return { x: VC_PAD, y: h - VC_PAD - VC_SIZE, w: VC_SIZE, h: VC_SIZE };
+}
+function inViewCube(e) {
+  const r = viewCubeRect();
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+function startViewCubeDrag(e) {
+  viewAnim = null;
+  vcubeDragS = null;   // 重置累积球坐标：本次拖拽从主相机当前视角起算
+  controls.enabled = false;   // 拖魔方时关掉 OrbitControls，避免两套旋转同时作用
+  drag = { kind: 'vcube', x: e.clientX, y: e.clientY, moved: false };
+}
+
+/** 立方体上的射线拾取（独立的视口小相机） */
+const vcubeRay = new THREE.Raycaster();
+function vcubePick(e) {
+  const r = viewCubeRect();
+  /* 统一到画布局部坐标：e.clientX/Y 是页面坐标，魔方区域按画布左下角计算 */
+  const rect = renderer.domElement.getBoundingClientRect();
+  const lx = e.clientX - rect.left, ly = e.clientY - rect.top;
+  const nx = ((lx - r.x) / r.w) * 2 - 1;
+  const ny = -(((ly - r.y) / r.h) * 2 - 1);
+  vcubeRay.setFromCamera(new THREE.Vector2(nx, ny), vcubeCam);
+  const hits = vcubeRay.intersectObject(vcube, false);
+  return hits.length ? hits[0] : null;
+}
+
+/** 点击立方体的某个面 → 主视图转到该面的标准视角 */
+function viewCubeClick(e) {
+  const hit = vcubePick(e);
+  if (!hit) return;
+  /* 魔方姿态只是为了跟随主视角显示；面的「局部」法线才代表它标注的世界方位，
+     不能用 transformDirection 后的世界法线，否则点「顶」会跳到别的面。 */
+  const wn = hit.face.normal.clone();
+  /* 取最接近的世界主轴方向 */
+  const axes = [
+    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
+  ];
+  let best = axes[0], bd = -2;
+  axes.forEach((v) => { const d = v.dot(wn); if (d > bd) { bd = d; best = v; } });
+  animateView(best);
+}
+
+/** 把立方体渲染进主画布左下角（scissor 小视口） */
+function renderViewCube() {
+  /* 魔方姿态直接跟随主相机（无预览偏移、无回弹） */
+  vcube.quaternion.copy(camera.quaternion).invert();
+  vcube.updateMatrixWorld();
+  const w = viewport.clientWidth || 1;
+  const h = viewport.clientHeight || 1;
+  renderer.clearDepth();
+  renderer.setScissorTest(true);
+  renderer.setScissor(VC_PAD, VC_PAD, VC_SIZE, VC_SIZE);
+  renderer.setViewport(VC_PAD, VC_PAD, VC_SIZE, VC_SIZE);
+  renderer.render(vcubeScene, vcubeCam);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, w, h);
+}
+
+/* ============================================================================
+   15 · 尺寸自适应与渲染循环
+   ========================================================================== */
+function resize() {
+  const w = viewport.clientWidth || 1;
+  const h = viewport.clientHeight || 1;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  positionFaceUI();
+}
+
+window.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(viewport);
+
+/* ============================================================================
+   14.5 · 尺寸编辑 gizmo（3D One 式：三轴蓝色双箭头 + 可输入数值标签）
+   ----------------------------------------------------------------------------
+   选中基本体时在包围盒中心画出三条带箭头的轴，每条轴末端一个白色胶囊标签显示
+   该方向的尺寸；点击标签直接输入数值回车即可精确改尺寸（替代拖拽缩放）。
+   浮层用 SVG（箭头/虚线）+ HTML（标签）绘制，随相机每帧投影更新。
+   ========================================================================== */
+const dimLayer = $('dimLayer'), dimSvg = $('dimSvg'), dimLabels = $('dimLabels');
+const DIM_COLOR = '#1e90ff';
+/** 箭头末端离模型表面的固定屏幕间隙（px）：拖拽时箭头跟鼠标走，杆长不随尺寸变化 */
+const DIM_GAP_PX = 46;
+let dimEditing = false;
+let dimDrag = null;                // 正在拖动箭头改尺寸
+
+/** 轴方向：x/y/z 为世界轴；r/R/r1/r2 等径向尺寸取与视线夹角更大的水平轴，
+    保证圆柱只出现「一个半径方向 + 一个高度方向」，箭头不会因视角重合。 */
+function dimAxisDir(key) {
+  if (key === 'z') return new THREE.Vector3(0, 0, 1);
+  if (key === 'x') return new THREE.Vector3(1, 0, 0);
+  if (key === 'y') return new THREE.Vector3(0, 1, 0);
+  const view = camera.position.clone().sub(controls.target).normalize();
+  return Math.abs(view.x) > Math.abs(view.y)
+    ? new THREE.Vector3(0, 1, 0)
+    : new THREE.Vector3(1, 0, 0);
+}
+
+/** 由 desc 得到需要标注的方向：[轴键, 显示值(mm), 参数键]。
+    旋转体各径向完全相同，只给一条径向标注（不再重复 X/Y 两条直径）。 */
+function dimAxesOf(desc) {
+  const p = desc.params || {};
+  switch (desc.kind) {
+    case 'box': return [['x', p.w, 'w'], ['y', p.d, 'd'], ['z', p.h, 'h']];
+    case 'sphere': return [['r', p.r * 2, 'r']];
+    case 'torus': return [['R', (p.R + p.r) * 2, 'R'], ['z', p.r * 2, 'r']];
+    case 'cylinder': return [['r', p.r * 2, 'r'], ['z', p.h, 'h']];
+    case 'cone': return [['r', p.r * 2, 'r'], ['z', p.h, 'h']];
+    case 'ellipsoid': return [['x', p.a * 2, 'a'], ['y', p.b * 2, 'b'], ['z', p.c * 2, 'c']];
+    case 'pyramid': return [['r', p.r * 2, 'r'], ['z', p.h, 'h']];
+    case 'frustum': return [['r1', p.r1 * 2, 'r1'], ['z', p.h, 'h']];
+    default: return null;
+  }
+}
+
+function dimParamIsRadius(kind, key) {
+  return ['r', 'R', 'r1', 'r2', 'a', 'b', 'c'].includes(key);
+}
+
+function projectToScreen(v3) {
+  const p = v3.clone().project(camera);
+  const rect = renderer.domElement.getBoundingClientRect();
+  return {
+    x: (p.x * 0.5 + 0.5) * rect.width,
+    y: (-p.y * 0.5 + 0.5) * rect.height,
+    z: p.z
+  };
+}
+
+/** 固定屏幕大小的实心箭头头（不随尺寸变长）：在 tip 处画一个朝 (ux,uy) 的粗蓝箭头 */
+function arrowHeadAt(tip, ux, uy, color) {
+  const len = 22, half = 9.5;          // 屏幕像素，恒定
+  const px = -uy, py = ux;
+  const bx = tip.x - ux * len, by = tip.y - uy * len;
+  return `<path d="M${tip.x.toFixed(1)},${tip.y.toFixed(1)} `
+    + `L${(bx + px * half).toFixed(1)},${(by + py * half).toFixed(1)} `
+    + `L${(bx - px * half).toFixed(1)},${(by - py * half).toFixed(1)} Z" `
+    + `fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`;
+}
+
+function updateDimGizmo() {
+  const obj = state.selected;
+  const desc0 = obj && obj.userData.desc;
+  /* 只在「刚放置、尚未确定」的基本体上显示；点确定后再次选中不再出现 */
+  if (!obj || !desc0 || desc0.dimPending !== true || !isPrimitive(desc0.kind)
+      || state.face || state.mode === 'sketch' || state.placing) {
+    dimLayer.classList.remove('show');
+    return;
+  }
+  /* 正在输入数值时：保持浮层可见（含正在编辑的输入框），仅跳过位置刷新。
+     注意：拖动箭头时不能跳过——否则要等松手后箭头才跳过去，不够跟手。 */
+  if (dimEditing) { dimLayer.classList.add('show'); return; }
+  const desc = desc0;
+  const axes = dimAxesOf(desc);
+  if (!axes) { dimLayer.classList.remove('show'); return; }
+
+  obj.updateMatrixWorld();
+  obj.geometry.computeBoundingBox();
+  const bb = obj.geometry.boundingBox;
+  const centerLocal = bb.getCenter(new THREE.Vector3());
+  const size = bb.getSize(new THREE.Vector3());
+  const center = centerLocal.clone().applyMatrix4(obj.matrixWorld);
+  const cS = projectToScreen(center);
+
+  // 包围盒虚线框（12 条棱）
+  const min = bb.min, max = bb.max;
+  const corners = [];
+  for (const xi of [min.x, max.x]) for (const yi of [min.y, max.y]) for (const zi of [min.z, max.z]) {
+    corners.push(projectToScreen(new THREE.Vector3(xi, yi, zi).applyMatrix4(obj.matrixWorld)));
+  }
+  const edges = [[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];
+  let svg = `<g stroke="#8fb8cc" stroke-width="1.1" stroke-dasharray="4 4" fill="none" opacity=".85">`;
+  edges.forEach(([a, b]) => { svg += `<line x1="${corners[a].x.toFixed(1)}" y1="${corners[a].y.toFixed(1)}" x2="${corners[b].x.toFixed(1)}" y2="${corners[b].y.toFixed(1)}"/>`; });
+  svg += `</g>`;
+
+  // 每个方向：模型表面锚点 → 虚线 → 固定大小箭头头；拖拽中箭头尖端实时跟随鼠标
+  const labels = [];
+  axes.forEach((rec, idx) => {
+    const axisKey = rec[0], value = rec[1];
+    const dir = dimAxisDir(axisKey);
+    /* 锚点落在模型表面：value 是完整尺寸(直径/宽/高)，半值即表面到中心的距离 */
+    const anchorWorld = center.clone().addScaledVector(dir, value / 2);
+    const anchorS = projectToScreen(anchorWorld);
+    /* 屏幕轴向 + 每毫米对应像素（投影中心与「中心+1mm」，与尺寸无关，恒定比例） */
+    const oneMM = projectToScreen(center.clone().addScaledVector(dir, 1));
+    let ux = oneMM.x - cS.x, uy = oneMM.y - cS.y;
+    let ulen = Math.hypot(ux, uy);
+    if (ulen < 0.001) { ux = 0; uy = -1; ulen = 1; }   // 轴向正对镜头时的退化方向
+    ux /= ulen; uy /= ulen;
+    const pxPerMM = Math.max(0.35, ulen);
+    /* 箭头尖端：拖拽中的当前轴用实时鼠标投影位置，否则固定在表面外一点点 */
+    let tipS;
+    if (dimDrag && dimDrag.i === idx && dimDrag.tipS) {
+      tipS = dimDrag.tipS;
+    } else {
+      const rest = Math.max(26, DIM_GAP_PX);
+      tipS = { x: anchorS.x + ux * rest, y: anchorS.y + uy * rest };
+    }
+    /* 虚线：模型表面 → 箭头（3D One 截图同款：细虚线引出，箭头本身不伸长） */
+    svg += `<line x1="${anchorS.x.toFixed(1)}" y1="${anchorS.y.toFixed(1)}" x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}"`
+      + ` stroke="#5b7185" stroke-width="1.5" stroke-dasharray="5 4" opacity=".9"/>`;
+    /* 固定大小箭头头 */
+    svg += arrowHeadAt(tipS, ux, uy, DIM_COLOR);
+    /* 透明拖拽热区：整条引出线都可抓 */
+    svg += `<line class="dim-hit" data-i="${idx}" x1="${anchorS.x.toFixed(1)}" y1="${anchorS.y.toFixed(1)}"`
+      + ` x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}" stroke="transparent"`
+      + ` stroke-width="18" pointer-events="stroke"/>`;
+    labels.push({
+      key: rec[2], value, axis: axisKey,
+      /* 标签紧挨箭头尖端外侧 */
+      x: tipS.x + ux * 24, y: tipS.y + uy * 24,
+      radius: dimParamIsRadius(desc.kind, rec[2]),
+      ux, uy, pxPerMM, anchorS, tipS
+    });
+  });
+
+  // 中心红靶心
+  svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="8" fill="none" stroke="#e0453f" stroke-width="1.7"/>`
+      + `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="3" fill="#e0453f"/>`;
+
+  dimSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
+  dimSvg.innerHTML = svg;
+
+  const confirm = $('dimConfirm');
+  confirm.style.left = cS.x + 'px';
+  confirm.style.top = (cS.y + 52) + 'px';
+
+  // 标签：复用 DOM（避免每帧重建打断输入）
+  if (dimLabels.dataset.kind !== desc.kind || dimLabels.children.length !== labels.length) {
+    dimLabels.dataset.kind = desc.kind;
+    dimLabels.innerHTML = labels.map((_, i) => `<div class="dim-tag" data-i="${i}"></div>`).join('');
+    dimLabels.querySelectorAll('.dim-tag').forEach((el) => {
+      el.addEventListener('click', (e) => { e.stopPropagation(); beginDimEdit(parseInt(el.dataset.i, 10)); });
+    });
+  }
+  labels.forEach((L, i) => {
+    const el = dimLabels.children[i];
+    if (!el || el.classList.contains('editing')) return;
+    el.style.left = L.x + 'px';
+    el.style.top = L.y + 'px';
+    el._data = L;
+    el.innerHTML = round1(L.value).toFixed(1) + '<span class="u"> mm</span>';
+  });
+  dimLayer.classList.add('show');
+}
+
+function beginDimEdit(i) {
+  const el = dimLabels.children[i];
+  const L = el && el._data;
+  if (!L) return;
+  const obj = state.selected;
+  if (!obj) return;
+  dimEditing = true;
+  el.classList.add('editing');
+  el.innerHTML = `<input type="number" step="0.5" min="0.5" value="${round1(L.value)}">`;
+  const input = el.querySelector('input');
+  input.focus(); input.select();
+  const finish = (commit) => {
+    if (!el.classList.contains('editing')) return;
+    const v = commit ? parseFloat(input.value) : NaN;
+    el.classList.remove('editing');
+    dimEditing = false;
+    if (isFinite(v) && v > 0) {
+      const desc = obj.userData.desc;
+      const val = L.radius ? v / 2 : v;
+      beginEdit();
+      desc.params[L.key] = Math.max(MIN_SIZE, round1(val));
+      updateObject(obj);
+      commitEdit();
+      syncPanel();
+      toast('已将尺寸改为 ' + round1(v) + ' mm');
+    }
+    updateDimGizmo();
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+/* —— 拖动蓝色箭头直接改尺寸（3D One 式）—— */
+dimSvg.addEventListener('pointerdown', (e) => {
+  const hit = e.target.closest && e.target.closest('.dim-hit');
+  if (!hit || dimEditing) return;
+  const i = parseInt(hit.dataset.i, 10);
+  const el = dimLabels.children[i];
+  const L = el && el._data;
+  const obj = state.selected;
+  if (!L || !obj) return;
+  e.preventDefault();
+  e.stopPropagation();
+  dimDrag = {
+    i, obj, L,
+    sx: e.clientX, sy: e.clientY,
+    startValue: L.value,
+    /* 箭头尖端跟随鼠标：记录起始尖端位置 + 屏幕轴方向，拖动时实时算出新尖端 */
+    tip0: L.tipS, tipS: L.tipS, ux: L.ux, uy: L.uy, pxPerMM: L.pxPerMM,
+    anchor: L.anchorS
+  };
+  beginEdit();
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!dimDrag) return;
+  const d = dimDrag;
+  const mvx = e.clientX - d.sx, mvy = e.clientY - d.sy;
+  const along = mvx * d.ux + mvy * d.uy;            // 沿轴位移(像素)
+  const v = Math.max(MIN_SIZE, round1(d.startValue + along / d.pxPerMM));
+  const desc = d.obj.userData.desc;
+  desc.params[d.L.key] = Math.max(MIN_SIZE, round1(d.L.radius ? v / 2 : v));
+  updateObject(d.obj);
+  syncPanel();
+  /* 箭头尖端立即跟到当前鼠标位置（沿轴投影），不等待尺寸计算/松手 */
+  d.tipS = {
+    x: d.tip0.x + along * d.ux,
+    y: d.tip0.y + along * d.uy
+  };
+  const el = dimLabels.children[d.i];
+  if (el && !el.classList.contains('editing')) {
+    el.innerHTML = v.toFixed(1) + '<span class="u"> mm</span>';
+    el.style.left = d.tipS.x + d.ux * 24 + 'px';
+    el.style.top = d.tipS.y + d.uy * 24 + 'px';
+  }
+  updateDimGizmo();   // 实时重绘箭头，尖端贴着鼠标走
+});
+
+window.addEventListener('pointerup', () => {
+  if (!dimDrag) return;
+  dimDrag = null;
+  commitEdit();
+  updateDimGizmo();
+});
+
+/** 自动确认：切换模型/工具/模式时，把上一个未确定模型的标注收起（不再显示） */
+function autoConfirmDim() {
+  const prev = state.selected;
+  if (prev && prev.userData.desc && prev.userData.desc.dimPending === true) {
+    prev.userData.desc.dimPending = false;
+    applyBodyAppearance(prev);   // 确认后由透明浅绿恢复为正式配色
+  }
+  if (dimEditing) {
+    dimEditing = false;
+    dimLabels.querySelectorAll('.editing').forEach((el) => el.classList.remove('editing'));
+  }
+  dimDrag = null;
+}
+
+/** 点击绿色「确定」：收起标注，之后选中该模型不再出现尺寸和箭头 */
+function confirmDim() {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc) return;
+  autoConfirmDim();
+  dimLayer.classList.remove('show');
+  syncPanel();
+  updateStatus();
+  toast('尺寸已确定');
+}
+$('dimConfirm').addEventListener('click', (e) => { e.stopPropagation(); confirmDim(); });
+
+renderer.setAnimationLoop(() => {
+  if (viewAnim) stepViewAnim();
+  stabilizeCameraUp();          // 顶/底视角用 Y 作 up，避免网格歪斜
+  controls.update();
+  renderer.render(scene, camera);
+  renderViewCube();
+  updateDimGizmo();
+  updateSegOverlay();
+});
+
+/* 启动 */
+resize();
+syncToolUI();
+syncPanel();
+updateFirstRun();
+updateStatus();
+updateUndoBtn();
+
+/* ============================================================================
+   15.5 · 二次开发 / 自动化入口（不参与界面逻辑，方便扩展与联调）
+   ========================================================================== */
+window.Sketch3D = {
+  THREE,
+  CSG,
+  scene, camera, renderer, controls,
+  modelGroup, overlayGroup, faceGroup, ghostGroup, draftGroup, state,
+  buildObject, updateObject, select, pickFace, pickSketchFace,
+  faceBoundary, buildFaceHighlight, faceExtrudeDesc, applyExtrude,
+  sketchToPlate, commitSketch, addSketchPoint, closeSketch, shapePoints, booleanWith,
+  updateSegOverlay, clearSegOverlay,
+  lockSketchPlane, backToPickPlane,
+  openExtrudePanel, closeExtrudePanel, setTool, setMode,
+  entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
+  animateView, viewCubeRect,
+  primitiveDesc, makeGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
+  confirmDim, autoConfirmDim, applyBodyAppearance,
+  serializeScene, restoreScene, undo,
+  saveZ1, openZ1, exportSTL, exportSTEP, buildSTEP, buildSTLBinary, collectExportTriangles, download
+};
+
+/* 内部探针（只读，供自动化检查；不参与业务） */
+Object.defineProperty(window.Sketch3D, '__vcube', { get: () => vcube });
+Object.defineProperty(window.Sketch3D, '__vcubeCam', { get: () => vcubeCam });
+Object.defineProperty(window.Sketch3D, '__vcubePick', { get: () => vcubePick });
+/* 拖拽联调：注入一个临时 dimDrag（用当前标签数据），供自动化模拟 pointermove 中途态 */
+window.Sketch3D.setDragForTest = (L) => {
+  dimDrag = {
+    i: 0, obj: state.selected, L,
+    sx: 0, sy: 0, startValue: L.value,
+    tip0: L.tipS, tipS: L.tipS, ux: L.ux, uy: L.uy, pxPerMM: L.pxPerMM, anchor: L.anchorS
+  };
+};
+window.Sketch3D.getDragTip = () => dimDrag && dimDrag.tipS ? { ...dimDrag.tipS } : null;
+window.Sketch3D.clearDragForTest = () => { dimDrag = null; };
+Object.defineProperty(window.Sketch3D, '__vcubeQOffset', { get: () => vcubeQOffset.clone() });
+Object.defineProperty(window.Sketch3D, '__camSpherical', { get: () => sphericalZUp(camera.position.clone().sub(controls.target)) });
+Object.defineProperty(window.Sketch3D, '__findSketchBooleanHost', { get: () => findSketchBooleanHost });
+Object.defineProperty(window.Sketch3D, '__fpSrc', { get: () => Function.prototype.toString.call(finishPlacement) });
+Object.defineProperty(window.Sketch3D, '__applyExtrudeSrc', { get: () => Function.prototype.toString.call(applyExtrude) });
+Object.defineProperty(window.Sketch3D, '__addSketchPointSrc', { get: () => Function.prototype.toString.call(addSketchPoint) });
+Object.defineProperty(window.Sketch3D, '__camUp', { get: () => camera.up.clone() });
+Object.defineProperty(window.Sketch3D, '__viewAnim', { get: () => viewAnim ? { from: {...viewAnim.from}, to: {...viewAnim.to} } : null });
+Object.defineProperty(window.Sketch3D, '__chooseSketchPlaneSrc', { get: () => Function.prototype.toString.call(chooseSketchPlane) });
+
+/* ============================================================================
+   16 · 文件：.z1 工程保存 / 打开 + STL / STEP 导出（供 3D One 输入）
+   ----------------------------------------------------------------------------
+   · .z1 是本工作台的专属工程格式（JSON 结构，可继续编辑）；
+     3D One 的私有 Z1 格式规范未公开，无法直接生成，故另提供标准 STL/STEP 导出，
+     经 3D One「输入」通道导入，实现几何互通。
+   ========================================================================== */
+
+/** 通用下载 */
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1200);
+}
+
+/** 收集可导出三角面（世界坐标）：排除草图线条，保留实体与拉伸面 */
+function collectExportTriangles() {
+  const tris = [];
+  modelGroup.children.forEach((o) => {
+    if (!o.isMesh || !o.userData.desc) return;
+    const d = o.userData.desc;
+    if (d.kind === 'sketch') return;             // 草图辅助对象不导出
+    o.updateMatrixWorld(true);
+    const g = o.geometry, pos = g && g.attributes.position;
+    if (!pos) return;
+    const idx = g.index;
+    const cnt = idx ? idx.count : pos.count;
+    const v = new THREE.Vector3();
+    const at = (i) => {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      return [v.x, v.y, v.z];
+    };
+    for (let i = 0; i + 2 < cnt; i += 3) {
+      const a = at(idx ? idx.getX(i) : i);
+      const b = at(idx ? idx.getX(i + 1) : i + 1);
+      const c = at(idx ? idx.getX(i + 2) : i + 2);
+      /* 跳过退化三角形 */
+      const ux = b[0]-a[0], uy = b[1]-a[1], uz = b[2]-a[2];
+      const vx = c[0]-a[0], vy = c[1]-a[1], vz = c[2]-a[2];
+      const nx = uy*vz-uz*vy, ny = uz*vx-ux*vz, nz = ux*vy-uy*vx;
+      if (nx*nx+ny*ny+nz*nz < 1e-14) continue;
+      tris.push([a, b, c]);
+    }
+  });
+  return tris;
+}
+
+/** 保存为 .z1 工程文件（本工作台可重新打开继续编辑） */
+function saveZ1() {
+  const data = {
+    format: 'z1', app: 'Sketch3D', version: 1,
+    savedAt: new Date().toISOString(),
+    objects: modelGroup.children.map((o) => o.userData.desc).filter(Boolean)
+  };
+  download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'Sketch3D模型.z1');
+  toast('已保存 .z1 工程文件（可在本工作台重新打开继续编辑）');
+}
+
+/** 打开 .z1 工程文件 */
+function openZ1(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const arr = Array.isArray(data) ? data : data.objects;
+      if (!Array.isArray(arr)) throw new Error('bad format');
+      restoreScene(JSON.stringify(arr));   // 复用统一的场景还原路径
+      undoStack.length = 0;
+      updateUndoBtn();
+      toast('已打开「' + file.name + '」：' + arr.length + ' 个对象');
+    } catch (e) {
+      toast('打开失败：不是有效的 .z1 工程文件');
+    }
+  };
+  reader.onerror = () => toast('读取文件失败');
+  reader.readAsText(file);
+}
+
+/** 二进制 STL（80 头 + uint32 面数 + 每面 50 字节） */
+function buildSTLBinary(tris) {
+  const buf = new ArrayBuffer(84 + tris.length * 50);
+  const dv = new DataView(buf);
+  const hdr = 'Sketch3D STL Export';
+  for (let i = 0; i < hdr.length && i < 80; i++) dv.setUint8(i, hdr.charCodeAt(i));
+  dv.setUint32(80, tris.length, true);
+  let off = 84;
+  for (const [a, b, c] of tris) {
+    const ux=b[0]-a[0], uy=b[1]-a[1], uz=b[2]-a[2];
+    const vx=c[0]-a[0], vy=c[1]-a[1], vz=c[2]-a[2];
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const len=Math.hypot(nx,ny,nz)||1; nx/=len; ny/=len; nz/=len;
+    const vals=[nx,ny,nz, a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]];
+    for (const x of vals) { dv.setFloat32(off, x, true); off += 4; }
+    dv.setUint16(off, 0, true); off += 2;
+  }
+  return buf;
+}
+
+/** STEP AP214（三角面片 faceted brep）——3D One「输入」可识别 */
+function buildSTEP(tris) {
+  let id = 100;
+  const N = () => '#' + (++id);
+  const num = (v) => {
+    if (!isFinite(v) || Math.abs(v) < 1e-9) v = 0;
+    let s = v.toFixed(6).replace(/0+$/, '');
+    if (s.endsWith('.')) s += '0';
+    return s;
+  };
+  const vec3 = (v) => `(${num(v[0])},${num(v[1])},${num(v[2])})`;
+  const key = (p) => p.map((x) => x.toFixed(4)).join(',');
+  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const norm = (v) => Math.hypot(v[0], v[1], v[2]) || 1;
+  const unit = (v) => { const n = norm(v); return [v[0]/n, v[1]/n, v[2]/n]; };
+  const cross = (u, v) => [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+
+  /* 顶点去重：CARTESIAN_POINT + VERTEX_POINT */
+  const ptId = new Map(), vpId = new Map();
+  const vLines = [];
+  tris.forEach((t) => t.forEach((p) => {
+    const k = key(p);
+    if (ptId.has(k)) return;
+    const pc = N(), vp = N();
+    ptId.set(k, pc); vpId.set(k, vp);
+    vLines.push(`${pc}=CARTESIAN_POINT('',${vec3(p)});`);
+    vLines.push(`${vp}=VERTEX_POINT('',${pc});`);
+  }));
+
+  const faces = [];
+  const fLines = [];
+  for (const [a, b, c] of tris) {
+    const ka = key(a), kb = key(b), kc = key(c);
+    const pa = ptId.get(ka), pb = ptId.get(kb), pc = ptId.get(kc);
+    const va = vpId.get(ka), vb = vpId.get(kb), vc = vpId.get(kc);
+    const nDir = N(), uDir = N();
+    fLines.push(`${nDir}=DIRECTION('',${vec3(unit(cross(sub(b, a), sub(c, a))))});`);
+    fLines.push(`${uDir}=DIRECTION('',${vec3(unit(sub(b, a)))});`);
+    const ax = N(), plane = N();
+    fLines.push(`${ax}=AXIS2_PLACEMENT_3D('',${pa},${nDir},${uDir});`);
+    fLines.push(`${plane}=PLANE('',${ax});`);
+    const edges = [];
+    const pairs = [[a, b, pa, pb, va, vb], [b, c, pb, pc, vb, vc], [c, a, pc, pa, vc, va]];
+    for (const [s, e, ps, pe, vs, ve] of pairs) {
+      const d = sub(e, s), len = norm(d);
+      const dir = N(), vec = N(), lin = N(), ec = N();
+      fLines.push(`${dir}=DIRECTION('',${vec3(unit(d))});`);
+      fLines.push(`${vec}=VECTOR('',${dir},${num(len)});`);
+      fLines.push(`${lin}=LINE('',${ps},${vec});`);
+      fLines.push(`${ec}=EDGE_CURVE('',${vs},${ve},${lin},.T.);`);
+      edges.push(ec);
+    }
+    const loop = N(), bound = N(), face = N();
+    fLines.push(`${loop}=EDGE_LOOP((${edges.join(',')}));`);
+    fLines.push(`${bound}=FACE_BOUND('',${loop},.T.);`);
+    fLines.push(`${face}=ADVANCED_FACE('',(${bound}),${plane},.T.);`);
+    faces.push(face);
+  }
+  const shell = N(), solid = N();
+  fLines.push(`${shell}=CLOSED_SHELL('',(${faces.join(',')}));`);
+  fLines.push(`${solid}=MANIFOLD_SOLID_BREP('',${shell});`);
+
+  const head = [
+    'ISO-10303-21;',
+    'HEADER;',
+    "FILE_DESCRIPTION(('Sketch3D STEP Export'),'2;1');",
+    `FILE_NAME('model.step','${new Date().toISOString()}',('Sketch3D'),('Sketch3D'),'Sketch3D','','');`,
+    "FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 3 1 1 }'));",
+    'ENDSEC;',
+    'DATA;',
+    "#1=APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#2);",
+    "#2=APPLICATION_CONTEXT('core data for automotive mechanical design processes');",
+    "#3=PRODUCT('model','model','',(#4));",
+    "#4=PRODUCT_CONTEXT('',#2,'mechanical');",
+    "#5=PRODUCT_DEFINITION_SHAPE('','',#6);",
+    "#6=PRODUCT_DEFINITION('','',#7,#8);",
+    "#7=PRODUCT_DEFINITION_FORMATION('','',#3);",
+    "#8=PRODUCT_DEFINITION_CONTEXT('part definition',#2,'design');",
+    '#9=SHAPE_DEFINITION_REPRESENTATION(#5,#10);',
+    `#10=ADVANCED_BREP_SHAPE_REPRESENTATION('',(#11,${solid}),#12);`,
+    "#11=AXIS2_PLACEMENT_3D('',#13,#14,#15);",
+    '#12=(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#16))GLOBAL_UNIT_ASSIGNED_CONTEXT((#17,#18,#19))REPRESENTATION_CONTEXT(\'\',\'\'));',
+    "#13=CARTESIAN_POINT('',(0.,0.,0.));",
+    "#14=DIRECTION('',(0.,0.,1.));",
+    "#15=DIRECTION('',(1.,0.,0.));",
+    "#16=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-07),#17,'distance_accuracy_value','');",
+    '#17=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));',
+    '#18=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));',
+    '#19=(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT());'
+  ];
+  return head.concat(vLines, fLines, ['ENDSEC;', 'END-ISO-10303-21;']).join('\n') + '\n';
+}
+
+/** 导出 STL（3D One「输入」支持） */
+function exportSTL() {
+  const tris = collectExportTriangles();
+  if (!tris.length) return toast('没有可导出的实体，请先建模');
+  download(new Blob([buildSTLBinary(tris)], { type: 'application/octet-stream' }), 'model.stl');
+  toast(`已导出 STL：${tris.length} 个三角面，可在 3D One「输入」中导入`);
+}
+
+/** 导出 STEP（3D One「输入」支持） */
+function exportSTEP() {
+  const tris = collectExportTriangles();
+  if (!tris.length) return toast('没有可导出的实体，请先建模');
+  download(new Blob([buildSTEP(tris)], { type: 'application/step' }), 'model.step');
+  toast(`已导出 STEP：${tris.length} 个三角面，可在 3D One「输入」中导入`);
+}
+
+/* 文件按钮事件绑定 */
+$('btnSave').addEventListener('click', saveZ1);
+$('btnOpen').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) openZ1(f);
+  e.target.value = '';
+});
+$('btnExport').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('exportDD').classList.toggle('open');
+});
+document.querySelectorAll('#exportDD [data-export]').forEach((b) => {
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('exportDD').classList.remove('open');
+    if (b.dataset.export === 'stl') exportSTL();
+    else if (b.dataset.export === 'step') exportSTEP();
+  });
+});
+document.addEventListener('click', () => $('exportDD').classList.remove('open'));
+
+/* ============================================================================
+   【使用说明】
+   ----------------------------------------------------------------------------
+   打开方式：双击本文件（Chrome / Edge）。首次打开需联网加载 Three.js 与
+   布尔运算库 CDN（若布尔库加载失败，基础建模仍可用，仅加/减/交不可用）。
+
+   一、基础实体
+      · 点击左侧「立方体 / 圆柱」，在地面按住左键拖出尺寸，松开完成放置；
+        不拖动直接松开 = 20mm 默认尺寸。放置后可在右侧改宽/高/深或半径。
+      · 实体按创建顺序轮换明亮配色（天蓝/薄荷/暖橙/淡紫/湖青），便于区分。
+
+   二、草图五件套（线段 / 矩形 / 圆 / 椭圆 / 正多边形）—— 两段式绘制
+      · 第 1 步：进入草图模式后，先【点击一次】选择绘制平面——
+        点地面网格 = 在 z=0 的 XY 平面（默认地面）画；点实体表面 = 草图贴着那个面画
+        （悬停时该面会淡橙色预览；选中的面保持橙色高亮）。
+      · 第 2 步：在所选平面上绘制：
+        线段 (S)：逐点点击绘线，回到起点（圆圈变橙）自动闭合；
+          ≥3 点时也可 Enter 闭合，Backspace 撤回一点，双击结束保留开放线段。
+        矩形 (R)：按住左键从一角拖到对角。
+        圆 (O)：按住左键从圆心拖出半径。
+        椭圆 (L)：按住左键从中心拖出长短轴。
+        正多边形 (P)：按住左键从中心拖出外接圆，等边等角；视口底部可设边数（3~12）。
+      · 按 Esc = 退回第 1 步重新选平面；再按 Esc = 退出草图模式。
+      只要轮廓一闭合，草图就直接变成一个【蓝色阴影平面】，
+      不需要任何额外操作 —— 它已经是一个面了。
+
+   三、面 → 体（拉伸，双入口冗余设计）
+      入口 A（视口浮层，3D One 式）：单击闭合草图（蓝色平面）或已选实体的面，
+        → 整面橙色高亮 + 浮出「拉伸」菜单（快捷键 E）→ 弹出面板：
+          · 高度输入实时预览；正向 / 反向；
+          · 四张运算卡片：新建实体 / 加运算 / 减运算 / 交运算
+            （草图没有母体，仅支持「新建实体」；布尔结果可继续选面继续运算）。
+      入口 B（右侧属性面板，冗余保留）：选中草图或面后，在面板里输入高度拉伸。
+      拉伸沿面的法向进行（地面草图默认沿 +Z 长高）。
+      这就是「线 → 面（自动）→ 体 + 布尔」的完整流程。
+
+   四、选择与移动（3D One 式操作）
+      · 按在实体上 = 立即选中；不松手直接拖 = 地面平移（5mm 吸附）。
+      · 已选中的实体再单击一次 = 选面；点空白处取消选择。
+      · 布尔运算结果同样可以继续选面、拉伸、再运算，反复叠加造型。
+
+   五、视角与坐标系
+      · 左键拖拽（空白处）= 旋转；【中键按住拖动 = 平移】；滚轮 = 缩放；右键已禁用。
+      · 左下角【ViewCube 魔方】：常驻显示当前视角，点击 前/后/左/右/顶/底
+        任一面平滑切到标准视角，按住魔方拖动可直接旋转主视图。
+      · 草图模式 / 放置工具下左键被工具占用，按住 Shift + 左键可旋转视角。
+      · 坐标系为 Z 朝上（与 3D One 一致）：网格地面 = XY 平面（z=0），
+        Z 是高度轴，面板「位置 Z」即高度。
+
+   六、撤销与删除
+      · Ctrl+Z 或左侧「撤销」按钮（快照式，最多 60 步）。
+      · Del / Backspace 或左侧「删除」按钮删除选中对象。
+
+   七、显示模式
+      · 左侧「线框」按钮在实体着色 / 线框之间切换，便于检查拓扑。
+
+   快捷键总表：V 选择 · B 立方体 · C 圆柱 · S 线段 · R 矩形 · O 圆 ·
+              L 椭圆 · P 正多边形 · E 拉伸选中面 · Esc 取消 · Enter 确认
+
+   已知边界（后续迭代）：倒角、STL / DXF 导出、激光排版、多草图共存、
+   尺寸约束、草图点编辑。扩展入口见上方第 16 节。
+   ========================================================================== */
+</script>
+</body>
+</html>
