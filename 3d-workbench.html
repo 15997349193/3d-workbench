@@ -192,6 +192,7 @@
   .tool[data-tool="ellipsoid"]{--tc:#8b5cf6}
   .tool[data-tool="pyramid"]{--tc:#ec4899}
   .tool[data-tool="frustum"]{--tc:#6366f1}
+  .tool[data-tool="horn"]{--tc:#d946a6}
   .tool[data-tool^="sketch"]{--tc:#8b5cf6}
   .tool[data-act="undo"]{--tc:#64748b}
   .tool[data-act="delete"]{--tc:#ef4444}
@@ -503,6 +504,96 @@
   .ex-foot{display:flex;gap:7px}
   .ex-foot .btn{height:30px;font-size:12px}
   .ex-tip{font-size:10.5px;color:var(--text-3);line-height:1.6;margin-bottom:9px}
+
+  /* =========================================================
+     "曲中取直" 教学演示 · 独立全屏覆盖层（与建模功能完全隔离）
+     ========================================================= */
+  .demo-entry{
+    display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;
+    font-size:12.5px;font-weight:600;color:#a3126e;white-space:nowrap;
+    background:linear-gradient(180deg,#fff0f8,#fde4f2);border:1px solid #f2b8db;
+    box-shadow:0 1px 2px rgba(163,18,110,.08),inset 0 1px 0 #fff;transition:.14s;
+  }
+  .demo-entry svg{width:16px;height:16px;stroke:#c21875;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .demo-entry:hover{background:linear-gradient(180deg,#fde4f2,#fbd4e9);border-color:#e78ec2;transform:translateY(-1px)}
+  .demo-entry:active{transform:translateY(0)}
+  .demo-entry.on{border-color:#c21875;box-shadow:0 0 0 2px rgba(194,24,117,.15)}
+
+  #demoOverlay{
+    position:fixed;inset:0;z-index:120;display:none;
+    background:radial-gradient(1200px 620px at 18% -8%,#fdeef7 0%,transparent 52%),
+               radial-gradient(1000px 520px at 100% 0%,#eef3ff 0%,transparent 50%),#eef2f8;
+  }
+  #demoOverlay.on{display:block}
+  .dm-top{
+    height:58px;display:flex;align-items:center;gap:12px;padding:0 20px;
+    background:linear-gradient(180deg,#fff,#faf6fc);border-bottom:1px solid #ecdbe6;
+    box-shadow:0 2px 12px rgba(90,30,70,.05);
+  }
+  .dm-back{
+    display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:600;
+    color:#6b4a5e;background:#fff;border:1px solid #ecdae5;transition:.14s;
+  }
+  .dm-back:hover{background:#fdf1f7;border-color:#e3a9c8;color:#a3126e}
+  .dm-back svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .dm-title{font-size:15px;font-weight:700;color:#7a1452;letter-spacing:.02em}
+  .dm-title .sub{font-weight:400;color:#9a7c8d;font-size:11.5px;margin-left:10px;letter-spacing:0}
+  .dm-stage{position:absolute;left:0;right:322px;top:58px;bottom:0}
+  .dm-stage canvas{display:block;width:100%;height:100%}
+  .dm-chip{
+    position:absolute;left:16px;top:14px;padding:8px 12px;border-radius:9px;max-width:min(560px,70%);
+    background:rgba(255,255,255,.86);backdrop-filter:blur(6px);border:1px solid #f0d9e7;box-shadow:var(--shadow);
+    font-size:11.5px;line-height:1.65;color:#6b4a5e;
+  }
+  .dm-chip b{color:#a3126e}
+  .dm-chip .q{color:#c21875;font-weight:700}
+  .dm-side{
+    position:absolute;right:0;top:58px;bottom:0;width:322px;overflow-y:auto;
+    background:linear-gradient(180deg,#fff,#fdf9fc);border-left:1px solid #ecdbe5;
+    padding:16px 16px 26px;box-shadow:-3px 0 14px rgba(90,30,70,.04);
+  }
+  .dm-side::-webkit-scrollbar{width:6px}
+  .dm-side::-webkit-scrollbar-thumb{background:#e7d3df;border-radius:6px}
+  .dm-card{border:1px solid #f0e0ea;border-radius:12px;padding:13px 14px;margin-bottom:13px;background:#fff;box-shadow:0 2px 8px rgba(120,50,90,.04)}
+  .dm-card h4{font-size:12px;font-weight:700;color:#7a1452;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .dm-card h4 svg{width:15px;height:15px;stroke:#c21875;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .dm-row{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:12px;color:#5d4a56}
+  .dm-row label{width:64px;flex:none;color:#8a6c7c}
+  .dm-row .val{font-variant-numeric:tabular-nums;font-weight:700;color:#a3126e}
+
+  /* 开关 */
+  .dm-switch{position:relative;width:50px;height:27px;border-radius:20px;background:#d9c7d2;transition:.18s;flex:none;box-shadow:inset 0 1px 3px rgba(0,0,0,.12)}
+  .dm-switch::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:.18s}
+  .dm-switch.on{background:linear-gradient(90deg,#d82383,#a3126e)}
+  .dm-switch.on::after{left:26px}
+
+  /* 旋钮 */
+  .dm-dialwrap{display:flex;align-items:center;gap:16px;margin-top:4px}
+  .dm-dial{
+    width:104px;height:104px;border-radius:50%;flex:none;position:relative;cursor:grab;touch-action:none;
+    background:radial-gradient(circle at 38% 32%,#fff 0%,#fbe9f3 46%,#eebcd6 100%);
+    border:2px solid #e7a9c9;box-shadow:0 5px 14px rgba(160,30,100,.18),inset 0 2px 5px rgba(255,255,255,.9);
+  }
+  .dm-dial:active{cursor:grabbing}
+  .dm-dial .ptr{position:absolute;left:50%;top:50%;width:4px;height:38px;border-radius:3px;background:linear-gradient(180deg,#a3126e,#d82383);transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(0deg);box-shadow:0 1px 3px rgba(160,20,100,.35)}
+  .dm-dial .cap{position:absolute;left:50%;top:50%;width:22px;height:22px;border-radius:50%;transform:translate(-50%,-50%);background:linear-gradient(140deg,#fff,#f0d9e6);box-shadow:0 1px 4px rgba(120,40,80,.25)}
+  .dm-ticks{position:absolute;inset:-9px;border-radius:50%;pointer-events:none}
+  .dm-ticks i{position:absolute;left:50%;top:50%;width:2px;height:7px;background:#dfa7c5;transform-origin:50% 59px;transform:translate(-50%,-59px)}
+  .dm-dialinfo{font-size:11.5px;line-height:1.7;color:#8a6c7c}
+  .dm-dialinfo b{display:block;font-size:20px;color:#a3126e;font-variant-numeric:tabular-nums;line-height:1.2}
+  .dm-btns{display:flex;gap:7px;margin-top:6px}
+  .dm-btn{flex:1;padding:9px 0;border-radius:9px;font-size:12px;font-weight:600;text-align:center;border:1px solid #e7c9db;background:#fff;color:#8a3a68;transition:.13s}
+  .dm-btn:hover{background:#fceef6;border-color:#dca2c4}
+  .dm-btn.on{background:linear-gradient(180deg,#d82383,#a3126e);border-color:#a3126e;color:#fff;box-shadow:0 2px 7px rgba(163,18,110,.25)}
+  .dm-btn.stop{color:#8a6c7c}
+  .dm-btn:disabled{opacity:.42;filter:grayscale(.9);cursor:not-allowed;box-shadow:none}
+  .dm-btn:disabled:hover{background:#fff}
+  .dm-keys{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .dm-key{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#7a5a6b;background:#faf1f6;border:1px solid #f0dbe8;border-radius:7px;padding:4px 8px}
+  .dm-key kbd{font-family:inherit;font-weight:700;color:#a3126e;background:#fff;border:1px solid #eccbdd;border-bottom-width:2px;border-radius:4px;padding:0 5px;min-width:18px;text-align:center}
+  .dm-note{font-size:11px;line-height:1.75;color:#8a6c7c}
+  .dm-note b{color:#7a1452}
+  .dm-note code{background:#faf1f6;color:#a3126e;border-radius:4px;padding:1px 5px;font-size:10.5px}
 </style>
 </head>
 <body>
@@ -540,6 +631,11 @@
     </div>
     <input type="file" id="fileInput" accept=".z1,.json" style="display:none" />
 
+    <button class="demo-entry" id="demoEntry" title="打开「曲中取直」双曲线穿杆教学演示">
+      <svg viewBox="0 0 24 24"><path d="M4 18C6 8 10 6 14 6c3 0 5 2 6 5"/><path d="M6 20h12"/><path d="M9 4l6 16" stroke-dasharray="2.5 2.5"/></svg>
+      曲中取直
+    </button>
+
     <div class="right"><span class="unit">单位 mm</span></div>
   </header>
 
@@ -575,7 +671,7 @@
 
     <!-- 二级弹出面板：每个分类一组 -->
     <div class="flyout" id="flyout">
-      <!-- 预设模型：8 种基本体 -->
+      <!-- 预设模型：9 种基本体 -->
       <div class="fly-panel on" data-panel="model">
         <div class="fly-head">预设模型</div>
         <button class="tool mitem" data-tool="box" title="六面体 · 地面拖拽放置">
@@ -594,6 +690,8 @@
           <svg viewBox="0 0 24 24"><path d="M12 3l8 15.5L12 21 4 18.5z"/><path d="M12 3v18M4 18.5l8 2.5 8-2.5"/></svg><span>棱锥体</span></button>
         <button class="tool mitem" data-tool="frustum" title="圆台体 · 地面拖拽放置">
           <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6.4" rx="4" ry="1.9"/><ellipse cx="12" cy="18" rx="8" ry="3"/><path d="M8 6.4L4 18M16 6.4l4 11.6"/></svg><span>圆台体</span></button>
+        <button class="tool mitem" data-tool="horn" title="羊角 · 螺旋锥带环纹，可在右侧调圈数/纹数">
+          <svg viewBox="0 0 24 24"><path d="M20 5c0 6.6-4.8 12-11 12-3.3 0-6-2.7-6-6 0-3.9 3.2-7 7-7 2.8 0 5 2.2 5 5 0 2.2-1.8 4-4 4-1.7 0-3-1.3-3-3"/></svg><span>羊角</span></button>
       </div>
 
       <!-- 绘制草图 -->
@@ -660,7 +758,7 @@
     </div>
     <div class="firstrun" id="firstRun">
       <b>从左侧工具栏开始建模</b>
-      选择「预设模型」里的 8 种基本体，在地面拖拽放置
+      选择「预设模型」里的 9 种基本体，在地面拖拽放置
     </div>
     <div class="hintbar" id="hintbar"></div>
 
@@ -829,6 +927,106 @@
   </aside>
 </div>
 
+<!-- ============ "曲中取直" 教学演示覆盖层（独立场景，不影响建模功能） ============ -->
+<div id="demoOverlay" aria-hidden="true">
+  <div class="dm-top">
+    <button class="dm-back" id="dmBack" title="返回建模工作台">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>返回工作台
+    </button>
+    <div class="dm-title">曲中取直 <span class="sub">双曲线 · 直杆穿缝演示</span></div>
+  </div>
+
+  <div class="dm-stage" id="dmStage">
+    <div class="dm-chip">
+      <div class="q">宁可直中取，不愿曲中求 —— 可这块弯曲的双曲线缝，直棒却能轻松穿过。</div>
+      <div><b>原理：</b>直杆与转轴异面，绕轴旋转时扫出<b>单叶双曲面</b>；竖直平板截取它，截线正是一条<b>双曲线</b>。缝是"直"的集合，所以直杆每一瞬都能贴合穿过。</div>
+    </div>
+  </div>
+
+  <aside class="dm-side">
+    <div class="dm-card">
+      <h4><svg viewBox="0 0 24 24"><path d="M12 3v9"/><circle cx="12" cy="15" r="5"/></svg>旋转控制</h4>
+      <div class="dm-row">
+        <label>旋转开关</label>
+        <div class="dm-switch on" id="dmSwitch" role="switch" aria-checked="true" title="打开/关闭自动旋转"></div>
+        <span class="val" id="dmSwitchTxt">运行中</span>
+      </div>
+      <div class="dm-row">
+        <label>转向</label>
+        <span class="val" id="dmDirTxt">向右 →</span>
+      </div>
+      <div class="dm-row">
+        <label>速度</label>
+        <input type="range" id="dmSpeed" min="0.2" max="3" step="0.1" value="1" style="flex:1;accent-color:#c21875">
+        <span class="val" id="dmSpeedTxt">1.0×</span>
+      </div>
+      <div class="dm-row">
+        <label>直棒倾角</label>
+        <input type="range" id="dmTilt" min="30" max="52" step="0.5" value="43.9" style="flex:1;accent-color:#c21875">
+        <span class="val" id="dmTiltTxt">43.9°</span>
+      </div>
+    </div>
+
+    <div class="dm-card">
+      <h4><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M12 12l4-4"/></svg>手动旋钮 · 拖动调角度</h4>
+      <div class="dm-dialwrap">
+        <div class="dm-dial" id="dmDial" title="按住拖动可手动旋转圆盘与直杆">
+          <div class="dm-ticks" id="dmTicks"></div>
+          <div class="ptr" id="dmPtr"></div>
+          <div class="cap"></div>
+        </div>
+        <div class="dm-dialinfo">
+          当前转角
+          <b id="dmAngle">0°</b>
+          拖动旋钮可逐帧观察<br>直杆穿过曲缝的位置
+        </div>
+      </div>
+      <div class="dm-btns">
+        <button class="dm-btn" id="dmLeft" title="向左转（←）">← 左转</button>
+        <button class="dm-btn on" id="dmRight" title="向右转（→）">右转 →</button>
+        <button class="dm-btn stop" id="dmStop" title="停止（↓）">停止 ■</button>
+      </div>
+      <div class="dm-keys">
+        <span class="dm-key"><kbd>→</kbd> 向右转</span>
+        <span class="dm-key"><kbd>←</kbd> 向左转</span>
+        <span class="dm-key"><kbd>↓</kbd> 停止</span>
+      </div>
+    </div>
+
+    <div class="dm-card">
+      <h4><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>教学要点</h4>
+      <div class="dm-note">
+        · <b>酒红板</b>（刻双曲线）静止不动；<b>蓝色圆盘</b>与<b>绿色直杆</b>同步旋转。<br>
+        · 直杆并非贴在盘面，而是与转轴<b>异面</b>倾斜——这是穿过曲缝的关键。<br>
+        · 杆与板平面的交点轨迹写成方程即 <code>x²/a² − z²/b² = 1</code>，正是雕刻的双曲线。<br>
+        · 转动旋钮观察：<b>看似弯曲的缝，其实是无数条直线位置的包络</b>。
+      </div>
+    </div>
+
+    <div class="dm-card">
+      <h4><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z" stroke-dasharray="3 2"/><path d="M8 12c0-3 2-5 4-5s4 2 4 5"/></svg>双曲线成因实验</h4>
+      <div class="dm-note">
+        半透明虚线框是随圆盘与直杆<b>同步旋转</b>的影子板。按 ↓ 暂停定格，再点<b>固化为实体板</b>：虚像随即消失，化为一块独立实体板（视图中最多只有原板 + 这一块自定义板）。固化后，青色轨迹会随直棒旋转<b>由交点逐点画出</b>，画完整条双曲线后<b>停留 2 秒</b>再消失，随后<b>自动循环重画</b>；一旦暂停，轨迹即刻停止推进。点<b>清除固化板</b>则虚像框重新出现。
+      </div>
+      <div class="dm-btns" style="margin-top:9px">
+        <button class="dm-btn" id="dmFreeze" style="color:#0a7f92;border-color:#8edce8">固化为实体板</button>
+        <button class="dm-btn stop" id="dmClearFreeze">清除固化板</button>
+      </div>
+      <div class="dm-note" id="dmFreezeStatus" style="margin-top:8px;color:#0a7f92">尚未固化。可随时暂停并固化当前影子板。</div>
+    </div>
+
+    <div class="dm-card">
+      <h4><svg viewBox="0 0 24 24"><path d="M4 7.5l8-4.5 8 4.5-8 4.5z"/><path d="M4 7.5v9l8 4.5M20 7.5v9l-8 4.5"/></svg>视角</h4>
+      <div class="dm-note">在视口中 <b>左键拖动</b>旋转观察，<b>滚轮</b>缩放，<b>中键</b>平移。</div>
+      <div class="dm-btns" style="margin-top:9px">
+        <button class="dm-btn" id="dmView1">默认视角</button>
+        <button class="dm-btn" id="dmView2">正对板面</button>
+        <button class="dm-btn" id="dmView3">俯视</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
 <!-- ============ CDN 依赖映射：Three.js 核心 / OrbitControls / 布尔运算（全走公网 CDN） ============ -->
 <script type="importmap">
 {
@@ -884,10 +1082,10 @@ const BODY_PALETTE = [
 
 const TYPE_LABEL = {
   box: '六面体', sphere: '球体', torus: '圆环体', cylinder: '圆柱体', cone: '圆锥体',
-  ellipsoid: '椭球体', pyramid: '棱锥体', frustum: '圆台体',
+  ellipsoid: '椭球体', pyramid: '棱锥体', frustum: '圆台体', horn: '羊角',
   plate: '拉伸实体', extrude: '拉伸实体', solid: '复合实体', sheet: '拉伸面', sketch: '草图'
 };
-/* 8 种基本体：放置尺寸 → desc 参数 / 包围盒尺寸 / 预览几何 / 属性面板行 */
+/* 9 种基本体：放置尺寸 → desc 参数 / 包围盒尺寸 / 预览几何 / 属性面板行 */
 const PRIMITIVES = {
   box: { label: '六面体', spec: [['w', '宽 W'], ['h', '高 H'], ['d', '深 D']] },
   sphere: { label: '球体', spec: [['r', '半径 R']] },
@@ -896,7 +1094,8 @@ const PRIMITIVES = {
   cone: { label: '圆锥体', spec: [['r', '半径 R'], ['h', '高 H']] },
   ellipsoid: { label: '椭球体', spec: [['a', '半轴 A'], ['b', '半轴 B'], ['c', '半轴 C']] },
   pyramid: { label: '棱锥体', spec: [['r', '底面半径'], ['h', '高 H']] },
-  frustum: { label: '圆台体', spec: [['r1', '下半径'], ['r2', '上半径'], ['h', '高 H']] }
+  frustum: { label: '圆台体', spec: [['r1', '下半径'], ['r2', '上半径'], ['h', '高 H']] },
+  horn: { label: '羊角', spec: [['r', '粗端半径'], ['R', '盘旋半径'], ['h', '上升高'], ['turns', '圈数'], ['rings', '环纹数']] }
 };
 const PRIM_KINDS = Object.keys(PRIMITIVES);
 const isPrimitive = (k) => Object.prototype.hasOwnProperty.call(PRIMITIVES, k);
@@ -1154,6 +1353,96 @@ function makeEdgeLines(coords, desc) {
   return edges;
 }
 
+/**
+ * 羊角：螺旋锥 + 环纹的程序化实体。
+ * 中心线是一条「盘旋收缩的螺旋」：极角 θ 从 0 转到 turns 圈，盘旋半径从 R 线性收到接近 0，
+ * 高度 z 从 0 升到 h；管半径沿程按 (1-t)^taper 收细，再乘周期性起伏做出节状环纹。
+ * 用平行传输标架扫掠出封闭管壁，两端封盖。所有点在局部坐标里生成，质心大致落在原点。
+ */
+function hornGeometry(p) {
+  const r     = p.r     || 6;     // 粗端管半径
+  const R     = p.R     || 18;    // 最大盘旋半径
+  const h     = p.h     || 14;    // 总上升高度
+  const turns = p.turns || 1.5;   // 盘旋圈数
+  const rings = p.rings || 12;    // 环纹数量
+  const N = 220, M = 20;          // 沿程采样 / 每圈管壁分段
+  const taper = 1.35;             // 收细指数：越大尖得越快
+
+  // 中心线：盘旋半径随 t 收缩（留出 12% 终径避免尖点退化）
+  const center = (t) => {
+    const th = t * turns * Math.PI * 2;
+    const rad = R * (1 - 0.88 * t);
+    return new THREE.Vector3(rad * Math.cos(th), rad * Math.sin(th), h * t);
+  };
+  // 管半径：沿程收细 + 环纹起伏（用 cos 的绝对值做出一节一节，谷底不收到 0）
+  const tubeR = (t) => {
+    const base = r * Math.pow(Math.max(0.02, 1 - t), taper) + r * 0.06;
+    const ridge = 0.88 + 0.12 * Math.abs(Math.cos(t * rings * Math.PI));
+    return Math.max(0.15, base * ridge);
+  };
+
+  // 平行传输标架：避免 Frenet 在螺旋上的翻转
+  const pts = [], tangents = [];
+  for (let i = 0; i <= N; i++) pts.push(center(i / N));
+  for (let i = 0; i <= N; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N, i + 1)];
+    tangents.push(b.clone().sub(a).normalize());
+  }
+  const pos = [], idx = [];
+  let transN = new THREE.Vector3(1, 0, 0);
+  transN.addScaledVector(tangents[0], -transN.dot(tangents[0]));
+  if (transN.lengthSq() < 1e-6) transN.set(0, 1, 0).addScaledVector(tangents[0], -tangents[0].y);
+  transN.normalize();
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, C = pts[i], T = tangents[i];
+    // 本帧标架：transN 已与 T 垂直，B = T × N
+    const Ni = transN.clone();
+    const B = new THREE.Vector3().crossVectors(T, Ni).normalize();
+    const rt = tubeR(t);
+    for (let j = 0; j < M; j++) {
+      const a = (j / M) * Math.PI * 2;
+      const v = C.clone()
+        .addScaledVector(Ni, Math.cos(a) * rt)
+        .addScaledVector(B, Math.sin(a) * rt);
+      pos.push(v.x, v.y, v.z);
+    }
+    // 传输法线到下一帧：投影到与新切线垂直的平面，避免螺旋上 Frenet 翻转
+    if (i < N) {
+      const Tn = tangents[i + 1];
+      transN.addScaledVector(Tn, -transN.dot(Tn));
+      if (transN.lengthSq() < 1e-6) transN.copy(B);
+      transN.normalize();
+    }
+  }
+  // 管壁三角形
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < M; j++) {
+      const a = i * M + j, b = i * M + (j + 1) % M, c = (i + 1) * M + (j + 1) % M, d = (i + 1) * M + j;
+      idx.push(a, d, b, b, d, c);
+    }
+  }
+  // 粗端封盖
+  const baseC = pts[0];
+  const bi = pos.length / 3; pos.push(baseC.x, baseC.y, baseC.z);
+  for (let j = 0; j < M; j++) idx.push(bi, (j + 1) % M, j);
+  // 尖端封盖
+  const tipC = pts[N];
+  const ti = pos.length / 3; pos.push(tipC.x, tipC.y, tipC.z);
+  const last = N * M;
+  for (let j = 0; j < M; j++) idx.push(ti, last + j, last + (j + 1) % M);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  // 把几何平移到以包围盒中心为原点，和 Box/Cylinder 放置逻辑一致
+  geo.computeBoundingBox();
+  const c = geo.boundingBox.getCenter(new THREE.Vector3());
+  geo.translate(-c.x, -c.y, -c.z);
+  geo.computeBoundingBox();
+  return geo;
+}
+
 /** 依据描述对象生成几何体 */
 function makeGeometry(desc) {
   const p = desc.params || {};
@@ -1199,6 +1488,9 @@ function makeGeometry(desc) {
     const g = new THREE.CylinderGeometry(p.r2, p.r1, p.h, 128, 1);
     g.rotateX(Math.PI / 2);
     return g;
+  }
+  if (desc.kind === 'horn') {
+    return hornGeometry(p);
   }
 
   if (desc.kind === 'plate') {
@@ -2469,6 +2761,10 @@ function primitiveDesc(kind, s, pos) {
     case 'ellipsoid': return { kind: 'ellipsoid', pos, params: { a: r, b: r, c: round1(s * 0.32) } };
     case 'pyramid': return { kind: 'pyramid', pos, params: { r: round1(s * 0.7), h: s } };
     case 'frustum': return { kind: 'frustum', pos, params: { r1: r, r2: round1(s * 0.28), h: s } };
+    case 'horn': return {
+      kind: 'horn', pos,
+      params: { r: round1(s * 0.13), R: round1(s * 0.42), h: round1(s * 0.95), turns: 1.5, rings: 12 }
+    };
     default: return { kind: 'cylinder', pos, params: { r, h: s } };
   }
 }
@@ -3236,6 +3532,7 @@ const SIZE_SPEC = {
   ellipsoid: [['a', '半轴 A'], ['b', '半轴 B'], ['c', '半轴 C']],
   pyramid: [['r', '底面半径'], ['h', '高 H']],
   frustum: [['r1', '下半径'], ['r2', '上半径'], ['h', '高 H']],
+  horn: [['r', '粗端半径'], ['R', '盘旋半径'], ['h', '上升高'], ['turns', '圈数'], ['rings', '环纹数']],
   plate: [['depth', '厚度 T']],
   extrude: [['depth', '拉伸长'], ],
   sheet: [['height', '高 H']]
@@ -4346,6 +4643,7 @@ function dimAxesOf(desc) {
     case 'ellipsoid': return [['x', p.a * 2, 'a'], ['y', p.b * 2, 'b'], ['z', p.c * 2, 'c']];
     case 'pyramid': return [['r', p.r * 2, 'r'], ['z', p.h, 'h']];
     case 'frustum': return [['r1', p.r1 * 2, 'r1'], ['z', p.h, 'h']];
+    case 'horn': return [['r', p.r * 2, 'r'], ['z', p.h, 'h']];
     default: return null;
   }
 }
@@ -4630,7 +4928,7 @@ window.Sketch3D = {
   openExtrudePanel, closeExtrudePanel, setTool, setMode,
   entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
   animateView, viewCubeRect,
-  primitiveDesc, makeGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
+  primitiveDesc, makeGeometry, hornGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
   confirmDim, autoConfirmDim, applyBodyAppearance,
   serializeScene, restoreScene, undo,
   saveZ1, openZ1, exportSTL, exportSTEP, buildSTEP, buildSTLBinary, collectExportTriangles, download
@@ -4954,6 +5252,808 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
    已知边界（后续迭代）：倒角、STL / DXF 导出、激光排版、多草图共存、
    尺寸约束、草图点编辑。扩展入口见上方第 16 节。
    ========================================================================== */
+</script>
+
+<!-- ============================================================================
+     "曲中取直" 教学演示 · 独立模块（不引用、不修改任何工作台变量）
+     数学原理：直母线 (a, a·t, z0+b·t) 绕 Z 轴旋转 → 单叶双曲面
+               x²/a² + y²/a² − (z−z0)²/b² = 1
+               与竖直板 y=0 相交 → 双曲线 x²/a² − (z−z0)²/b² = 1
+               故任意转角下，直杆与板面的交点始终精确落在这条双曲线（曲缝）上。
+     ============================================================================ -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = (id) => document.getElementById(id);
+const overlay = $('demoOverlay');
+const stageEl = $('dmStage');
+
+/* ---------- 几何参数（mm） ---------- */
+const A = 52;          // 双曲线实半轴（顶点半径）
+let   B = 50;          // 虚半轴（上升斜率）。直棒倾角 = atan(B/A)，可由面板滑杆调整
+const Z0 = 95;         // 双曲线中心高度
+const TSPAN = 1.5;     // 直杆母线参数范围
+const TH = 54 * Math.PI / 180;   // 曲缝对应最大转角
+const HALF = 6.4;      // 曲缝半宽（略宽于杆半径 4.2，保证穿过不卡）
+const BX0 = 46, BX1 = 96, BT = 6;  // 板水平边界 / 板厚
+let   BZ0 = 22, BZ1 = 168;         // 板上下边界（随倾角 B 自适应，保证曲缝完整落在板内）
+
+const dScene = new THREE.Scene();
+dScene.background = null;
+const dCamera = new THREE.PerspectiveCamera(42, 1, 1, 4000);
+dCamera.up.set(0, 0, 1);
+const HOME = new THREE.Vector3(245, -300, 215);
+const TARGET = new THREE.Vector3(25, 0, 78);
+dCamera.position.copy(HOME);
+
+let dRenderer = null;
+try {
+  dRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (e) { console.warn('演示场景 WebGL 不可用', e); }
+let dControls = null;
+let built = false;
+let open = false;
+
+/* ---------- 灯光 ---------- */
+dScene.add(new THREE.HemisphereLight(0xffffff, 0xbfd2e6, 1.1));
+const dl = new THREE.DirectionalLight(0xffffff, 1.25); dl.position.set(120, -160, 260); dScene.add(dl);
+const df = new THREE.DirectionalLight(0xffe6f2, 0.55); df.position.set(-160, 90, 120); dScene.add(df);
+
+/* ---------- 材质 ---------- */
+const matBoard = new THREE.MeshStandardMaterial({ color: 0xb52a86, roughness: .42, metalness: .06, side: THREE.DoubleSide });
+const matDisk  = new THREE.MeshStandardMaterial({ color: 0x1438c9, roughness: .4, metalness: .12 });
+const matPlate = new THREE.MeshStandardMaterial({ color: 0xff5a1f, roughness: .45, metalness: .05, side: THREE.DoubleSide });
+const matRod   = new THREE.MeshStandardMaterial({ color: 0x43e34a, roughness: .35, metalness: .08, emissive: 0x0d4d13, emissiveIntensity: .25 });
+const matDot   = new THREE.MeshStandardMaterial({ color: 0xffd21f, roughness: .35, metalness: .05, emissive: 0x7a5c00, emissiveIntensity: .3 });
+const matMark  = new THREE.MeshStandardMaterial({ color: 0xfff36b, emissive: 0xffd000, emissiveIntensity: .9, roughness: .3 });
+const matPost  = new THREE.MeshStandardMaterial({ color: 0xf0c419, roughness: .5, metalness: .1 });
+/* 影子板：半透明酒红 + 虚线框；轨迹：醒目青色 */
+const matShadow = new THREE.MeshBasicMaterial({ color: 0xff8ac4, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false });
+const matShadowLine = new THREE.LineDashedMaterial({ color: 0xff5fae, dashSize: 4, gapSize: 3, transparent: true, opacity: .85 });
+const matTrace = new THREE.MeshBasicMaterial({ color: 0x1ee7ff, transparent: true, opacity: 1, depthWrite: false });
+const matTraceDot = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+
+/* ---------- 旋转体：圆盘 + 直杆 ---------- */
+const rotor = new THREE.Group();
+dScene.add(rotor);
+
+function diskShape(r, gapDeg) {
+  const s = new THREE.Shape();
+  const a0 = gapDeg * Math.PI / 360;
+  const a1 = (360 - gapDeg) * Math.PI / 360;
+  s.moveTo(0, 0);
+  s.lineTo(r * Math.cos(a0), r * Math.sin(a0));
+  s.absarc(0, 0, r, a0, a1, false);
+  s.lineTo(0, 0);
+  return s;
+}
+
+function buildRotor() {
+  /* 蓝色底盘 */
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(150, 150, 16, 96), matDisk);
+  base.rotation.x = Math.PI / 2;   // 圆柱轴 Y → 世界 Z（Z 朝上）
+  base.position.z = 8;
+  rotor.add(base);
+
+  /* 橙色扇形顶板（带缺口，呼应截图） */
+  const plate = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(diskShape(148, 62), { depth: 9, bevelEnabled: true, bevelSize: 1.6, bevelThickness: 1.2, bevelSegments: 2, curveSegments: 96 }),
+    matPlate
+  );
+  plate.position.z = 16;
+  rotor.add(plate);
+
+  /* 盘面金色锚点：两对共四枚。扇面实际覆盖 31°~149°，两条直边即 31° 与 149°。
+     每一枚都落在各自直边内侧、距该直边垂直 10px（即"距半径边缘 10px"，不贴边）。
+     外圈半径 112，内圈半径 30（距圆心 30px，远离 +X 方向的酒红板避免冲突）。 */
+  const EDGE_A = 31, EDGE_B = 149, OFF_PX = 10;   // 扇面两条直边 / 距直边垂直距离
+  const OUTER_R = 112, INNER_R = 30;              // 外圈半径 / 内圈半径（距圆心）
+  const offOuter = Math.asin(OFF_PX / OUTER_R) * 180 / Math.PI;
+  const offInner = Math.asin(OFF_PX / INNER_R) * 180 / Math.PI;
+  /* 外圈两枚：半径 112，距各自直边垂直 10px */
+  for (const deg of [EDGE_A + offOuter, EDGE_B - offOuter]) {
+    const a = deg * Math.PI / 180;
+    const d = new THREE.Mesh(new THREE.SphereGeometry(3.6, 14, 12), matDot);
+    d.position.set(OUTER_R * Math.cos(a), OUTER_R * Math.sin(a), 26.5);
+    rotor.add(d);
+  }
+  /* 内圈两枚：半径 30（距圆心 30px），同样距各自直边垂直 10px，不贴在边上 */
+  for (const deg of [EDGE_A + offInner, EDGE_B - offInner]) {
+    const a = deg * Math.PI / 180;
+    const d = new THREE.Mesh(new THREE.SphereGeometry(3.6, 14, 12), matDot);
+    d.position.set(INNER_R * Math.cos(a), INNER_R * Math.sin(a), 26.5);
+    rotor.add(d);
+  }
+
+  /* 绿色直杆：母线 (a, a·t, z0+b·t)，t∈[-TSPAN,TSPAN]；
+     下端沿母线方向加长一截，直插到蓝盘盘面内，拖住金球。 */
+  const p0 = new THREE.Vector3(A, -A * TSPAN, Z0 - B * TSPAN);
+  const p1 = new THREE.Vector3(A,  A * TSPAN, Z0 + B * TSPAN);
+  const dir = p1.clone().sub(p0);
+  const unit = dir.clone().normalize();
+  /* 下端加长量由 p0 直接落到蓝盘顶面 z=16 反解，保证球心与杆端严格重合。 */
+  const p0z = p0.z;
+  const ext = (p0z - 16) / unit.z;                  // 使 pLow.z = 16（蓝盘 base 顶面）
+  const pLow = p0.clone().addScaledVector(unit, -ext);
+  const len = dir.length() + ext;
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, len, 20), matRod);
+  rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), unit);
+  rod.position.copy(pLow.clone().add(p1).multiplyScalar(.5));
+  rotor.add(rod);
+
+  /* 下端金色大圆球：球心在杆端 pLow 基础上再下沉 半径×0.7，
+     使球体仅上方约 1/5 球径露出蓝盘、其余没入盘内，尽可能降低球顶高度，
+     避免与酒红板产生视觉冲突；杆端仍从球体上部穿出，衔接自然。 */
+  const BALL_R = 8.5;
+  const hinge = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 20, 16), matPost);
+  hinge.position.set(pLow.x, pLow.y, pLow.z - BALL_R * 0.7);
+  rotor.add(hinge);
+}
+
+/* ---------- 板面几何：原板 / 影子板 / 固化板共用 ---------- */
+function hyperbolaPt(t) {
+  return { x: A / Math.cos(t), z: Z0 - B * Math.tan(t) };
+}
+/* 带双曲线曲缝孔的矩形板 Shape（shape 坐标 u=X, v=Z） */
+function boardShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(BX0, BZ0); shape.lineTo(BX1, BZ0);
+  shape.lineTo(BX1, BZ1); shape.lineTo(BX0, BZ1); shape.closePath();
+  const N = 72, sideA = [], sideB = [];
+  for (let i = 0; i <= N; i++) {
+    const t = -TH + (2 * TH) * i / N;
+    const p = hyperbolaPt(t);
+    const q = hyperbolaPt(t + 1e-3);
+    let dx = q.x - p.x, dz = q.z - p.z;
+    const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    sideA.push([p.x - dz * HALF, p.z + dx * HALF]);
+    sideB.push([p.x + dz * HALF, p.z - dx * HALF]);
+  }
+  const hole = new THREE.Path();
+  hole.moveTo(sideA[0][0], sideA[0][1]);
+  for (let i = 1; i < sideA.length; i++) hole.lineTo(sideA[i][0], sideA[i][1]);
+  for (let i = sideB.length - 1; i >= 0; i--) hole.lineTo(sideB[i][0], sideB[i][1]);
+  hole.closePath();
+  shape.holes.push(hole);
+  return shape;
+}
+/* 生成一块板 mesh（shape 的 u,v → 世界 X,Z；挤出方向 → 世界 −Y） */
+function boardMesh(material) {
+  const m = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(boardShape(), { depth: BT, bevelEnabled: false, curveSegments: 12 }),
+    material
+  );
+  m.rotation.x = Math.PI / 2;
+  m.position.y = BT / 2;
+  return m;
+}
+/* 无孔实心矩形板：固化后的实体板用它——不刻固定双曲线，只由青色交点轨迹显示交集 */
+function solidBoardMesh(material) {
+  const s = new THREE.Shape();
+  s.moveTo(BX0, BZ0); s.lineTo(BX1, BZ0);
+  s.lineTo(BX1, BZ1); s.lineTo(BX0, BZ1); s.closePath();
+  const m = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(s, { depth: BT, bevelEnabled: false }),
+    material
+  );
+  m.rotation.x = Math.PI / 2;
+  m.position.y = BT / 2;
+  return m;
+}
+/* 曲缝两侧描边（局部坐标 y=yFace） */
+function boardRims(material, yFace) {
+  const N = 72, out = [];
+  for (const sgn of [1, -1]) {
+    const rimPts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = -TH + 2 * TH * i / N;
+      const p = hyperbolaPt(t);
+      const q = hyperbolaPt(t + 1e-3);
+      let dx = q.x - p.x, dz = q.z - p.z;
+      const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+      rimPts.push(new THREE.Vector3(p.x - dz * HALF * sgn, yFace, p.z + dx * HALF * sgn));
+    }
+    out.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rimPts), material));
+  }
+  return out;
+}
+function buildBoard() {
+  const bm = boardMesh(matBoard); bm.userData.tiltDependent = true; dScene.add(bm);
+  const rimMat = new THREE.LineBasicMaterial({ color: 0xffd21f });
+  boardRims(rimMat, -BT / 2 - .5).forEach(l => { l.userData.tiltDependent = true; dScene.add(l); });
+
+  /* 板面金色标题："曲中取直"四字竖向排列，置于曲线右侧空白区。
+     曲缝在 z∈[77,113] 时 x 仅 52~56，故题字放在 x≈78 处可完全避开。 */
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 512;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, 128, 512);
+  g.font = 'bold 84px "Microsoft YaHei",sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 7; g.strokeStyle = 'rgba(90,20,60,.55)';
+  const chars = ['曲','中','取','直'];
+  chars.forEach((c, i) => {
+    const y = 64 + i * 128;
+    g.strokeText(c, 64, y);
+    g.fillStyle = '#ffd21f'; g.fillText(c, 64, y);
+  });
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(9, 36),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false })
+  );
+  label.rotation.x = Math.PI / 2;
+  label.position.set(78, -BT / 2 - .6, (BZ0 + BZ1) / 2);
+  label.userData.tiltDependent = true;
+  dScene.add(label);
+}
+
+/* ---------- 交点标记：直杆与板面的交点始终落在曲缝上 ---------- */
+let marker = null;
+function buildMarker() {
+  marker = new THREE.Mesh(new THREE.SphereGeometry(3.2, 16, 12), matMark);
+  marker.userData.tiltDependent = true;
+  dScene.add(marker);
+}
+function updateMarker(theta) {
+  if (!marker) return;
+  if (Math.abs(Math.cos(theta)) < .38) { marker.visible = false; return; }
+  marker.visible = true;
+  marker.position.set(A / Math.cos(theta), 0, Z0 - B * Math.tan(theta));
+}
+
+/* ---------- 影子板：跟随圆盘/直杆同步旋转的半透明虚线框 ----------
+   作为 rotor 的子对象，随旋转实时同步；暂停时定格，点「固化」后
+   在当前姿态生成一块独立实体酒红板（与原静止板并存）。 */
+let shadow = null;
+function buildShadow() {
+  shadow = new THREE.Group();
+  const face = boardMesh(matShadow);
+  shadow.add(face);
+  /* 虚线矩形外框 */
+  const w = BX1 - BX0, h = BZ1 - BZ0;
+  const cx = (BX0 + BX1) / 2, cz = (BZ0 + BZ1) / 2;
+  const rect = [[BX0,BZ0],[BX1,BZ0],[BX1,BZ1],[BX0,BZ1],[BX0,BZ0]];
+  const rp = rect.map(([x,z]) => new THREE.Vector3(x, -BT/2 - .7, z));
+  const frame = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp), matShadowLine);
+  frame.computeLineDistances();
+  shadow.add(frame);
+  /* 虚线双曲线缝（影子轮廓） */
+  for (const l of boardRims(matShadowLine, -BT/2 - .7)) { l.computeLineDistances(); shadow.add(l); }
+  rotor.add(shadow);   // 随转子同步旋转
+}
+
+/* ---------- 固化实体板 + 交集轨迹 ----------
+   轨迹呈现状态机（与直棒旋转严格同步；圆盘始终 0~360° 连续循环，绝不跳角）：
+   笔尖与轨迹端点都由「直棒实体与固化实体板的真实交点」驱动：
+     相对角 d = θ − bf（归一化到 −π..π）；
+     真实交点（板局部）u=A/cos d, v=Z0−B·tan d，仅当 |d|≤TH 时落在板上。
+   wait  —— 直棒尚未进入曲缝范围，等待它每转一圈自然穿过固化板；
+   draw  —— 从进入端逐点画到另一端，只画到真实交点（笔尖）处；正反两面同步；
+   hold  —— 画完整条双曲线后停留 2 秒（真实时间计，暂停时冻结）；
+   blank —— 直接隐藏轨迹，短暂停顿后回到 wait，等待下一圈自动重画。
+   全程不再改写 θ（绝不传送直棒），暂停（running=false）即冻结。 */
+let frozenBoards = [];      // 已固化的实体板（最多 1 块自定义板）
+let traceGroup = null;      // 当前轨迹组（正反两面各一条管体）
+let traceDot = null;        // 笔尖亮点（= 直棒与实体板的真实交点，前面）
+let traceScan = -TH;        // 当前真实交点参数 d ∈ [-TH,+TH]（探针/显示用）
+let tracePrevD = 0;         // 上帧相对角，用于捕捉"进入曲缝"的瞬间
+let traceArmed = false;     // 本轮是否已离开过曲缝（跳过固化瞬间那半条）
+let tracePhase = 'wait';    // 'wait' | 'draw' | 'hold' | 'blank'
+let tracePhaseT = 0;        // 当前阶段计时（秒）
+let traceDrawSegs = 0;      // 当前已显示的分段数（探针用）
+const TRACE_HOLD_S = 2.0;   // 画完停留秒数
+const TRACE_BLANK_S = 0.35; // 消失后到重新描绘的间隔秒数
+const TRACE_N = 90, TRACE_RADIAL = 8;  // 管体分段数 / 每圈分段
+const TRACE_GAP = 1.0;      // 轨迹相对板面（y=±BT/2）的外移距离
+
+/** 直棒与固化板在给定转角 θ、冻结角 bf 下的真实交点（板局部坐标）。
+    这是三维实体与实体求交的解析解，笔尖与轨迹都以此为准。 */
+function realIntersection(thetaNow, bf) {
+  let d = thetaNow - bf;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  const cosd = Math.cos(d);
+  return {
+    d,
+    valid: Math.abs(d) <= TH + 1e-6 && cosd > .38,
+    u: A / cosd,
+    v: Z0 - B * Math.tan(d)
+  };
+}
+
+/** 移除一条轨迹（含正反两面几何/材质释放） */
+function disposeTrace(tg) {
+  if (!tg) return;
+  dScene.remove(tg);
+  const d = tg.userData;
+  for (const t of [d.tube, d.tubeBack]) { if (t) { t.geometry.dispose(); t.material.dispose(); } }
+  for (const p of [d.dot, d.dotBack]) { if (p) { p.geometry.dispose(); p.material.dispose(); } }
+}
+
+/** 固化当前影子板姿态：生成实体板，并计算直杆继续旋转时与该板的交集轨迹 */
+function freezeShadow() {
+  const bf = theta;   // 冻结角
+  disposeTrace(traceGroup);            // 上一条轨迹立即让位
+  traceGroup = null; traceDot = null;
+
+  /* 视图上最多两块共面板：一块原静止板 + 一块用户自定义固化板。
+     再次固化时先移除上一块自定义板，不累加。 */
+  for (const b of frozenBoards) {
+    dScene.remove(b);
+    b.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  frozenBoards = [];
+
+  /* 固化瞬间：半透明虚像（影子板）消失 */
+  if (shadow) shadow.visible = false;
+
+  /* 1) 独立实体酒红板：与原静止板并存。板上不刻固定双曲线，
+        只由下方青色交点轨迹标示直棒与它的交集。
+        关键点：必须用外层 Group 绕竖直 Z 轴旋转 bf，内层板 mesh 保持
+        rotation.x=π/2 立着——与影子板/历史正确版一致。若直接对板 mesh
+        同时设 rotation.x 与 rotation.z，欧拉组合会把板"放倒"跑到圆盘下方。 */
+  const solid = new THREE.Group();
+  solid.add(solidBoardMesh(matBoard));
+  solid.rotation.z = bf;             // 冻结在影子板当前角度（外层绕 Z 转）
+  solid.userData.frozenAngle = bf;
+  dScene.add(solid);
+  frozenBoards.push(solid);
+
+  /* 2) 交集轨迹：直杆继续转 Δ 时，交点在板局部为 u=A/cosΔ, v=Z0−B·tanΔ
+        —— 即同一条双曲线。整条管体一次生成，再用 drawRange 随直棒旋转逐段揭示，
+        实现"由交点逐点画出、转到哪画到哪"。固化板正反两面（y=±BT/2）各画一条，
+        共用同一条曲线，两面进度完全一致。 */
+  const tg = new THREE.Group();
+  tg.rotation.z = bf;
+  const N = TRACE_N, pts = [];
+  for (let i = 0; i <= N; i++) {
+    const d = -TH + 2 * TH * i / N;
+    const u = A / Math.cos(d), v = Z0 - B * Math.tan(d);
+    pts.push(new THREE.Vector3(u, 0, v));   // y 由两面各自的管体偏移决定
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const tubeFront = new THREE.Mesh(new THREE.TubeGeometry(curve, N, 1.5, TRACE_RADIAL, false), matTrace.clone());
+  tubeFront.position.y = BT / 2 + TRACE_GAP;
+  const tubeBack = new THREE.Mesh(new THREE.TubeGeometry(curve, N, 1.5, TRACE_RADIAL, false), matTrace.clone());
+  tubeBack.position.y = -BT / 2 - TRACE_GAP;
+  /* TubeGeometry 索引按 [管段][环向] 顺序排列，每段 TRACE_RADIAL*6 个索引；
+     初始两面都显示 0 段，随后沿旋转方向同步逐段增加。 */
+  tubeFront.geometry.setDrawRange(0, 0);
+  tubeBack.geometry.setDrawRange(0, 0);
+  tg.add(tubeFront, tubeBack);
+  const dotFront = new THREE.Mesh(new THREE.SphereGeometry(3.0, 16, 12), matTraceDot.clone());
+  const dotBack  = new THREE.Mesh(new THREE.SphereGeometry(3.0, 16, 12), matTraceDot.clone());
+  dotFront.visible = dotBack.visible = false;
+  tg.add(dotFront, dotBack);
+  tg.userData = { frozenAngle: bf, tube: tubeFront, tubeBack, dot: dotFront, dotBack, curvePts: pts };
+  dScene.add(tg);
+  traceGroup = tg; traceDot = dotFront;
+  /* 关键修正：绝不改写 θ！圆盘保持 0~360° 连续旋转。
+     固化瞬间直棒正落在板上（d=0），首圈只会画半条，先跳过；
+     待直棒离开曲缝后置 traceArmed，下一圈从起始端完整描绘，正反两面同步。 */
+  tracePhase = 'wait'; tracePhaseT = 0; traceDrawSegs = 0;
+  tracePrevD = realIntersection(theta, bf).d;
+  traceArmed = false;
+  syncUI();
+  updateTrace(theta, 0);   // 立刻把两面的笔尖放到当前真实交点上
+  const st = $('dmFreezeStatus');
+  if (st) st.textContent = `已固化实体板（虚像隐藏）· 直棒每转一圈自然穿过实体板，正反两面同步逐点画出真实交点轨迹`;
+  return { frozenAngle: bf, boardCount: frozenBoards.length };
+}
+
+/** 每帧推进轨迹状态机：笔尖=真实交点 → 逐点描绘 → 画完整条停留 2 秒 → 直接消失 →
+    等待直棒下一圈自然穿过固化板后重画。θ 只由旋转驱动，绝不在此改写；暂停即冻结。 */
+function updateTrace(thetaNow, dt) {
+  if (!traceGroup) return;
+  const d = traceGroup.userData;
+  const bf = d.frozenAngle;
+  const hit = realIntersection(thetaNow, bf);
+  const cur = hit.d;
+  traceScan = cur;
+  const st = $('dmFreezeStatus');
+  const perSeg = TRACE_RADIAL * 6;
+
+  /* 两面笔尖亮点都精确落在直棒与固化实体板的真实交点上（板局部 u,v）。
+     只在交点真正落在曲缝范围（|d|≤TH）时显示；等待/消失阶段则隐藏。 */
+  if (hit.valid) {
+    d.dot.position.set(hit.u,  BT / 2 + TRACE_GAP, hit.v);
+    d.dotBack.position.set(hit.u, -BT / 2 - TRACE_GAP, hit.v);
+    d.dot.visible = d.dotBack.visible = true;
+  } else if (tracePhase === 'wait' || tracePhase === 'blank') {
+    d.dot.visible = d.dotBack.visible = false;
+  }
+
+  const prev = tracePrevD;
+  /* 曲缝进入端：右转 d 从 −TH 增大，左转 d 从 +TH 减小。
+     用"上一帧在窗外、这一帧进窗"捕捉干净的进入瞬间，避免暂停/跳帧误触发。 */
+  const entered = dir > 0 ? (prev < -TH && cur >= -TH) : (prev > TH && cur <= TH);
+  if (Math.abs(cur) > TH + 0.02) traceArmed = true;   // 离开过曲缝才允许下一轮开始
+
+  if (tracePhase === 'wait') {
+    if (running && traceArmed && entered) {
+      tracePhase = 'draw'; tracePhaseT = 0; traceDrawSegs = 0;
+      d.tube.geometry.setDrawRange(0, 0);
+      d.tubeBack.geometry.setDrawRange(0, 0);
+    }
+  } else if (tracePhase === 'draw') {
+    if (running) {
+      /* 进度 = 真实交点走过的参数区间，与 θ 严格同步。
+         两面共用 f/segs，drawRange 逐段揭示范围完全一致。 */
+      const f = Math.max(0, Math.min(1, (cur + TH) / (2 * TH)));
+      const segs = Math.max(0, Math.min(TRACE_N, Math.round(f * TRACE_N)));
+      /* 右转：从 0 段画到 segs 段；左转：从 segs 段画到 N 段（笔尖沿相反方向走）。 */
+      const start = dir > 0 ? 0 : segs * perSeg;
+      const count = dir > 0 ? segs * perSeg : (TRACE_N - segs) * perSeg;
+      d.tube.geometry.setDrawRange(start, count);
+      d.tubeBack.geometry.setDrawRange(start, count);
+      traceDrawSegs = segs;
+      const done = dir > 0 ? cur >= TH - 1e-6 : cur <= -TH + 1e-6;
+      if (st && !done) st.textContent = `真实交点随直棒移动 · 正反两面同步描绘双曲线 ${Math.round(f * 100)}%`;
+      if (done) {                                  // 真实交点抵达曲缝另一端 → 两面都画完整条
+        tracePhase = 'hold'; tracePhaseT = 0;
+        if (st) st.textContent = `双曲线已在正反两面完整呈现 · 停留 2 秒后轨迹消失`;
+      }
+    }
+  } else if (tracePhase === 'hold') {
+    if (running) {
+      tracePhaseT += dt;
+      if (tracePhaseT >= TRACE_HOLD_S) {           // 2 秒后两面直接消失（不淡出）
+        tracePhase = 'blank'; tracePhaseT = 0;
+        d.tube.geometry.setDrawRange(0, 0);
+        d.tubeBack.geometry.setDrawRange(0, 0);
+        traceDrawSegs = 0;
+        d.dot.visible = d.dotBack.visible = false;
+        if (st) st.textContent = `交集轨迹已消失 · 等待直棒下一圈再次穿过实体板`;
+      }
+    }
+  } else if (tracePhase === 'blank') {
+    if (running) {
+      tracePhaseT += dt;
+      if (tracePhaseT >= TRACE_BLANK_S) {          // 不传送 θ，只回到等待态
+        tracePhase = 'wait'; tracePhaseT = 0;
+        traceArmed = false;
+        if (st) st.textContent = `等待直棒自然转回 · 正反两面将同步重画交集轨迹`;
+      }
+    }
+  }
+  tracePrevD = cur;
+}
+
+/** 清除自定义实体板与当前轨迹；清除后半透明虚像（影子板）重新出现 */
+function clearFrozen() {
+  for (const b of frozenBoards) {
+    dScene.remove(b);
+    b.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  frozenBoards = [];
+  disposeTrace(traceGroup);
+  traceGroup = null; traceDot = null;
+  /* 清除固化板 → 虚像框恢复显示 */
+  if (shadow) shadow.visible = true;
+  syncUI();
+}
+
+/* ---------- 地面网格（演示场景自带，浅灰细线，不影响主工作台） ---------- */
+function buildGrid() {
+  const g = new THREE.GridHelper(900, 180, 0xcbd3dd, 0xd7dee8);
+  g.rotation.x = Math.PI / 2;   // GridHelper 默认在 XZ，转到 XY（Z 朝上 → 地面 XY）
+  g.position.z = -0.4;
+  g.material.transparent = true; g.material.opacity = .5;
+  dScene.add(g);
+}
+
+function buildAll() {
+  if (built) return;
+  buildGrid(); buildBoard(); buildRotor(); buildMarker(); buildShadow();
+  built = true;
+}
+
+/** 依据直棒倾角 α=atan(B/A) 重算双曲线虚半轴 B 与板上下边界，保证曲缝完整落在板内。 */
+function applyTilt(deg) {
+  const rad = deg * Math.PI / 180;
+  B = A * Math.tan(rad);
+  const zSpan = B * Math.tan(TH);
+  BZ0 = Math.round(Z0 - zSpan - 8);
+  BZ1 = Math.round(Z0 + zSpan + 8);
+  if (!built) { syncUI(); return; }
+
+  /* 清除固化板与轨迹（其几何依赖 B，必须重建） */
+  clearFrozen();
+
+  /* 移除并释放板、影子、标记、直杆等全部倾角相关对象 */
+  const disposable = [];
+  for (const o of [...dScene.children]) {
+    if (o === rotor) continue;
+    if (o.userData && o.userData.tiltDependent) disposable.push(o);
+  }
+  for (const o of disposable) { dScene.remove(o); o.traverse(x => { x.geometry && x.geometry.dispose(); }); }
+  while (rotor.children.length) {
+    const c = rotor.children[0]; rotor.remove(c);
+    c.traverse(x => { x.geometry && x.geometry.dispose(); });
+  }
+  shadow = null; marker = null;
+
+  buildBoard(); buildRotor(); buildMarker(); buildShadow();
+  shadow.visible = true;   // 倾角调整后回到初始演示态：虚像显示、无固化板
+  syncUI();
+}
+
+/* ---------- 交互状态 ---------- */
+let theta = 0;                 // 旋转角（rad）
+let running = true;
+let dir = 1;                   // 1 = 向右(顺时针俯视)，-1 = 向左
+let speed = 1;                 // 倍率
+const BASE_SPEED = 0.55;       // rad/s @ 1×
+let dragging = false, lastPtrAngle = 0;
+
+function fmtAngle(rad) {
+  let d = rad * 180 / Math.PI % 360; if (d < 0) d += 360;
+  return d.toFixed(0) + '°';
+}
+function syncUI() {
+  rotor.rotation.z = theta;
+  updateMarker(theta);
+  $('dmAngle').textContent = fmtAngle(theta);
+  $('dmPtr').style.transform = `translate(-50%,-100%) rotate(${theta * 180 / Math.PI}deg)`;
+  const sw = $('dmSwitch');
+  sw.classList.toggle('on', running);
+  sw.setAttribute('aria-checked', running ? 'true' : 'false');
+  $('dmSwitchTxt').textContent = running ? '运行中' : '已暂停';
+  $('dmDirTxt').textContent = dir > 0 ? '向右 →' : '向左 ←';
+  $('dmSpeedTxt').textContent = speed.toFixed(1) + '×';
+  $('dmRight').classList.toggle('on', running && dir > 0);
+  $('dmLeft').classList.toggle('on', running && dir < 0);
+  $('dmStop').classList.toggle('on', !running);
+  /* 已有固化板时，「固化为实体板」按钮禁用置灰；清除后恢复可用 */
+  $('dmFreeze').disabled = frozenBoards.length > 0;
+}
+function setRunning(v) { running = v; syncUI(); }
+function setDir(d) {
+  /* 换向时丢弃半途的轨迹，下一圈按新方向重新进入；不改动 θ，圆盘连续旋转。 */
+  if (d !== dir && traceGroup) {
+    const u = traceGroup.userData;
+    u.tube.geometry.setDrawRange(0, 0);
+    u.tubeBack.geometry.setDrawRange(0, 0);
+    if (u.dot) u.dot.visible = false;
+    if (u.dotBack) u.dotBack.visible = false;
+    tracePhase = 'wait'; traceArmed = false; traceDrawSegs = 0;
+  }
+  dir = d; running = true; syncUI();
+}
+
+/* ---------- 开关 / 按钮 ---------- */
+$('dmSwitch').addEventListener('click', () => setRunning(!running));
+$('dmRight').addEventListener('click', () => setDir(1));
+$('dmLeft').addEventListener('click', () => setDir(-1));
+$('dmStop').addEventListener('click', () => setRunning(false));
+$('dmSpeed').addEventListener('input', (e) => { speed = parseFloat(e.target.value); syncUI(); });
+$('dmTilt').addEventListener('input', (e) => {
+  const deg = parseFloat(e.target.value);
+  $('dmTiltTxt').textContent = deg.toFixed(1) + '°';
+  applyTilt(deg);
+});
+$('dmFreeze').addEventListener('click', () => freezeShadow());
+$('dmClearFreeze').addEventListener('click', () => {
+  clearFrozen();
+  const st = $('dmFreezeStatus');
+  if (st) st.textContent = '固化板已清除，半透明虚像框重新出现。视图中最多保留原静止板与一块自定义实体板。';
+});
+
+/* ---------- 旋钮拖动 ---------- */
+const dial = $('dmDial');
+(function ticks(){
+  const box = $('dmTicks');
+  for (let i = 0; i < 24; i++) {
+    const el = document.createElement('i');
+    el.style.transform = `translate(-50%,-59px) rotate(${i * 15}deg)`;
+    box.appendChild(el);
+  }
+})();
+function ptrAngle(e) {
+  const r = dial.getBoundingClientRect();
+  return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+}
+dial.addEventListener('pointerdown', (e) => {
+  dragging = true; lastPtrAngle = ptrAngle(e);
+  dial.setPointerCapture(e.pointerId);
+  setRunning(false);
+});
+dial.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  const a = ptrAngle(e);
+  let d = a - lastPtrAngle;
+  if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+  theta += d; lastPtrAngle = a; syncUI();
+});
+const endDrag = () => { dragging = false; };
+dial.addEventListener('pointerup', endDrag);
+dial.addEventListener('pointercancel', endDrag);
+
+/* ---------- 键盘：→ 右 / ← 左 / ↓ 停止（仅演示打开时生效） ---------- */
+window.addEventListener('keydown', (e) => {
+  if (!open) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); setDir(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); setDir(-1); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); setRunning(false); }
+  else if (e.key === 'Escape') { e.preventDefault(); closeDemo(); }
+}, true);
+
+/* ---------- 视角按钮 ---------- */
+function flyTo(pos, tgt) {
+  dCamera.position.copy(pos);
+  dControls && dControls.target.copy(tgt);
+  dControls && dControls.update();
+}
+$('dmView1').addEventListener('click', () => flyTo(HOME, TARGET));
+$('dmView2').addEventListener('click', () => flyTo(new THREE.Vector3(25, -360, 96), new THREE.Vector3(25, 0, 96)));
+$('dmView3').addEventListener('click', () => flyTo(new THREE.Vector3(28, -1, 430), new THREE.Vector3(28, 0, 70)));
+
+/* ---------- 打开 / 关闭 ---------- */
+function resize() {
+  if (!dRenderer) return;
+  const w = stageEl.clientWidth || 800, h = stageEl.clientHeight || 600;
+  dCamera.aspect = w / h; dCamera.updateProjectionMatrix();
+  dRenderer.setSize(w, h, false);
+}
+function openDemo() {
+  buildAll();
+  if (!dRenderer) { alert('当前浏览器不支持 WebGL，无法运行演示。'); return; }
+  stageEl.appendChild(dRenderer.domElement);
+  if (!dControls) {
+    dControls = new OrbitControls(dCamera, dRenderer.domElement);
+    dControls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: null };
+    dControls.target.copy(TARGET);
+    dControls.enableDamping = true; dControls.dampingFactor = .09;
+    dControls.minDistance = 90; dControls.maxDistance = 1400;
+    dControls.maxPolarAngle = Math.PI - .04;
+  }
+  overlay.classList.add('on');
+  overlay.setAttribute('aria-hidden', 'false');
+  open = true;
+  $('demoEntry').classList.add('on');
+  resize();
+  syncUI();
+  requestAnimationFrame(resize);
+}
+function closeDemo() {
+  overlay.classList.remove('on');
+  overlay.setAttribute('aria-hidden', 'true');
+  open = false;
+  $('demoEntry').classList.remove('on');
+}
+$('demoEntry').addEventListener('click', openDemo);
+$('dmBack').addEventListener('click', closeDemo);
+window.addEventListener('resize', () => { if (open) resize(); });
+new ResizeObserver(() => { if (open) resize(); }).observe(stageEl);
+
+/* ---------- 渲染循环 ---------- */
+const clock = new THREE.Clock();
+function loop() {
+  requestAnimationFrame(loop);
+  if (!open || !dRenderer) return;
+  const dt = Math.min(clock.getDelta(), .05);
+  if (running && !dragging) {
+    theta += dir * BASE_SPEED * speed * dt;
+    /* 仅在整圈处归一化到 [0,2π)：旋转量相差整圈，视觉与交点计算都完全连续，
+       避免长时间累积后浮点精度下降；绝不产生半圈跳变。 */
+    if (theta >= 2 * Math.PI) theta -= 2 * Math.PI;
+    else if (theta < 0) theta += 2 * Math.PI;
+    syncUI();
+  }
+  updateTrace(theta, dt);
+  dControls && dControls.update();
+  dRenderer.render(dScene, dCamera);
+}
+loop();
+
+/* ---------- 自动化探针 ---------- */
+window.Demo3D = {
+  open: openDemo, close: closeDemo,
+  get state() {
+    return { open, running, dir, speed, theta,
+      shadowVisible: !!shadow && shadow.visible,
+      frozenCount: frozenBoards.length,
+      traceActive: !!traceGroup,
+      tracePhase,
+      traceProgress: +((traceScan + TH) / (2 * TH)).toFixed(3),
+      traceSegs: traceDrawSegs,
+      frozenAngles: frozenBoards.map(b => b.userData.frozenAngle) };
+  },
+  setRunning, setDir,
+  setTheta(v) { theta = v; syncUI(); updateTrace(theta, 0); },
+  setTilt(deg) { $('dmTilt').value = deg; $('dmTiltTxt').textContent = (+deg).toFixed(1) + '°'; applyTilt(deg); },
+  get tilt() { return +(Math.atan(B / A) * 180 / Math.PI).toFixed(2); },
+  /* 给定转角直接求真实交点（不依赖当前 θ），用于校验笔尖同步 */
+  intersectionAt(thetaNow, bf) { const r = realIntersection(thetaNow, bf); return { d: +r.d.toFixed(4), u: +r.u.toFixed(3), v: +r.v.toFixed(3), valid: r.valid }; },
+  /* 诊断：固化板的世界包围盒（验证它竖直立在圆盘上、高度与静止板相当，未放倒到圆盘下方）
+     以及是否为无孔实心板（mesh 数 = 1，无曲缝描边线）。 */
+  get frozenBoardInfo() {
+    return frozenBoards.map(g => {
+      const box = new THREE.Box3().setFromObject(g);
+      let meshes = 0, lines = 0;
+      g.traverse(o => { if (o.isMesh) meshes++; if (o.isLine) lines++; });
+      return {
+        frozenAngle: +g.userData.frozenAngle.toFixed(3),
+        minY: +box.min.y.toFixed(1), maxY: +box.max.y.toFixed(1),
+        minZ: +box.min.z.toFixed(1), maxZ: +box.max.z.toFixed(1),
+        heightZ: +(box.max.z - box.min.z).toFixed(1),
+        meshes, lines
+      };
+    });
+  },
+  /* 影子板 / 固化 / 轨迹 */
+  freeze: freezeShadow, clearFrozen,
+  /* 校验：任意冻结角 bf 下，直杆继续转 d 后与新板交点的轨迹残差 */
+  traceResidual(bf, d) {
+    const u = A / Math.cos(d), v = Z0 - B * Math.tan(d);
+    return (u * u) / (A * A) - ((v - Z0) * (v - Z0)) / (B * B) - 1;
+  },
+  /* 诊断：轨迹正反两面 tube 的点数 / 材质 / 可见性 / 绘制进度 */
+  get traceInfo() {
+    if (!traceGroup) return null;
+    const d = traceGroup.userData;
+    return {
+      faces: 2,
+      tubePts: d.tube.geometry.attributes.position.count,
+      drawCount: d.tube.geometry.drawRange.count,
+      backDrawCount: d.tubeBack.geometry.drawRange.count,
+      faceY: { front: d.tube.position.y, back: d.tubeBack.position.y },
+      segs: traceDrawSegs,
+      phase: tracePhase,
+      scan: +traceScan.toFixed(3),
+      color: '#' + d.tube.material.color.getHexString(),
+      visible: traceGroup.visible,
+      dotVisible: d.dot.visible && d.dotBack.visible,
+      dotPos: { x: +d.dot.position.x.toFixed(1), z: +d.dot.position.z.toFixed(1) },
+      frozenAngle: d.frozenAngle
+    };
+  },
+  /* 校验：两面笔尖是否都精确等于「直棒与固化板真实交点」。同步成立时两者误差都为 0。 */
+  penSyncError() {
+    if (!traceGroup || !traceDot) return null;
+    const d = traceGroup.userData;
+    const r = realIntersection(theta, d.frozenAngle);
+    if (!r.valid) return null;
+    const eFront = Math.hypot(d.dot.position.x - r.u, d.dot.position.z - r.v);
+    const eBack  = Math.hypot(d.dotBack.position.x - r.u, d.dotBack.position.z - r.v);
+    return +Math.max(eFront, eBack).toFixed(6);
+  },
+  /* 诊断：四枚锚点局部角度 + 是否落在橙扇(31°~149°)覆盖内 + 距两条直边垂直距离 */
+  get anchorInfo() {
+    const a = [];
+    rotor.children.forEach(o => {
+      if (o.isMesh && o.geometry && o.geometry.type === 'SphereGeometry'
+          && Math.abs(o.position.z - 26.5) < .1 && o.geometry.parameters.radius === 3.6) {
+        const deg = ((Math.atan2(o.position.y, o.position.x) * 180 / Math.PI) + 360) % 360;
+        const r = Math.hypot(o.position.x, o.position.y);
+        const dA = r * Math.sin(Math.abs(deg - 31) * Math.PI / 180);
+        const dB = r * Math.sin(Math.abs(deg - 149) * Math.PI / 180);
+        a.push({ deg: +deg.toFixed(1), r: +r.toFixed(1),
+                 onPlate: deg >= 31 && deg <= 149,
+                 perpToEdge: +Math.min(dA, dB).toFixed(2) });
+      }
+    });
+    return a;
+  },
+  /* 轨迹点世界坐标（供验证交点确实落在实体板平面上） */
+  tracePoint(bf, d) {
+    const u = A / Math.cos(d), v = Z0 - B * Math.tan(d);
+    const c = Math.cos(bf), s = Math.sin(bf);
+    return { x: u * c + (BT/2 + 1.0) * s, y: u * s - (BT/2 + 1.0) * c, z: v };
+  },
+  get crossing() {
+    const c = Math.cos(theta);
+    return Math.abs(c) < .38 ? null : { x: A / c, z: Z0 - B * Math.tan(theta) };
+  },
+  /* 校验：交点是否落在双曲线 x²/a² − (z−z0)²/b² = 1 上 */
+  get residual() {
+    const c = Math.cos(theta); if (Math.abs(c) < .38) return null;
+    const x = A / c, z = Z0 - B * Math.tan(theta);
+    return (x * x) / (A * A) - ((z - Z0) * (z - Z0)) / (B * B) - 1;
+  }
+};
 </script>
 </body>
 </html>
