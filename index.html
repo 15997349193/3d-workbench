@@ -9365,6 +9365,42 @@ const $ = (id) => document.getElementById(id);
 const overlay = $('demoOverlay');
 const stageEl = $('dmStage');
 
+/* ---------- 可见错误提示 ----------
+   教学一体机 / 无头 / 受管控浏览器常拦截 alert()，导致启动失败时"点了没反应"。
+   这里改用页面内浮层提示，确保任何异常都能被使用者直接看到。 */
+function dmFatal(msg) {
+  var box = $('dmFatalBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'dmFatalBox';
+    box.style.cssText = 'position:fixed;z-index:2147483647;left:50%;top:24px;transform:translateX(-50%);' +
+      'max-width:600px;width:calc(100% - 40px);background:#fff4e5;border:2px solid #e08700;' +
+      'border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:18px 22px;' +
+      'font:15px/1.7 "Microsoft YaHei",sans-serif;color:#6b4a00;box-sizing:border-box;';
+    (document.body || document.documentElement).appendChild(box);
+  }
+  box.innerHTML = '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">⚠ 演示启动遇到问题</div>' +
+    '<div>' + String(msg) + '</div>' +
+    '<div style="margin-top:10px;">请在 360 浏览器地址栏右侧切换到「极速模式 / 闪电图标」后刷新；' +
+    '或使用新版 Chrome / Edge 打开本网址。</div>' +
+    '<button onclick="var b=document.getElementById(\'dmFatalBox\');if(b)b.style.display=\'none\'" ' +
+    'style="margin-top:12px;background:#e08700;color:#fff;border:0;border-radius:6px;padding:6px 16px;font-size:14px;cursor:pointer;">知道了</button>';
+  box.style.display = 'block';
+}
+
+/* 入口按钮绑定放在模块最前面：即便下方某段初始化在老内核里抛错，
+   按钮依然可点，并走带兜底提示的安全包装，绝不出现"点了没反应"。
+   openDemo / closeDemo 是函数声明，会被提升，此处引用安全。 */
+(function bindEntryEarly() {
+  var entry = $('demoEntry'), back = $('dmBack');
+  if (entry) entry.addEventListener('click', function () {
+    try { openDemo(); } catch (e) { console.error('[曲中取直] 打开失败', e); dmFatal('打开演示失败：' + (e && e.message || e)); }
+  });
+  if (back) back.addEventListener('click', function () {
+    try { closeDemo(); } catch (e) { console.warn(e); }
+  });
+})();
+
 /* ---------- 几何参数（mm） ---------- */
 const A = 52;          // 双曲线实半轴（顶点半径）
 let   B = 50;          // 虚半轴（上升斜率）。直棒倾角 = atan(B/A)，可由面板滑杆调整
@@ -9384,9 +9420,19 @@ const TARGET = new THREE.Vector3(25, 0, 78);
 dCamera.position.copy(HOME);
 
 let dRenderer = null;
-try {
-  dRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-} catch (e) { console.warn('演示场景 WebGL 不可用', e); }
+/* 教学一体机可能只允许一个 WebGL 上下文（主工作台已占用一个），或显卡驱动较老。
+   依次尝试多组参数，尽最大努力拿到演示用的第二个上下文。 */
+(function createDemoRenderer() {
+  const variants = [
+    { antialias: true, alpha: true },
+    { antialias: false, alpha: true, powerPreference: 'low-power' },
+    { antialias: false, alpha: true }
+  ];
+  for (const opt of variants) {
+    try { dRenderer = new THREE.WebGLRenderer(opt); break; }
+    catch (e) { console.warn('[曲中取直] WebGL 上下文创建失败，尝试降级参数', e); }
+  }
+})();
 let dControls = null;
 let built = false;
 let open = false;
@@ -9562,17 +9608,19 @@ function buildBoard() {
   /* 板面金色标题："曲中取直"四字竖向排列，置于曲线右侧空白区。
      曲缝在 z∈[77,113] 时 x 仅 52~56，故题字放在 x≈78 处可完全避开。 */
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 512;
-  const g = cv.getContext('2d');
-  g.clearRect(0, 0, 128, 512);
-  g.font = 'bold 84px "Microsoft YaHei",sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 7; g.strokeStyle = 'rgba(90,20,60,.55)';
-  const chars = ['曲','中','取','直'];
-  chars.forEach((c, i) => {
-    const y = 64 + i * 128;
-    g.strokeText(c, 64, y);
-    g.fillStyle = '#ffd21f'; g.fillText(c, 64, y);
-  });
+  const g = cv.getContext && cv.getContext('2d');
+  if (g) {
+    g.clearRect(0, 0, 128, 512);
+    g.font = 'bold 84px "Microsoft YaHei",sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 7; g.strokeStyle = 'rgba(90,20,60,.55)';
+    const chars = ['曲','中','取','直'];
+    chars.forEach((c, i) => {
+      const y = 64 + i * 128;
+      g.strokeText(c, 64, y);
+      g.fillStyle = '#ffd21f'; g.fillText(c, 64, y);
+    });
+  }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   const label = new THREE.Mesh(
@@ -9995,7 +10043,10 @@ function resize() {
 }
 function openDemo() {
   buildAll();
-  if (!dRenderer) { alert('当前浏览器不支持 WebGL，无法运行演示。'); return; }
+  if (!dRenderer) {
+    dmFatal('当前设备未能创建 3D 绘图环境（WebGL），演示无法运行。请切换 360 极速模式或改用新版 Chrome / Edge。');
+    return;
+  }
   stageEl.appendChild(dRenderer.domElement);
   if (!dControls) {
     dControls = new OrbitControls(dCamera, dRenderer.domElement);
@@ -10019,10 +10070,12 @@ function closeDemo() {
   open = false;
   $('demoEntry').classList.remove('on');
 }
-$('demoEntry').addEventListener('click', openDemo);
-$('dmBack').addEventListener('click', closeDemo);
+/* 入口按钮 / 返回按钮已在模块顶部提前绑定（见 bindEntryEarly），此处不再重复绑定。 */
 window.addEventListener('resize', () => { if (open) resize(); });
-new ResizeObserver(() => { if (open) resize(); }).observe(stageEl);
+if (typeof ResizeObserver !== 'undefined') {
+  try { new ResizeObserver(() => { if (open) resize(); }).observe(stageEl); }
+  catch (e) { /* 老内核无此 API 或观察失败：已由 window.resize 兜底 */ }
+}
 
 /* ---------- 渲染循环 ---------- */
 const clock = new THREE.Clock();
@@ -10173,9 +10226,9 @@ window.Demo3D = {
       '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">⚠ 3D 工作台未能启动</div>' +
       (isIE
         ? '<div>检测到当前是 <b>IE 兼容内核</b>，它不支持本页所需的网页技术，所以菜单点击没有反应。</div>'
-        : '<div>3D 引擎未能加载，可能是内核模式或网络（CDN）原因。</div>') +
+        : '<div>3D 引擎未能加载，可能是浏览器内核模式或显卡加速受限。</div>') +
       '<div style="margin-top:10px;">请在 360 浏览器地址栏右侧或设置中，<b>切换到「极速模式 / 闪电图标」</b> 后刷新页面；' +
-      '或使用较新的 <b>Chrome / Edge</b> 浏览器打开本网址。若已是最快内核仍不行，请确认网络可访问公网 CDN。</div>' +
+      '或使用较新的 <b>Chrome / Edge</b> 浏览器打开本网址。本页已内置全部依赖，无需联网；若极速模式下仍不行，请开启浏览器的硬件加速。</div>' +
       '<button onclick="this.parentNode.style.display=\'none\'" style="margin-top:12px;background:#e0a800;color:#fff;' +
       'border:0;border-radius:6px;padding:6px 16px;font-size:14px;cursor:pointer;">知道了</button>';
     (document.body || document.documentElement).appendChild(tip);
