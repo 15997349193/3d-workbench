@@ -5642,6 +5642,109 @@ function hornGeometry(p) {
   return geo;
 }
 
+/**
+ * 近圆拉伸体的边线：只画顶 / 底两个端盖圆环，不画竖直棱线。
+ * 圆形轮廓的点被量化成阶梯后，EdgesGeometry 会把相邻面夹角 > 阈值的竖棱全画出来，
+ * 形成一根根竖条（视觉上像矩形碎片）。这里按轮廓顺序连成上下两个闭环，侧面保持干净。
+ * 非近圆轮廓返回 null，调用方回退到 EdgesGeometry。
+ */
+function roundExtrudeEdgeCoords(desc) {
+  const pts = desc.pts2d || [], b = desc.basis;
+  if (!b || !isRoundishPts(pts)) return null;
+  const u = new THREE.Vector3().fromArray(b.u);
+  const v = new THREE.Vector3().fromArray(b.v);
+  const n = new THREE.Vector3().fromArray(b.n);
+  const depth = (desc.params && desc.params.depth) || 0;
+  const coords = [], N = pts.length;
+  for (const z of [0, depth]) {
+    for (let i = 0; i < N; i++) {
+      const a = pts[i], c = pts[(i + 1) % N];
+      const pa = new THREE.Vector3().addScaledVector(u, a[0]).addScaledVector(v, a[1]).addScaledVector(n, z);
+      const pc = new THREE.Vector3().addScaledVector(u, c[0]).addScaledVector(v, c[1]).addScaledVector(n, z);
+      coords.push(pa.x, pa.y, pa.z, pc.x, pc.y, pc.z);
+    }
+  }
+  return coords;
+}
+
+/**
+ * 让 ExtrudeGeometry 的侧壁具有平滑法线（圆形轮廓不再是一根根竖条）。
+ * 圆形/近圆轮廓：侧壁点的位置向量就是径向，直接归一化当法线——这样即使轮廓
+ *   点被量化成阶梯状也不会出现假折角。
+ * 一般轮廓：用两条邻边外法线的角平分线；夹角 > 40° 视为真硬边，保留原法线。
+ * 只改侧壁（groups 中 materialIndex===1）的顶点，端盖法线保持不变。
+ */
+function isRoundishPts(pts) {
+  const N = pts.length;
+  if (N < 12) return false;
+  let cx = 0, cy = 0;
+  for (const q of pts) { cx += q[0]; cy += q[1]; }
+  cx /= N; cy /= N;
+  const rs = pts.map((q) => Math.hypot(q[0] - cx, q[1] - cy));
+  const rMean = rs.reduce((a, b) => a + b, 0) / N;
+  const rDev = rMean > 0 ? (Math.max(...rs) - Math.min(...rs)) / rMean : 1;
+  return rDev < 0.12;
+}
+
+function smoothExtrudeSideNormals(geo, pts) {
+  const nor = geo.attributes && geo.attributes.normal;
+  const pos = geo.attributes && geo.attributes.position;
+  if (!nor || !pos || !geo.groups || !geo.groups.length) return;
+  const N = pts.length;
+  if (N < 3) return;
+
+  const roundish = isRoundishPts(pts);
+  let cx = 0, cy = 0;
+  if (roundish) {
+    for (const q of pts) { cx += q[0]; cy += q[1]; }
+    cx /= N; cy /= N;
+  }
+
+  /* 一般轮廓：各边外法线（轮廓统一逆时针，边方向顺时针 90° 即外法线） */
+  const en = [], bis = [], sharp = [];
+  if (!roundish) {
+    for (let i = 0; i < N; i++) {
+      const a = pts[i], b = pts[(i + 1) % N];
+      const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+      en.push([dy / L, -dx / L]);
+    }
+    const COS_SHARP = Math.cos(40 * Math.PI / 180);
+    for (let i = 0; i < N; i++) {
+      const e0 = en[(i - 1 + N) % N], e1 = en[i];
+      if (e0[0] * e1[0] + e0[1] * e1[1] < COS_SHARP) { sharp.push(true); bis.push(null); }
+      else {
+        let nx = e0[0] + e1[0], ny = e0[1] + e1[1];
+        const L = Math.hypot(nx, ny) || 1;
+        bis.push([nx / L, ny / L]); sharp.push(false);
+      }
+    }
+  }
+
+  /* 侧壁顶点的 (x,y) 就是轮廓点；找最近点匹配，避免依赖顶点顺序 */
+  for (const grp of geo.groups) {
+    if (grp.materialIndex !== 1) continue;
+    const end = grp.start + grp.count;
+    for (let i = grp.start; i < end && i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      let nx, ny;
+      if (roundish) {
+        nx = x - cx; ny = y - cy;
+      } else {
+        let best = -1, bd = Infinity;
+        for (let k = 0; k < N; k++) {
+          const dx = x - pts[k][0], dy = y - pts[k][1], d = dx * dx + dy * dy;
+          if (d < bd) { bd = d; best = k; }
+        }
+        if (best < 0 || bd > 0.0025 || sharp[best]) continue; // 0.05mm 容差；硬边跳过
+        nx = bis[best][0]; ny = bis[best][1];
+      }
+      const L = Math.hypot(nx, ny) || 1;
+      nor.setXYZ(i, nx / L, ny / L, 0);
+    }
+  }
+  nor.needsUpdate = true;
+}
+
 /** 依据描述对象生成几何体 */
 function makeGeometry(desc) {
   const p = desc.params || {};
@@ -5713,13 +5816,16 @@ function makeGeometry(desc) {
     pts.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)));
     shape.closePath();
     const geo = new THREE.ExtrudeGeometry(shape, { depth: p.depth, bevelEnabled: false, curveSegments: 8 });
+    /* ExtrudeGeometry 侧壁默认逐段平面法线：圆形轮廓会渲染成一根根竖条。
+       这里按轮廓每个顶点的两条邻边外法线求角平分线，得到平滑侧面；
+       夹角大于阈值的仍是硬边（矩形/棱柱），保留原法线不平滑。 */
+    smoothExtrudeSideNormals(geo, pts);
     const b = desc.basis;
     geo.applyMatrix4(new THREE.Matrix4().makeBasis(
       new THREE.Vector3().fromArray(b.u),
       new THREE.Vector3().fromArray(b.v),
       new THREE.Vector3().fromArray(b.n)
     ));
-    geo.computeVertexNormals();
     return geo;
   }
 
@@ -5914,7 +6020,9 @@ function buildObject(desc) {
     /* 布尔复合体不画边线：CSG 切割会把平面切成扇形三角汤，任何基于边的过滤都会残留
        放射状碎边（蛛网）。靠平滑法线 + 环境反射塑形，视觉最干净。普通实体用 EdgesGeometry。 */
     if (desc.kind !== 'solid') {
-      const edges = makeEdgeLines(new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array, desc);
+      const rec = desc.kind === 'extrude' ? roundExtrudeEdgeCoords(desc) : null;
+      const ec = rec || new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array;
+      const edges = makeEdgeLines(ec, desc);
       obj.add(edges);
     }
     if (state.shade === 'wire') obj.material.wireframe = true;
@@ -5947,7 +6055,8 @@ function updateObject(obj) {
         edges.material.dispose();
       }
     } else {
-      const ec = Array.from(new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array);
+      const rec = desc.kind === 'extrude' ? roundExtrudeEdgeCoords(desc) : null;
+      const ec = rec || Array.from(new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array);
       if (edges) {
         edges.geometry.dispose();
         edges.geometry = new THREE.BufferGeometry();
