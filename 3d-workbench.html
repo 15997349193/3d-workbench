@@ -6981,6 +6981,7 @@ function renderDraft() {
 
 /** 逐点绘制时追加一个点（仅线段工具）：世界点 → 绘制平面局部坐标 */
 function addSketchPoint(worldP) {
+  clearSegOverlay();   // 落新点：清掉上一段线段残留的长度浮层（若还在）
   const [px, py] = worldToPlane2D(worldP);
   /* 磁性吸附：靠近格点/实体顶点才吸（<=1.7mm），否则保留两位小数，可画任意小数长度 */
   const [x, y] = magnetSnap2D(px, py);
@@ -6999,14 +7000,13 @@ function addSketchPoint(worldP) {
   pts.push([x, y]);
   state.closeReady = false;
   renderDraft();
-  /* 两点即成线：第二点落下就提交为开放线段；不退出线段工具，
-     下一次在画布任意位置点击即确认，并直接开始画下一段。 */
+  /* 两点即成线：终点落下即完成确认（commitSketch 已生成正式对象并保持线段工具），
+     浮层保留供点标签输入精确长度；下一次点画布直接落新起点，无需额外确认。 */
   if (pts.length === 2) {
     const linePts = pts.map((p) => [...p]);
     state.draft = null;
     clearGroup(draftGroup);
-    const made = commitSketch(linePts, null, false, true);
-    if (made) { segObj = made; linePendingConfirm = true; }
+    commitSketch(linePts, null, false, true);
     updateFirstRun();
   }
 }
@@ -7125,7 +7125,7 @@ function commitSketch(points, tip, closed = true, stayInLine = false) {
   toast(tip || (closed
     ? '闭合草图已成面（蓝色阴影）：点它或右侧面板都能拉伸成实体'
     : stayInLine
-      ? '线段已画好：在任意位置再点一下确认，接着画下一段'
+      ? '线段已画好并自动确认：直接点下一段起点继续画'
       : '线段已生成：选中它，可拉伸成面'));
   return obj;
 }
@@ -7186,7 +7186,9 @@ function updateSegOverlay() {
   if (segEditing) { segLayer.classList.add('show'); return; }
   let a = null, b = null, editable = false;
   if (segObj) {
-    if (state.selected !== segObj || (state.mode !== 'object' && !linePendingConfirm)) { clearSegOverlay(); }
+    /* 终点即确认：浮层在画下一段前一直保留（可点标签输入精确长度），
+       仅在选中其它对象时清除；画新起点时 addSketchPoint 开头也会清。 */
+    if (state.selected !== segObj) { clearSegOverlay(); }
     else {
       const d = segObj.userData.desc;
       const sp = d.plane || { o: d.pos, u: [1,0,0], v: [0,1,0], n: [0,0,1] };
@@ -8846,7 +8848,7 @@ function setTool(t) {
     syncToolUI();
     updateFirstRun();
     const tip = {
-      sketch: '线段：点起点→点终点，任意处再点一下确认并接着画下一段；靠近格点/顶点自动吸附，远处可画小数长度',
+      sketch: '线段：点起点→点终点即成线并自动确认，接着点下一段起点连续画；靠近格点/顶点自动吸附，远处可画小数长度',
       'sketch-rect': '矩形：按住左键对角线拖出',
       'sketch-circle': '圆：从圆心往外拖出半径',
       'sketch-ellipse': '椭圆：从中心拖出长短轴',
@@ -9159,8 +9161,7 @@ window.addEventListener('pointerup', (e) => {
     if (!d.moved) chooseSketchPlane(e);
   } else if (d.kind === 'sketch') {
     if (!d.moved) {
-      /* 线段工具：成线后的下一次点击 = 确认，并立即开始画下一段（不需要回菜单） */
-      if (confirmPendingLine()) return;
+      /* 线段工具：终点落下即成线、即确认；下一次点击直接作为新线段起点，连续画线 */
       const p = planePoint(e);
       if (p) addSketchPoint(p);
     }
@@ -9417,7 +9418,7 @@ function updateHints() {
     if (state.sketchStage === 'plane') {
       html = `<b>第 1 步 · 选择绘制平面</b>${dots}点击【地面网格】或某个【实体表面】作为草图平面${dots}悬停可预览${dots}<kbd>Esc</kbd> 退出`;
     } else if (state.tool === 'sketch') {
-      html = `<b>第 2 步 · 线段</b>${dots}左键点起点、再点终点即成线${dots}端点自动吸附 5mm 格点并高亮${dots}点白色标签可填长度、点绿勾确定${dots}<b>双击</b> 结束开放线段${dots}<kbd>Enter</kbd> 闭合并退出`;
+      html = `<b>第 2 步 · 线段</b>${dots}左键点起点、再点终点即成线并自动确认${dots}直接点下一段起点连续画，无需额外确认${dots}靠近格点/顶点自动吸附，远处可画小数长度${dots}点白色标签可填精确长度${dots}<kbd>Esc</kbd> 退出`;
     } else {
       html = `<b>第 2 步 · ${SKETCH_TOOL_HINT[state.tool] || '拖拽绘制'}</b>${dots}按住左键在所选平面上拖出尺寸${dots}松开生成草图${dots}<kbd>Esc</kbd> 重新选平面`;
     }
