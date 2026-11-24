@@ -1159,7 +1159,7 @@
 
     <div class="dm-card">
       <h4><svg viewBox="0 0 24 24"><path d="M4 7.5l8-4.5 8 4.5-8 4.5z"/><path d="M4 7.5v9l8 4.5M20 7.5v9l-8 4.5"/></svg>视角</h4>
-      <div class="dm-note">在视口中 <b>右键拖动</b>旋转观察（左键拖动空白也可），<b>滚轮</b>缩放，<b>中键</b>平移。</div>
+      <div class="dm-note">在视口中 <b>右键拖动</b>旋转观察，<b>滚轮</b>缩放，<b>中键</b>平移；左键不旋转视图。</div>
       <div class="dm-btns" style="margin-top:9px">
         <button class="dm-btn" id="dmView1">默认视角</button>
         <button class="dm-btn" id="dmView2">正对板面</button>
@@ -5408,10 +5408,10 @@ const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
 camera.up.set(0, 0, 1);                       // Z 朝上
 camera.position.set(190, -235, 165);
 
-/* 轨道控制器：右键拖拽（任意位置）旋转视图 / 左键拖拽空白处也可旋转 / 中键拖拽平移 / 滚轮缩放 */
+/* 轨道控制器：仅右键拖拽旋转视图；左键不参与视图旋转（只在 ViewCube 上用于转魔方）/ 中键拖拽平移 / 滚轮缩放 */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.mouseButtons = {
-  LEFT: THREE.MOUSE.ROTATE,
+  LEFT: null,
   MIDDLE: THREE.MOUSE.PAN,
   RIGHT: THREE.MOUSE.ROTATE
 };
@@ -9133,7 +9133,7 @@ window.addEventListener('keydown', (e) => {
 
 /* ============================================================================
    13 · 指针交互（对齐 3D One 的手感）
-   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；右键拖动（或左键拖动空白）= 旋转视图
+   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键只用于选中/绘制/魔方，不旋转视图；右键拖动 = 旋转视图
    · 中键拖动 = 平移视图；滚轮 = 缩放；右键只用于旋转，不弹菜单
    · 悬停实体 = 浅黄预览，选中 = 深黄，拖动中 = 透明浅绿
    · 草图模式两段式：第一次点击选绘制平面（地面或实体面），第二次起才开始绘制
@@ -9171,7 +9171,7 @@ viewport.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  /* Shift + 左键：物体模式下加选第二实体 B（布尔用）；点空白仍放行给 OrbitControls 旋转 */
+  /* Shift + 左键：物体模式下加选第二实体 B（布尔用）；点空白不旋转视图（左键已从视图旋转中移除） */
   if (e.shiftKey) {
     if (state.mode === 'object' && state.tool === 'select') {
       const sh = pick(e);
@@ -10994,7 +10994,7 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
       · 布尔运算结果同样可以继续选面、拉伸、再运算，反复叠加造型。
 
    五、视角与坐标系
-      · 右键拖拽（任意位置）= 旋转视图；左键拖拽空白处也可旋转；中键按住拖动 = 平移；滚轮 = 缩放。
+      · 右键拖拽（任意位置）= 旋转视图；左键仅用于选中/绘制/魔方，不旋转视图；中键按住拖动 = 平移；滚轮 = 缩放。
       · 实体交互色：鼠标悬停 = 浅黄；单击选中 = 深黄；按住拖动 = 透明浅绿。
       · 选中实体后点浮出菜单的「移动」才会出现 X/Y/Z 三轴箭头；点坐标标签可输入精确数值，
         Esc / 点空白处退出移动模式。
@@ -11718,7 +11718,7 @@ function openDemo() {
   stageEl.appendChild(dRenderer.domElement);
   if (!dControls) {
     dControls = new OrbitControls(dCamera, dRenderer.domElement);
-    dControls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+    dControls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     dControls.target.copy(TARGET);
     dControls.enableDamping = true; dControls.dampingFactor = .09;
     dControls.minDistance = 90; dControls.maxDistance = 1400;
