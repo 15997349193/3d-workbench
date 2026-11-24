@@ -6765,8 +6765,27 @@ function faceBoundary(obj, hit) {
     .applyMatrix3(new THREE.Matrix3().getNormalMatrix(mw)).normalize();
   const traced = rasterFaceLoops(picked, vx, vy, vz, mw, worldNormal);
   if (!traced) return null;
-  const loop = traced.best;
-  const loopsWorld = traced.loops;
+
+  /* —— 近圆轮廓拟合：栅格追踪得到的圆环带 0.2mm 阶梯，选面高亮会看出锯齿。
+     在面平面内做最小二乘圆拟合，重建为 128 点等角环；矩形/异形轮廓不受影响。
+     拟合后的环同时供高亮、草图平面、拉伸体使用，后续 CSG 也不会再切出薄片。 */
+  const { u: pu, v: pv } = planeBasis(worldNormal);
+  const origin = new THREE.Vector3();
+  traced.best.forEach((p) => origin.add(p));
+  origin.multiplyScalar(1 / traced.best.length);
+  const fitRing = (ring) => {
+    if (!ring || ring.length < 12) return ring;
+    const pts2 = ring.map((p) => {
+      const d = p.clone().sub(origin);
+      return [d.dot(pu), d.dot(pv)];
+    });
+    if (!isRoundishPts(pts2)) return ring;
+    const fitted = fitCircleRing(pts2, Math.max(128, ring.length));
+    if (!fitted) return ring;
+    return fitted.map(([x, y]) => origin.clone().addScaledVector(pu, x).addScaledVector(pv, y));
+  };
+  const loop = fitRing(traced.best);
+  const loopsWorld = traced.loops.map(fitRing);
 
   const fillCoords = [];
   for (let j = 0; j < picked.length; j += 3) {
@@ -7517,6 +7536,77 @@ function worldGeometryOf(desc) {
   return g;
 }
 
+/** 把规则几何打包成布尔结果通用的 {p,i,n}（objA 局部坐标，顶点按三角展开） */
+function geometryPins(geo, offsetZ) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const pos = g.attributes.position, nor = g.attributes.normal;
+  const p = [], n = [], index = [];
+  for (let k = 0; k < pos.count; k++) {
+    p.push(
+      Math.round(pos.getX(k) * 100) / 100,
+      Math.round(pos.getY(k) * 100) / 100,
+      Math.round((pos.getZ(k) + (offsetZ || 0)) * 100) / 100
+    );
+    if (nor) n.push(
+      Math.round(nor.getX(k) * 10000) / 10000,
+      Math.round(nor.getY(k) * 10000) / 10000,
+      Math.round(nor.getZ(k) * 10000) / 10000
+    );
+    index.push(k);
+  }
+  if (g !== geo) g.dispose();
+  geo.dispose();
+  return { p, i: index, n };
+}
+
+/**
+ * 同轴等截面规则体的相切/重叠布尔快速路径。
+ * 两个圆柱首尾相接时，CSG 虽然能算出正确外表面，但接缝两侧的三角划分相位不同，
+ * 渲染后会留下一条隐约的弧线。这里直接合成为一根规则圆柱（盒体同理），
+ * 法线连续、没有接缝；端面整圈切除也按缩短尺寸处理，不产生薄片。
+ * 不满足条件返回 null，交回 three-bvh-csg 处理一般形状。
+ */
+function fastPrimitiveBoolean(objA, descB, op) {
+  const da = objA.userData && objA.userData.desc;
+  if (!da || !descB || da.kind !== descB.kind || da.quat || descB.quat) return null;
+  const pa = da.params || {}, pb = descB.params || {};
+  if (!isFinite(pa.h) || !isFinite(pb.h) || pa.h <= 0 || pb.h <= 0) return null;
+  if (!Array.isArray(da.pos) || !Array.isArray(descB.pos)) return null;
+  if (Math.hypot(da.pos[0] - descB.pos[0], da.pos[1] - descB.pos[1]) > 0.01) return null;
+
+  if (da.kind === 'cylinder') {
+    if (Math.abs((pa.r || 0) - (pb.r || 0)) > 0.01) return null;
+  } else if (da.kind === 'box') {
+    if (Math.abs((pa.w || 0) - (pb.w || 0)) > 0.01 ||
+        Math.abs((pa.d || 0) - (pb.d || 0)) > 0.01) return null;
+  } else {
+    return null;                          // 锥 / 环 / 复合体仍走 CSG
+  }
+
+  const za = da.pos[2], zb = descB.pos[2];
+  const aTop = za + pa.h / 2, aBot = za - pa.h / 2;
+  const bTop = zb + pb.h / 2, bBot = zb - pb.h / 2;
+  let h, zc;
+  if (op === 'add') {
+    if (bTop < aBot - 0.01 || bBot > aTop + 0.01) return null;  // 完全分离，不是相切/重叠
+    h = Math.max(aTop, bTop) - Math.min(aBot, bBot);
+    zc = (Math.max(aTop, bTop) + Math.min(aBot, bBot)) / 2;
+  } else if (op === 'sub') {
+    if (pb.r != null && pa.r != null && pb.r < pa.r - 0.01) return null; // 只切中间一孔 → CSG
+    if (Math.abs(bTop - aTop) < 0.01 && bBot >= aBot - 0.01 && pb.h <= pa.h + 0.01) {
+      h = pa.h - pb.h; zc = za - pb.h / 2;             // 顶面齐平，往下挖掉一层
+    } else if (Math.abs(bBot - aBot) < 0.01 && bTop <= aTop + 0.01 && pb.h <= pa.h + 0.01) {
+      h = pa.h - pb.h; zc = za + pb.h / 2;             // 底面齐平，往上挖掉一层
+    } else return null;
+  } else {
+    return null;
+  }
+  if (!(h > 0.01)) return null;
+  const merged = { kind: da.kind, params: { ...pa, h } };
+  const geo = makeGeometry(merged);
+  return geometryPins(geo, zc - za);                   // 返回值在 objA 局部坐标
+}
+
 /**
  * 草图布尔的母体（规则A）：
  *   1) 画在实体表面 → 用记录的宿主实体 uid
@@ -7548,6 +7638,9 @@ function findSketchBooleanHost(sketchObj, sDesc) {
  * 结果保存成顶点表，所以撤销 / 重开都能原样还原。
  */
 function booleanWith(objA, descB, op) {
+  /* 规则体相切/重叠的合成先走快速路径：无共面碎片、无接缝弧线，也快得多 */
+  const fast = fastPrimitiveBoolean(objA, descB, op);
+  if (fast) return fast;
   if (!CSG || !csgEvaluator) throw new Error('布尔运算库未加载（需联网）');
 
   objA.updateMatrixWorld();
@@ -7670,7 +7763,13 @@ function entityBoolean(op) {
  * 绕开 CSG，既没有共面碎片，也不必对 128 段圆柱做昂贵的布尔求值。
  */
 function fastCapCut(obj, desc0, depth) {
-  if (state.ex.dir !== -1 || state.ex.dirVec || !state.face) return false;
+  if (!state.face || depth <= 0) return false;
+  /* 默认方向 = 沿面法向反向扎进去；自定义方向只要与面法向平行、合成方向向内，
+     同样可以按“直接减小尺寸”处理，避免落到 CSG 上切出弧形薄片。 */
+  const faceN = state.face.normal.clone().normalize();
+  const dirN = state.ex.dirVec ? state.ex.dirVec.clone().normalize() : faceN.clone();
+  const effective = dirN.multiplyScalar(state.ex.dir < 0 ? -1 : 1);
+  if (effective.dot(faceN) > -0.999) return false;
   const d = desc0, p = d.params;
   if (!p || !d.pos || !Array.isArray(d.pos)) return false;
   const nWorld = state.face.normal.clone().normalize();
@@ -7801,7 +7900,6 @@ function applyExtrude() {
   }
   /* 端面整圈减运算：直接改尺寸，结果与 3D One 一致（圆柱高度降低），且瞬时完成 */
   if (useOp === 'sub' && !isSheet && desc0.kind !== 'sketch'
-      && state.ex.dir === -1 && !state.ex.dirVec
       && fastCapCut(obj, desc0, h)) {
     syncPanel();
     updateStatus();
