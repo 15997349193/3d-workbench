@@ -5306,6 +5306,8 @@ const state = {
 };
 
 let drag = null;                 // 当前指针拖拽会话
+let hoverEntity = null;          // 当前悬停的实体（浅黄预览）
+let vcHoverTri = -1;             // 当前悬停的魔方三角（白绿渐变预览）
 let editBase = null;             // 撤销快照的事务起点
 const undoStack = [];            // 撤销栈（存整个场景快照）
 
@@ -5343,12 +5345,12 @@ const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
 camera.up.set(0, 0, 1);                       // Z 朝上
 camera.position.set(190, -235, 165);
 
-/* 轨道控制器：右键拖拽旋转视图 / 中键拖拽平移 / 滚轮缩放；左键留给建模与选择 */
+/* 轨道控制器：左键拖拽（空白处）旋转视图 / 中键拖拽平移 / 滚轮缩放；右键禁用 */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.mouseButtons = {
-  LEFT: null,                   // 左键留给选择/建模，不再旋转视图
+  LEFT: THREE.MOUSE.ROTATE,
   MIDDLE: THREE.MOUSE.PAN,
-  RIGHT: THREE.MOUSE.ROTATE     // 按住右键旋转视图（3D One 手感）
+  RIGHT: null
 };
 controls.target.set(0, 0, 12);
 controls.enableDamping = true;
@@ -6156,34 +6158,68 @@ function worldNormal(obj, face) {
    高亮用它，拉伸的轮廓也用它，所以「高亮出来的面」和「实际拉伸的面」永远一致。
    立方体 / 圆柱 / 拉伸体 / 布尔运算结果（任意网格）走的是同一套代码。
    ========================================================================== */
-function setHighlight(obj, on, asB) {
+/* 实体交互配色（仿参考图的悬停预览）
+   · 悬停实体   = 浅黄色
+   · 选中实体   = 深黄色
+   · 拖动实体   = 透明浅绿（与刚放置未确定的预览色一致）
+   · 布尔 B     = 原来的橙色，保持不变 */
+const LOOK_HOVER   = { fill: 0xffe6a3, edge: 0xd9a441, emis: 0x6b4f00, ei: 0.10, opacity: 0.97, depth: true };
+const LOOK_SELECT  = { fill: 0xf2b200, edge: 0xb87c00, emis: 0x8a5f00, ei: 0.16, opacity: 0.97, depth: true };
+const LOOK_DRAG    = { fill: PENDING_FILL, edge: PENDING_EDGE, emis: 0x2f8f5a, ei: 0.16, opacity: 0.5, depth: false };
+const LOOK_B       = { fill: FACE_C, edge: FACE_C, emis: FACE_C, ei: 0.12, opacity: 0.97, depth: true };
+
+/** 直接把对象刷成指定交互态（normal / hover / selected / drag / B） */
+function paintEntity(obj, look) {
   if (!obj) return;
-  const hi = on ? (asB ? FACE_C : ACCENT) : 0x000000;   // A 蓝色高亮，B 橙色高亮
-  if (obj.isMesh) {
-    obj.material.emissive.setHex(hi);
-    obj.material.emissiveIntensity = on ? 0.12 : 0;
-    const e = obj.children.find((c) => c.userData.isEdge);
-    if (e) {
-      e.material.color.setHex(on ? hi : toneOf(obj.userData.desc).line);
-      e.material.opacity = on ? 1 : 0.85;
+  const d = obj.userData.desc;
+  /* 刚放置未确定的模型保持浅绿预览，只有拖动态会重新落到同一套浅绿 */
+  if (d && d.dimPending === true && look !== 'drag' && look !== 'B') {
+    applyBodyAppearance(obj);
+    if (obj.material && obj.material.emissive) { obj.material.emissive.setHex(0); obj.material.emissiveIntensity = 0; }
+    return;
+  }
+  const L = look && LOOK[look];
+  if (!L) {
+    applyBodyAppearance(obj);
+    if (obj.isMesh && obj.material && obj.material.emissive) { obj.material.emissive.setHex(0); obj.material.emissiveIntensity = 0; }
+    else if (!obj.isMesh) {
+      obj.traverse((c) => {
+        if (!c.material || !c.material.color) return;
+        c.material.color.setHex(c.userData.isNode ? SKETCH_NODE_C : c.userData.isFill ? SKETCH_FILL_C : SKETCH_C);
+        if (c.userData.isFill) c.material.opacity = 0.36;
+      });
     }
+    return;
+  }
+  const c = (which) => L[which];
+  if (obj.isMesh) {
+    obj.material.color.setHex(c('fill'));
+    obj.material.opacity = L.opacity;
+    obj.material.depthWrite = L.depth;
+    obj.material.emissive.setHex(c('emis'));
+    obj.material.emissiveIntensity = L.ei;
+    const e = obj.children.find((ch) => ch.userData.isEdge);
+    if (e) { e.material.color.setHex(c('edge')); e.material.opacity = L.depth ? 1 : 0.95; }
   } else {
-    obj.traverse((c) => {
-      if (!c.material || !c.material.color) return;
-      if (c.userData.isNode) {
-        /* 端点圆点始终保持深蓝，选中时略提亮 */
-        c.material.color.setHex(on ? ACCENT : SKETCH_NODE_C);
+    obj.traverse((ch) => {
+      if (!ch.material || !ch.material.color) return;
+      if (ch.userData.isNode) { ch.material.color.setHex(c('edge')); return; }
+      if (ch.userData.isFill) {
+        ch.material.color.setHex(c('fill')); ch.material.opacity = L.depth ? 0.45 : 0.3;
         return;
       }
-      if (c.userData.isFill) {
-        /* 蓝色阴影面：平时浅蓝，选中加深 */
-        c.material.color.setHex(on ? hi : SKETCH_FILL_C);
-        c.material.opacity = on ? 0.45 : 0.36;
-        return;
-      }
-      c.material.color.setHex(on ? hi : SKETCH_C);
+      ch.material.color.setHex(c('edge'));
     });
   }
+}
+const LOOK = { hover: LOOK_HOVER, selected: LOOK_SELECT, drag: LOOK_DRAG, B: LOOK_B };
+
+function setHighlight(obj, on, asB) {
+  if (!obj) return;
+  if (!on) { paintEntity(obj, 'normal'); return; }
+  let look = asB ? 'B' : 'selected';
+  if (!asB && drag && drag.kind === 'move' && drag.root === obj) look = 'drag';
+  paintEntity(obj, look);
 }
 
 /** 设置布尔运算的第二选中实体 B（Shift 加选），不影响 A 的高亮 */
@@ -6206,6 +6242,7 @@ function updateBoolButtons() {
 }
 
 function select(obj) {
+  setEntityHover(null);
   autoConfirmDim();   // 切换对象时，上一个未确定的模型视为已确定
   if (obj !== segObj) clearSegOverlay();
   if (state.selected && state.selected !== obj) setHighlight(state.selected, false);
@@ -8390,18 +8427,21 @@ window.addEventListener('keydown', (e) => {
 
 /* ============================================================================
    13 · 指针交互（对齐 3D One 的手感）
-   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键点空白 = 取消选择
-   · 右键按住拖动 = 旋转视图；中键拖动 = 平移视图；滚轮 = 缩放
+   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键拖动空白 = 旋转视图
+   · 中键拖动 = 平移视图；滚轮 = 缩放；右键禁用
+   · 悬停实体 = 浅黄预览，选中 = 深黄，拖动中 = 透明浅绿
    · 草图模式两段式：第一次点击选绘制平面（地面或实体面），第二次起才开始绘制
-   · 视口左下角 ViewCube 区域的左键事件归视角立方体处理
+   · 视口左下角 ViewCube 区域的左键事件归视角立方体处理，悬停呈白绿渐变预览
    ========================================================================== */
 /* 全页面彻底禁用右键：菜单 + 浏览器「按住右键拖拽 = 前进/后退」手势。
    关键：手势由 mousedown 触发，必须在捕获阶段拦掉，仅在 contextmenu 阶段拦来不及。 */
 document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
 document.addEventListener('auxclick', (e) => { if (e.button !== 0) e.preventDefault(); }, true);
 document.addEventListener('mousedown', (e) => {
-  if (e.button === 2) { e.preventDefault(); return; }  // 右键：放行给 OrbitControls 旋转视图
-  if (e.button === 3 || e.button === 4) { e.preventDefault(); e.stopPropagation(); }
+  if (e.button === 2 || e.button === 3 || e.button === 4) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 }, true);
 document.addEventListener('dragstart', (e) => {
   const b = e.button;
@@ -8409,9 +8449,9 @@ document.addEventListener('dragstart', (e) => {
 }, true);
 
 viewport.addEventListener('pointerdown', (e) => {
-  /* 右键/中键不参与建模，放行给 OrbitControls（右键旋转、中键平移）；侧键忽略 */
-  if (e.button !== 0) {
-    if (e.button === 2 || e.button === 3 || e.button === 4) e.preventDefault();
+  /* 右键 / 侧键：一律禁用，不弹菜单、不触发前进后退、不产生任何建模动作 */
+  if (e.button !== 0) {                 // 中键(1)交给 OrbitControls 平移，其余拦截
+    if (e.button !== 1) e.preventDefault();
     return;
   }
   if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit')) return;  // 浮层上的点击按 DOM 处理
@@ -8477,6 +8517,9 @@ viewport.addEventListener('pointerdown', (e) => {
       sketchOrigin: null,
       planeLocked: kd === 'sketch' && !(hit.root.userData.desc.plane || {}).isGround
     };
+    /* 拖动期间：透明浅绿预览（松手后恢复深黄选中态） */
+    hoverEntity = null;
+    paintEntity(hit.root, 'drag');
     return;
   }
 
@@ -8543,6 +8586,7 @@ function moveByDrag(e) {
     desc.pos[1] = d.origin[1] + dy;
   }
   updateObject(d.root);
+  paintEntity(d.root, 'drag');   // updateObject 会重刷正式配色，这里补回拖动浅绿
   clearGroup(faceGroup);
   state.face = null;
   hideFaceMenu();
@@ -8577,6 +8621,8 @@ window.addEventListener('pointerup', (e) => {
   } else if (d.kind === 'place') {
     finishPlacement();
   } else if (d.kind === 'move') {
+    /* 松手：拖动态浅绿 → 选中态深黄（未选中则恢复原色） */
+    paintEntity(d.root, state.selected === d.root ? 'selected' : 'normal');
     if (d.moved) {
       commitEdit();
       updateStatus();
@@ -8761,6 +8807,13 @@ function pickSketchFace(root) {
 /* 悬停：选平面阶段预览可平面；线段工具更新橡皮筋与闭合提示；物体模式换指针样式 */
 viewport.addEventListener('pointermove', (e) => {
   if (drag) return;
+  /* 魔方区域：先把命中的三角刷成白绿渐变预览，不再穿透到实体悬停 */
+  if (inViewCube(e)) {
+    setViewCubeHover(vcubePick(e));
+    setEntityHover(null);
+    return;
+  }
+  setViewCubeHover(null);
   if (state.ex.picking) { hoverExtrudeDir(e); return; }   // 拾取方向：高亮候选边
   if (state.mode === 'sketch' && state.sketchStage === 'plane') {
     renderPlaneHover(pick(e));
@@ -8781,8 +8834,27 @@ viewport.addEventListener('pointermove', (e) => {
   }
 
   if (state.mode === 'object' && state.tool === 'select') {
-    renderer.domElement.style.cursor = pick(e) ? 'move' : 'default';
+    const hit = pick(e);
+    renderer.domElement.style.cursor = hit ? 'move' : 'default';
+    setEntityHover(hit && hit.root);
+  } else {
+    setEntityHover(null);
   }
+});
+
+/** 实体悬停三态：浅黄预览；已选中保持深黄；移开恢复原色 */
+function setEntityHover(obj) {
+  const next = obj || null;
+  if (hoverEntity === next) return;
+  const prev = hoverEntity;
+  hoverEntity = next;
+  if (prev && prev !== state.selected && prev !== state.selectedB) paintEntity(prev, 'normal');
+  if (next && next !== state.selected && next !== state.selectedB) paintEntity(next, 'hover');
+}
+
+viewport.addEventListener('pointerleave', () => {
+  setEntityHover(null);
+  setViewCubeHover(null);
 });
 
 /* ============================================================================
@@ -8801,11 +8873,11 @@ function updateHints() {
       html = `<b>第 2 步 · ${SKETCH_TOOL_HINT[state.tool] || '拖拽绘制'}</b>${dots}按住左键在所选平面上拖出尺寸${dots}松开生成草图${dots}<kbd>Esc</kbd> 重新选平面`;
     }
   } else if (isPrimitive(state.tool)) {
-    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>右键</kbd>拖动 旋转视角${dots}<kbd>Esc</kbd> 取消`;
+    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>左键</kbd>拖动空白处旋转视角${dots}<kbd>Esc</kbd> 取消`;
   } else if (state.face) {
     html = `<b>已选面</b>${dots}点浮出的「<b>拉伸</b>」或按 <kbd>E</kbd>${dots}可选 新建 / 加 / 减 / 交 运算${dots}<kbd>Esc</kbd> 取消`;
   } else {
-    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}单击选定，再点一次 <b>选面</b>${dots}<b>右键拖动</b> 旋转${dots}<b>中键拖动</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
+    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}悬停浅黄、选中深黄、拖动透明浅绿${dots}<b>左键拖动空白处</b> 旋转${dots}<b>中键拖动</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
   }
   $('hintbar').innerHTML = html;
 }
@@ -8959,6 +9031,77 @@ const vcube = new THREE.Mesh(vcubeGeo, [
   new THREE.MeshBasicMaterial({ color: 0xe9f0fa, toneMapped: false })  // 倒角（棱 + 角）
 ]));
 vcubeScene.add(vcube);
+
+/* 悬停高亮：把鼠标命中的面/棱/角三角单独复制出来，盖一层「白 → 浅绿」渐变，
+   先于点击呈现，仿参考图里骰子待选择时的预览效果。 */
+function vcHoverTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 128, 128);
+  g.addColorStop(0, 'rgba(255,255,255,0.98)');
+  g.addColorStop(0.55, 'rgba(226,250,236,0.94)');
+  g.addColorStop(1, 'rgba(122,222,170,0.96)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const vcHoverGeo = new THREE.BufferGeometry();
+vcHoverGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+vcHoverGeo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1], 2));
+const vcHoverMesh = new THREE.Mesh(vcHoverGeo, new THREE.MeshBasicMaterial({
+  map: vcHoverTexture(), transparent: true, opacity: 0.94,
+  side: THREE.DoubleSide, depthWrite: false, toneMapped: false
+}));
+vcHoverMesh.visible = false;
+vcHoverMesh.renderOrder = 2;
+vcube.add(vcHoverMesh);
+const vcHoverLineGeo = new THREE.BufferGeometry();
+vcHoverLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+const vcHoverLine = new THREE.LineLoop(vcHoverLineGeo, new THREE.LineBasicMaterial({
+  color: 0x35c17a, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false
+}));
+vcHoverLine.visible = false;
+vcHoverLine.renderOrder = 3;
+vcube.add(vcHoverLine);
+
+/** 设置 / 清除魔方悬停高亮：命中的是整个面就高亮整个面，命中棱/角就高亮对应小面 */
+function setViewCubeHover(hit) {
+  const fi = hit ? hit.faceIndex : -1;
+  if (fi === vcHoverTri) return;
+  vcHoverTri = fi;
+  if (fi < 0) { vcHoverMesh.visible = vcHoverLine.visible = false; return; }
+  const geo = vcube.geometry;
+  const pos = geo.attributes.position, nor = geo.attributes.normal;
+  const group = geo.groups.find((g) => fi * 3 >= g.start && fi * 3 < g.start + g.count);
+  const first = group ? group.start : fi * 3;
+  const tris = group ? group.count / 3 : 1;
+  const n = new THREE.Vector3().fromBufferAttribute(nor, first);
+  const offset = (i, d, out, k) => {
+    out[k*3] = pos.getX(i) + n.x * d;
+    out[k*3+1] = pos.getY(i) + n.y * d;
+    out[k*3+2] = pos.getZ(i) + n.z * d;
+  };
+  const hp = new Float32Array(tris * 9);
+  const lp = new Float32Array((tris === 1 ? 3 : 4) * 3);
+  const hu = new Float32Array(tris * 6);
+  const QUAD_UV = [[0,0],[1,0],[1,1],[0,0],[1,1],[0,1]];
+  for (let t = 0; t < tris; t++) {
+    for (let k = 0; k < 3; k++) {
+      const i = first + t * 3 + k, j = t * 3 + k;
+      offset(i, 0.006, hp, j);
+      const uvpair = tris === 1 ? [[0,0],[1,0],[0,1]][k] : QUAD_UV[j];
+      hu[j*2] = uvpair[0]; hu[j*2+1] = uvpair[1];
+    }
+  }
+  /* 轮廓沿整个面的外沿走一圈（两面三角：A→B→D→C） */
+  const rim = tris === 1 ? [first, first+1, first+2]
+                         : [first, first+1, first+5, first+4];
+  rim.forEach((i, k) => offset(i, 0.010, lp, k));
+  vcHoverGeo.setAttribute('position', new THREE.BufferAttribute(hp, 3));
+  vcHoverGeo.setAttribute('uv', new THREE.BufferAttribute(hu, 2));
+  vcHoverLineGeo.setAttribute('position', new THREE.BufferAttribute(lp, 3));
+  vcHoverMesh.visible = vcHoverLine.visible = true;
+}
 
 /* Z 朝上的球坐标工具（Three 内置 Spherical 是 Y 朝上的，不能用） */
 function sphericalZUp(v) {
@@ -9914,11 +10057,12 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
       · 布尔运算结果同样可以继续选面、拉伸、再运算，反复叠加造型。
 
    五、视角与坐标系
-      · 按住右键拖动 = 旋转视图；中键按住拖动 = 平移；滚轮 = 缩放；左键留给选择与建模。
+      · 左键拖拽（空白处）= 旋转视图；中键按住拖动 = 平移；滚轮 = 缩放；右键已禁用。
+      · 实体交互色：鼠标悬停 = 浅黄；单击选中 = 深黄；按住拖动 = 透明浅绿。
       · 选中实体后点浮出菜单的「移动」才会出现 X/Y/Z 三轴箭头；点坐标标签可输入精确数值，
         Esc / 点空白处退出移动模式。
-      · 左下角【ViewCube 魔方】：棱边倒角、每个面三角分区；点面=正视角，点棱=两面中间视角，
-        点角=三面等轴测视角；按住魔方拖动可直接旋转主视图。
+      · 左下角【ViewCube 魔方】：棱边倒角、每个面三角分区；鼠标悬停呈白→浅绿渐变预览；
+        点面=正视角，点棱=两面中间视角，点角=三面等轴测视角；按住魔方拖动可直接旋转主视图。
       · 坐标系为 Z 朝上（与 3D One 一致）：网格地面 = XY 平面（z=0），
         Z 是高度轴，面板「位置 Z」即高度。
 
