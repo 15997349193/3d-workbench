@@ -5252,7 +5252,9 @@ if (csgEvaluator) csgEvaluator.attributes = ['position', 'normal'];
 /* ============================================================================
    01 · 全局状态与常量
    ========================================================================== */
-const SNAP = 5;              // 地面吸附步距（mm）
+const BASE_SNAP = 10;        // 地面吸附步距基准（mm）：格子数减半，单格更大更清晰
+let SNAP = BASE_SNAP;        // 当前吸附步距（随视图切换，顶面视图 ×1.5）
+const TOP_VIEW_SCALE = 1.5;  // 顶面视图网格边长放大系数
 const MIN_SIZE = 0.5;        // 尺寸下限，避免退化
 const ACCENT = 0x2f6fed;     // 选中主色
 const FACE_C = 0xf5871f;     // 面选中色（橙）
@@ -5416,7 +5418,7 @@ scene.add(fillLight);
 /* 地面网格：XY 平面（z=0），5 mm × 5 mm 方格，3D One 网页版顶面视图同款密度。
    原生 GridHelper 的 linewidth 在多数 WebGL 实现里恒为 1px，无法加粗；
    改用着色器平面：线宽按屏幕像素精确控制（原 1px 加粗一倍 = 2px），颜色沿用原浅灰。 */
-const GRID_STEP = 5;               // 每格 5 mm，与吸附步距 SNAP 一致
+const GRID_STEP = 10;              // 每格 10 mm（格子数减半、单格更大），与吸附步距 SNAP 一致
 const grid = new THREE.Mesh(
   new THREE.PlaneGeometry(500, 500),
   new THREE.ShaderMaterial({
@@ -5454,6 +5456,87 @@ const grid = new THREE.Mesh(
 grid.position.z = -0.02;           // 略低于模型底面，避免深度闪烁
 grid.renderOrder = -1;
 scene.add(grid);
+
+/* ---------- 网格步距随视图切换：顶面视图 ×1.5（格子更大更少） ----------
+   相机俯视（dir.z 接近 ±1）时把步距放大，其余视图恢复基准；
+   吸附步距 SNAP 同步跟随，保证格点吸附与视觉格线始终对齐。 */
+let gridStepTarget = BASE_SNAP;    // 目标步距（顶面视图 = BASE_SNAP*1.5）
+function isTopDownView() {
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() < 1e-6) return false;
+  return Math.abs(dir.z / dir.length()) > 0.985;   // 与水平面夹角 > ~80°，视作顶/底视图
+}
+function refreshGridStep() {
+  gridStepTarget = BASE_SNAP * (isTopDownView() ? TOP_VIEW_SCALE : 1);
+}
+function stepGridZoom() {
+  /* 视觉步距平滑趋近目标；吸附步距直接取目标（离散吸附不需要平滑） */
+  const u = grid.material.uniforms.uStep;
+  u.value += (gridStepTarget - u.value) * 0.14;
+  if (Math.abs(u.value - gridStepTarget) < 0.01) u.value = gridStepTarget;
+  if (SNAP !== gridStepTarget) SNAP = gridStepTarget;   // 吸附步距与视觉格线始终对齐
+}
+
+/* ---------- 原点目标点标记（地图定位点样式）：X=0,Y=0 若隐若现闪烁浮动 ----------
+   躺在 XY 平面：外圈虚线环 + 内圈柔光 + 十字准星 + 中心实心点 + 向外扩散的脉冲环。
+   整体透明度做呼吸闪烁、沿 Z 轻微浮动，脉冲环周期性扩散淡出（地图“目标点”既视感）。 */
+const originMarker = new THREE.Group();
+originMarker.position.set(0, 0, 0.06);   // 贴在网格上方一点
+originMarker.renderOrder = 1;
+const OM_C = 0x2f6fed;                    // 与选中主色一致的定位蓝
+function omBasic(opacity) {
+  return new THREE.MeshBasicMaterial({
+    color: OM_C, transparent: true, opacity, side: THREE.DoubleSide,
+    depthWrite: false, depthTest: false
+  });
+}
+/* 柔光内圈 */
+const omGlow = new THREE.Mesh(new THREE.CircleGeometry(3.6, 48), omBasic(0.16));
+/* 中心实心点 */
+const omCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), omBasic(0.9));
+omCore.material.color.setHex(0xffffff);
+/* 内环 */
+const omRingIn = new THREE.Mesh(new THREE.RingGeometry(4.6, 5.0, 64), omBasic(0.65));
+/* 外圈虚线环：用多段小圆弧拼成 */
+const omDash = new THREE.Group();
+for (let i = 0; i < 24; i++) {
+  const a0 = (i / 24) * Math.PI * 2;
+  const a1 = a0 + (Math.PI * 2 / 24) * 0.5;
+  const seg = new THREE.Mesh(new THREE.RingGeometry(8.2, 8.7, 6, 1, a0, a1 - a0), omBasic(0.5));
+  omDash.add(seg);
+}
+/* 十字准星 */
+const omCrossPts = [];
+const omCrossMat = new THREE.LineBasicMaterial({ color: OM_C, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
+[[-11, 0, -6.2, 0], [6.2, 0, 11, 0], [0, -11, 0, -6.2], [0, 6.2, 0, 11]].forEach(([x1,y1,x2,y2]) => {
+  omCrossPts.push(x1, y1, 0, x2, y2, 0);
+});
+const omCrossGeo = new THREE.BufferGeometry();
+omCrossGeo.setAttribute('position', new THREE.Float32BufferAttribute(omCrossPts, 3));
+const omCross = new THREE.LineSegments(omCrossGeo, omCrossMat);
+/* 扩散脉冲环 */
+const omPulse = new THREE.Mesh(new THREE.RingGeometry(6, 6.7, 64), omBasic(0.4));
+originMarker.add(omGlow, omCore, omRingIn, omDash, omCross, omPulse);
+originMarker.traverse((o) => { o.raycast = () => {}; });   // 不参与拾取
+scene.add(originMarker);
+let originPulseT = 0;
+function stepOriginMarker(dt) {
+  originPulseT = (originPulseT + dt * 0.00055) % 1;        // ~1.8s 一个脉冲周期
+  const t = performance.now() * 0.001;
+  const breathe = 0.78 + 0.22 * Math.sin(t * 1.9);         // 呼吸闪烁 0.56~1.0
+  omGlow.material.opacity = 0.22 * breathe;
+  omRingIn.material.opacity = 0.78 * breathe;
+  omCrossMat.opacity = 0.62 * breathe;
+  omDash.children.forEach((s) => { s.material.opacity = 0.62 * breathe; });
+  omCore.material.opacity = 0.85 + 0.15 * Math.sin(t * 2.6);
+  /* 脉冲：从内向外扩散并淡出 */
+  const p = originPulseT;
+  const sc = 0.7 + p * 1.7;
+  omPulse.scale.set(sc, sc, 1);
+  omPulse.material.opacity = 0.42 * (1 - p) * (0.6 + 0.4 * breathe);
+  /* 轻微浮动：Z 方向 ~1mm 起伏 */
+  originMarker.position.z = 0.06 + 0.9 * (0.5 + 0.5 * Math.sin(t * 1.3));
+}
 
 /* 分组：模型 / 覆盖层（面高亮 · 放置预览 · 草图草稿） */
 const modelGroup = new THREE.Group();
@@ -10268,9 +10351,16 @@ window.addEventListener('pointerup', () => {
   updateMoveGizmo();
 });
 
+let _lastFrameT = performance.now();
 renderer.setAnimationLoop(() => {
+  const _now = performance.now();
+  const _dt = Math.min(64, _now - _lastFrameT);   // 限制单帧步长，避免切后台回来跳变
+  _lastFrameT = _now;
   if (viewAnim) stepViewAnim();
   stabilizeCameraUp();          // 顶/底视角用 Y 作 up，避免网格歪斜
+  refreshGridStep();            // 顶面视图网格 ×1.5（吸附步距联动）
+  stepGridZoom();               // 网格步距平滑过渡
+  stepOriginMarker(_dt);        // 原点目标点闪烁 + 浮动 + 脉冲
   controls.update();
   renderer.render(scene, camera);
   renderViewCube();
@@ -10302,6 +10392,9 @@ window.Sketch3D = {
   faceBoundary, buildFaceHighlight, faceExtrudeDesc, applyExtrude,
   sketchToPlate, commitSketch, addSketchPoint, closeSketch, shapePoints, booleanWith,
   updateSegOverlay, clearSegOverlay, magnetSnap2D, sketchVertexCandidates, worldToPlane2D,
+  grid, originMarker, isTopDownView, refreshGridStep,
+  get gridStep() { return grid.material.uniforms.uStep.value; },
+  get snapStep() { return SNAP; },
   lockSketchPlane, backToPickPlane,
   openExtrudePanel, closeExtrudePanel, setTool, setMode,
   entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
