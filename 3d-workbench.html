@@ -5343,12 +5343,12 @@ const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
 camera.up.set(0, 0, 1);                       // Z 朝上
 camera.position.set(190, -235, 165);
 
-/* 轨道控制器：左键旋转 / 中键平移 / 滚轮缩放；右键完全禁用（防浏览器手势干扰） */
+/* 轨道控制器：右键拖拽旋转视图 / 中键拖拽平移 / 滚轮缩放；左键留给建模与选择 */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.mouseButtons = {
-  LEFT: THREE.MOUSE.ROTATE,
+  LEFT: null,                   // 左键留给选择/建模，不再旋转视图
   MIDDLE: THREE.MOUSE.PAN,
-  RIGHT: null                   // 右键不绑定任何行为
+  RIGHT: THREE.MOUSE.ROTATE     // 按住右键旋转视图（3D One 手感）
 };
 controls.target.set(0, 0, 12);
 controls.enableDamping = true;
@@ -7557,6 +7557,7 @@ function applyExtrude() {
 const faceMenuEl = $('faceMenu');
 const exPopEl = $('exPop');
 const objMenuEl = $('objMenu');
+let moveActive = false;   // 是否处于「移动模式」：只有点了「移动」才显示三轴箭头
 
 /* ---------- 选中实体浮出菜单：移动 / 缩放 / 置平 ---------- */
 function showObjMenu() {
@@ -7568,12 +7569,13 @@ function showObjMenu() {
   positionObjUI();
 }
 
-function hideObjMenu() {
+function hideObjMenu(opts) {
   objMenuEl.classList.remove('show');
   const ms = $('omMoveSub'), ss = $('omScaleSub');
   if (ms) ms.style.display = 'none';
   if (ss) ss.style.display = 'none';
   objMenuEl.querySelectorAll('.om-btn').forEach((b) => b.classList.remove('on'));
+  if (!opts || !opts.keepMove) moveActive = false;   // 关闭菜单即退出移动模式（点「移动」时例外）
 }
 
 /** 把对象菜单贴到「实体包围盒中心」的屏幕投影位置 */
@@ -7819,12 +7821,11 @@ objMenuEl.addEventListener('click', (e) => {
   const act = btn.dataset.om;
   const moveSub = $('omMoveSub'), scaleSub = $('omScaleSub');
   if (act === 'move') {
-    const willOpen = moveSub.style.display !== 'flex';
-    moveSub.style.display = willOpen ? 'flex' : 'none';
-    scaleSub.style.display = 'none';
-    btn.classList.toggle('on', willOpen);
-    objMenuEl.querySelector('[data-om="scale"]').classList.remove('on');
-    if (willOpen) positionObjUI();
+    /* 点「移动」→ 三个操作菜单立即收起，改由 X/Y/Z 三轴箭头接管，避免视觉打架 */
+    hideObjMenu({ keepMove: true });
+    moveActive = true;
+    updateMoveGizmo();
+    toast('移动模式：拖动 X/Y/Z 箭头，或点坐标标签输入数值 · Esc 退出');
   } else if (act === 'scale') {
     const willOpen = scaleSub.style.display !== 'block';
     scaleSub.style.display = willOpen ? 'block' : 'none';
@@ -8352,6 +8353,7 @@ window.addEventListener('keydown', (e) => {
       backToPickPlane();          // 从绘制状态退回「选平面」
       return;
     }
+    if (moveActive) { hideObjMenu(); toast('已退出移动模式'); return; }
     if (objMenuEl.classList.contains('show')) { hideObjMenu(); return; }
     if (state.placeFace) {         // 放弃贴附基准，回到地面放置
       state.placeFace = null;
@@ -8388,20 +8390,18 @@ window.addEventListener('keydown', (e) => {
 
 /* ============================================================================
    13 · 指针交互（对齐 3D One 的手感）
-   · 物体模式：按在实体上 = 选中并可直接拖动移动；按在空白 = 旋转视角
+   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键点空白 = 取消选择
+   · 右键按住拖动 = 旋转视图；中键拖动 = 平移视图；滚轮 = 缩放
    · 草图模式两段式：第一次点击选绘制平面（地面或实体面），第二次起才开始绘制
-   · 中键拖动 = 平移视图；右键完全禁用（防浏览器前进/后退手势干扰）
-   · 视口左下角 ViewCube 区域的指针事件归视角立方体处理
+   · 视口左下角 ViewCube 区域的左键事件归视角立方体处理
    ========================================================================== */
 /* 全页面彻底禁用右键：菜单 + 浏览器「按住右键拖拽 = 前进/后退」手势。
    关键：手势由 mousedown 触发，必须在捕获阶段拦掉，仅在 contextmenu 阶段拦来不及。 */
 document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
 document.addEventListener('auxclick', (e) => { if (e.button !== 0) e.preventDefault(); }, true);
 document.addEventListener('mousedown', (e) => {
-  if (e.button === 2 || e.button === 3 || e.button === 4) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
+  if (e.button === 2) { e.preventDefault(); return; }  // 右键：放行给 OrbitControls 旋转视图
+  if (e.button === 3 || e.button === 4) { e.preventDefault(); e.stopPropagation(); }
 }, true);
 document.addEventListener('dragstart', (e) => {
   const b = e.button;
@@ -8409,9 +8409,9 @@ document.addEventListener('dragstart', (e) => {
 }, true);
 
 viewport.addEventListener('pointerdown', (e) => {
-  /* 右键 / 侧键：一律禁用，不弹菜单、不触发前进后退、不产生任何建模动作 */
-  if (e.button !== 0) {                 // 中键/右键/侧键都不是建模左键
-    if (e.button !== 1) e.preventDefault();   // 中键(1)放行给 OrbitControls 平移，其余拦截默认行为
+  /* 右键/中键不参与建模，放行给 OrbitControls（右键旋转、中键平移）；侧键忽略 */
+  if (e.button !== 0) {
+    if (e.button === 2 || e.button === 3 || e.button === 4) e.preventDefault();
     return;
   }
   if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit')) return;  // 浮层上的点击按 DOM 处理
@@ -8801,11 +8801,11 @@ function updateHints() {
       html = `<b>第 2 步 · ${SKETCH_TOOL_HINT[state.tool] || '拖拽绘制'}</b>${dots}按住左键在所选平面上拖出尺寸${dots}松开生成草图${dots}<kbd>Esc</kbd> 重新选平面`;
     }
   } else if (isPrimitive(state.tool)) {
-    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>Shift</kbd>+左键 旋转视角${dots}<kbd>Esc</kbd> 取消`;
+    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>右键</kbd>拖动 旋转视角${dots}<kbd>Esc</kbd> 取消`;
   } else if (state.face) {
     html = `<b>已选面</b>${dots}点浮出的「<b>拉伸</b>」或按 <kbd>E</kbd>${dots}可选 新建 / 加 / 减 / 交 运算${dots}<kbd>Esc</kbd> 取消`;
   } else {
-    html = `<b>拖动实体</b> 移动${dots}单击选定，再点一次 <b>选面</b>${dots}<b>左键</b>（空白处）旋转${dots}<b>中键按住</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
+    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}单击选定，再点一次 <b>选面</b>${dots}<b>右键拖动</b> 旋转${dots}<b>中键拖动</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
   }
   $('hintbar').innerHTML = html;
 }
@@ -8856,78 +8856,109 @@ vcubeCam.up.set(0, 1, 0);
 vcubeCam.position.set(0, 0, 3.0);
 vcubeCam.lookAt(0, 0, 0);
 
-/** 面标签贴图：浅色面 + 高饱和彩色描边与文字（方案 B） */
+/** 面贴图：3D One 式四三角分区 + 中心彩色标签，浅灰描边让面更像折纸魔方 */
 function vcubeFaceTexture(text, edge, ink) {
   const c = document.createElement('canvas');
-  c.width = c.height = 128;
+  c.width = c.height = 256;
   const ctx = c.getContext('2d');
-  /* 极浅渐变白底，让面更亮 */
-  const g = ctx.createLinearGradient(0, 0, 128, 128);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(1, '#f3f7ff');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillStyle = '#f8fbff';
+  ctx.fillRect(0, 0, 256, 256);
+  /* 从中心向四个角切出四个微色差三角面 */
+  const corners = [[0, 0], [256, 0], [256, 256], [0, 256]];
+  const shades = ['#ffffff', '#e6eefb', '#f7faff', '#dce8f7'];
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i], b = corners[(i + 1) % 4];
+    ctx.beginPath();
+    ctx.moveTo(128, 128); ctx.lineTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.closePath();
+    ctx.fillStyle = shades[i]; ctx.fill();
+    ctx.strokeStyle = '#aebfd8'; ctx.lineWidth = 3; ctx.stroke();
+  }
   ctx.strokeStyle = edge;
-  ctx.lineWidth = 9;
-  ctx.strokeRect(5, 5, 118, 118);
-  ctx.fillStyle = ink;
-  ctx.font = 'bold 56px "Microsoft YaHei", sans-serif';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, 240, 240);
+  /* 白色描边保证任何底色上都看得清 */
+  ctx.font = 'bold 80px "Microsoft YaHei", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 64, 68);
+  ctx.lineWidth = 14;
+  ctx.strokeStyle = 'rgba(255,255,255,.98)';
+  ctx.strokeText(text, 128, 133);
+  ctx.fillStyle = ink;
+  ctx.fillText(text, 128, 133);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   return tex;
 }
 
-/* BoxGeometry 材质顺序：+X 右 / -X 左 / +Y 后 / -Y 前 / +Z 顶 / -Z 底 */
-const vcube = new THREE.Mesh(
-  new THREE.BoxGeometry(1, 1, 1),
-  [
-    vcubeFaceTexture('右', '#ff8f4d', '#e2641a'),   // 暖橙
-    vcubeFaceTexture('左', '#38b6ff', '#1476c4'),   // 天蓝
-    vcubeFaceTexture('后', '#3fc79a', '#12865f'),   // 薄荷绿
-    vcubeFaceTexture('前', '#ff6f8d', '#d63a5f'),   // 珊瑚粉
-    vcubeFaceTexture('顶', '#ffc44d', '#c0840b'),   // 明黄
-    vcubeFaceTexture('底', '#a98cf5', '#6e45c9')    // 淡紫
-  ].map((t) => new THREE.MeshBasicMaterial({ map: t }))
-);
-vcubeScene.add(vcube);
+/* 真正带倒角的魔方几何：6 个主面 + 12 条倒角棱面 + 8 个三角角面。
+   每个三角都记录其局部朝向 VC_PICK_DIRS：命中面=正向，命中棱=两面中间，命中角=三面等轴测。 */
+const VC_H = 0.5, VC_C = 0.09, VC_S = VC_H - VC_C;
+const vcubeGeo = new THREE.BufferGeometry();
+const VC_POS = [], VC_UV = [], VC_PICK_DIRS = [], VC_GROUPS = [];
+const V3 = (x, y, z) => [x, y, z];
+function vcAddTri(a, b, c, ua, ub, uc, dir, mat) {
+  const start = VC_POS.length / 3;
+  const dv = Array.isArray(dir) ? new THREE.Vector3().fromArray(dir) : dir;
+  VC_POS.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  VC_UV.push(ua[0], ua[1], ub[0], ub[1], uc[0], uc[1]);
+  VC_PICK_DIRS.push(dv.clone().normalize());
+  VC_GROUPS.push([start, 3, mat]);
+}
+function vcAddQuad(verts, uvs, expected, dir, mat) {
+  let vs = verts.slice(), us = uvs.slice();
+  const exp = Array.isArray(expected) ? new THREE.Vector3().fromArray(expected) : expected;
+  const n = new THREE.Vector3().subVectors(new THREE.Vector3().fromArray(vs[1]), new THREE.Vector3().fromArray(vs[0]))
+    .cross(new THREE.Vector3().subVectors(new THREE.Vector3().fromArray(vs[2]), new THREE.Vector3().fromArray(vs[0])));
+  if (n.dot(exp) < 0) { vs = [verts[0], verts[3], verts[2], verts[1]]; us = [uvs[0], uvs[3], uvs[2], uvs[1]]; }
+  vcAddTri(vs[0], vs[1], vs[2], us[0], us[1], us[2], dir, mat);
+  vcAddTri(vs[0], vs[2], vs[3], us[0], us[2], us[3], dir, mat);
+}
+const QUV = [[0, 0], [1, 0], [1, 1], [0, 1]];
+/* 主面材质顺序：+X 右 / -X 左 / +Y 后 / -Y 前 / +Z 顶 / -Z 底（材质 6 = 倒角） */
+vcAddQuad([V3(VC_H,-VC_S,-VC_S),V3(VC_H,VC_S,-VC_S),V3(VC_H,VC_S,VC_S),V3(VC_H,-VC_S,VC_S)], QUV, V3(1,0,0),  V3(1,0,0),  0);
+vcAddQuad([V3(-VC_H,VC_S,-VC_S),V3(-VC_H,-VC_S,-VC_S),V3(-VC_H,-VC_S,VC_S),V3(-VC_H,VC_S,VC_S)], QUV, V3(-1,0,0), V3(-1,0,0), 1);
+vcAddQuad([V3(VC_S,VC_H,-VC_S),V3(-VC_S,VC_H,-VC_S),V3(-VC_S,VC_H,VC_S),V3(VC_S,VC_H,VC_S)], QUV, V3(0,1,0),  V3(0,1,0),  2);
+vcAddQuad([V3(-VC_S,-VC_H,-VC_S),V3(VC_S,-VC_H,-VC_S),V3(VC_S,-VC_H,VC_S),V3(-VC_S,-VC_H,VC_S)], QUV, V3(0,-1,0), V3(0,-1,0), 3);
+vcAddQuad([V3(-VC_S,-VC_S,VC_H),V3(VC_S,-VC_S,VC_H),V3(VC_S,VC_S,VC_H),V3(-VC_S,VC_S,VC_H)], QUV, V3(0,0,1),  V3(0,0,1),  4);
+vcAddQuad([V3(VC_S,-VC_S,-VC_H),V3(-VC_S,-VC_S,-VC_H),V3(-VC_S,VC_S,-VC_H),V3(VC_S,VC_S,-VC_H)], QUV, V3(0,0,-1), V3(0,0,-1), 5);
+/* 12 条棱的倒角面：点击后相机转到两个面的正中间 */
+for (let a = 0; a < 3; a++) for (let b = a + 1; b < 3; b++) {
+  const t = 3 - a - b;
+  for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
+    const mk = (va, vb, vt) => { const v = [0, 0, 0]; v[a] = va; v[b] = vb; v[t] = vt; return v; };
+    const dir = mk(sa, sb, 0);
+    vcAddQuad([
+      mk(sa * VC_H, sb * VC_S, -VC_S), mk(sa * VC_H, sb * VC_S, VC_S),
+      mk(sa * VC_S, sb * VC_H, VC_S), mk(sa * VC_S, sb * VC_H, -VC_S)
+    ], QUV, new THREE.Vector3().fromArray(dir), new THREE.Vector3().fromArray(dir), 6);
+  }
+}
+/* 8 个角的三角倒角面：点击后相机转到三面等轴测 */
+for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+  const dir = V3(sx, sy, sz);
+  const vs = [V3(sx*VC_H, sy*VC_S, sz*VC_S), V3(sx*VC_S, sy*VC_H, sz*VC_S), V3(sx*VC_S, sy*VC_S, sz*VC_H)];
+  const n = new THREE.Vector3().subVectors(new THREE.Vector3().fromArray(vs[1]), new THREE.Vector3().fromArray(vs[0]))
+    .cross(new THREE.Vector3().subVectors(new THREE.Vector3().fromArray(vs[2]), new THREE.Vector3().fromArray(vs[0])));
+  const tri = n.dot(new THREE.Vector3().fromArray(dir)) < 0 ? [vs[0], vs[2], vs[1]] : vs;
+  vcAddTri(tri[0], tri[1], tri[2], [0,0], [1,0], [0,1], new THREE.Vector3().fromArray(dir), 6);
+}
+vcubeGeo.setAttribute('position', new THREE.Float32BufferAttribute(VC_POS, 3));
+vcubeGeo.setAttribute('uv', new THREE.Float32BufferAttribute(VC_UV, 2));
+vcubeGeo.clearGroups();
+VC_GROUPS.forEach((g) => vcubeGeo.addGroup(g[0], g[1], g[2]));
+vcubeGeo.computeVertexNormals();
 
-/* 棱边倒角：12 条棱各放一根圆角圆柱、8 个角各放一颗圆球（略凸出表面形成过渡） */
-const VC_R = 0.07;
-(function addVcubeChamfer() {
-  const mat = new THREE.MeshBasicMaterial({ color: 0xf2f6fd });
-  /* CylinderGeometry 轴向是 Y：沿 X 的棱转 Z 90°，沿 Z 的棱转 X 90° */
-  const cylGeo = {
-    x: new THREE.CylinderGeometry(VC_R, VC_R, 1 - 2 * VC_R, 14, 1, true),
-    y: new THREE.CylinderGeometry(VC_R, VC_R, 1 - 2 * VC_R, 14, 1, true),
-    z: new THREE.CylinderGeometry(VC_R, VC_R, 1 - 2 * VC_R, 14, 1, true)
-  };
-  cylGeo.x.rotateZ(Math.PI / 2);
-  cylGeo.z.rotateX(Math.PI / 2);
-  const sphGeo = new THREE.SphereGeometry(VC_R, 14, 10);
-  for (const axis of ['x', 'y', 'z']) {
-    for (const a of [-0.5, 0.5]) {
-      for (const b of [-0.5, 0.5]) {
-        const cyl = new THREE.Mesh(cylGeo[axis], mat);
-        if (axis === 'x') cyl.position.set(0, a, b);
-        else if (axis === 'y') cyl.position.set(a, 0, b);
-        else cyl.position.set(a, b, 0);
-        vcube.add(cyl);
-      }
-    }
-  }
-  for (const sx of [-0.5, 0.5]) {
-    for (const sy of [-0.5, 0.5]) {
-      for (const sz of [-0.5, 0.5]) {
-        const sph = new THREE.Mesh(sphGeo, mat);
-        sph.position.set(sx, sy, sz);
-        vcube.add(sph);
-      }
-    }
-  }
-})();
+const vcube = new THREE.Mesh(vcubeGeo, [
+  vcubeFaceTexture('右', '#ff8f4d', '#e2641a'),   // 暖橙
+  vcubeFaceTexture('左', '#38b6ff', '#1476c4'),   // 天蓝
+  vcubeFaceTexture('后', '#3fc79a', '#12865f'),   // 薄荷绿
+  vcubeFaceTexture('前', '#ff6f8d', '#d63a5f'),   // 珊瑚粉
+  vcubeFaceTexture('顶', '#ffc44d', '#c0840b'),   // 明黄
+  vcubeFaceTexture('底', '#a98cf5', '#6e45c9')    // 淡紫
+].map((tex) => new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })).concat([
+  new THREE.MeshBasicMaterial({ color: 0xe9f0fa, toneMapped: false })  // 倒角（棱 + 角）
+]));
+vcubeScene.add(vcube);
 
 /* Z 朝上的球坐标工具（Three 内置 Spherical 是 Y 朝上的，不能用） */
 function sphericalZUp(v) {
@@ -9032,22 +9063,13 @@ function vcubePick(e) {
   return hits.length ? hits[0] : null;
 }
 
-/** 点击立方体的某个面 → 主视图转到该面的标准视角 */
+/** 点击魔方：点面=正视角，点倒角棱=两面中间，点倒角角=三面等轴测，均平滑过渡 */
 function viewCubeClick(e) {
   const hit = vcubePick(e);
   if (!hit) return;
-  /* 魔方姿态只是为了跟随主视角显示；面的「局部」法线才代表它标注的世界方位，
-     不能用 transformDirection 后的世界法线，否则点「顶」会跳到别的面。 */
-  const wn = hit.face.normal.clone();
-  /* 取最接近的世界主轴方向 */
-  const axes = [
-    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
-    new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
-    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
-  ];
-  let best = axes[0], bd = -2;
-  axes.forEach((v) => { const d = v.dot(wn); if (d > bd) { bd = d; best = v; } });
-  animateView(best);
+  /* 魔方局部坐标即世界方位；VC_PICK_DIRS 在建模时已为每个三角记录好目标方向 */
+  const dir = VC_PICK_DIRS[hit.faceIndex];
+  if (dir) animateView(dir.clone());
 }
 
 /** 把立方体渲染进主画布左下角（scissor 小视口） */
@@ -9396,6 +9418,7 @@ let moveDrag = null, moveEditing = false;
 
 function moveGizmoVisible() {
   const obj = state.selected, d = obj && obj.userData.desc;
+  if (!moveActive) return false;   // 仅在用户点了「移动」之后出现，选中实体本身不弹箭头
   if (!obj || !d || d.kind === 'sketch' || d.kind === 'sheet') return false;
   if (state.face || state.ex.open || state.mode === 'sketch' || state.placing) return false;
   if (d.dimPending === true) return false;   // 刚放置未确定：让尺寸 gizmo 先接管
@@ -9891,10 +9914,11 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
       · 布尔运算结果同样可以继续选面、拉伸、再运算，反复叠加造型。
 
    五、视角与坐标系
-      · 左键拖拽（空白处）= 旋转；【中键按住拖动 = 平移】；滚轮 = 缩放；右键已禁用。
-      · 左下角【ViewCube 魔方】：常驻显示当前视角，点击 前/后/左/右/顶/底
-        任一面平滑切到标准视角，按住魔方拖动可直接旋转主视图。
-      · 草图模式 / 放置工具下左键被工具占用，按住 Shift + 左键可旋转视角。
+      · 按住右键拖动 = 旋转视图；中键按住拖动 = 平移；滚轮 = 缩放；左键留给选择与建模。
+      · 选中实体后点浮出菜单的「移动」才会出现 X/Y/Z 三轴箭头；点坐标标签可输入精确数值，
+        Esc / 点空白处退出移动模式。
+      · 左下角【ViewCube 魔方】：棱边倒角、每个面三角分区；点面=正视角，点棱=两面中间视角，
+        点角=三面等轴测视角；按住魔方拖动可直接旋转主视图。
       · 坐标系为 Z 朝上（与 3D One 一致）：网格地面 = XY 平面（z=0），
         Z 是高度轴，面板「位置 Z」即高度。
 
