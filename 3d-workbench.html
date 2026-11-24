@@ -6288,6 +6288,62 @@ function worldToPlane2D(p) {
   return [d.dot(u), d.dot(v)];
 }
 
+/* ---------- 线段工具「磁性吸附」：靠近格点/实体顶点才吸，远处保留小数落点 ---------- */
+const SNAP_TOL = SNAP * 0.34;   // 磁性吸附半径（约 1.7mm）：光标进入这个范围才吸附
+let _sketchVertSig = '', _sketchVerts2D = [];
+
+/** 收集所有实体的顶点，投影到当前绘制平面 2D（带场景签名缓存，避免每帧重算） */
+function sketchVertexCandidates() {
+  const sp = state.sketchPlane;
+  const planeSig = sp ? JSON.stringify([sp.o, sp.u, sp.v]) : 'ground';
+  const geomSig = modelGroup.children.map((o) => {
+    const d = o.userData.desc || {};
+    const g = o.geometry;
+    const cnt = g && g.attributes && g.attributes.position ? g.attributes.position.count : 0;
+    return (d.uid || '') + ':' + JSON.stringify(d.pos || []) + ':' + cnt;
+  }).join('|') + '#' + planeSig;
+  if (geomSig === _sketchVertSig) return _sketchVerts2D;
+
+  const o = new THREE.Vector3().fromArray(sp ? sp.o : [0, 0, 0]);
+  const u = new THREE.Vector3().fromArray(sp ? sp.u : [1, 0, 0]);
+  const v = new THREE.Vector3().fromArray(sp ? sp.v : [0, 1, 0]);
+  const tmp = new THREE.Vector3();
+  const out = [];
+  for (const obj of modelGroup.children) {
+    const d = obj.userData.desc;
+    if (!d || d.kind === 'sketch' || d.kind === 'sheet') continue;   // 排除草图自身
+    const g = obj.geometry;
+    if (!g || !g.attributes || !g.attributes.position) continue;
+    obj.updateMatrixWorld(true);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      tmp.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld).sub(o);
+      out.push([tmp.dot(u), tmp.dot(v)]);
+    }
+  }
+  _sketchVertSig = geomSig;
+  _sketchVerts2D = out;
+  return out;
+}
+
+/**
+ * 线段落点磁性吸附：
+ *  · 靠近格点（<= SNAP_TOL）→ 吸到格点
+ *  · 靠近实体顶点（<= SNAP_TOL）→ 吸到顶点（取更近者）
+ *  · 都不命中 → 原样保留两位小数，可画任意小数长度
+ */
+function magnetSnap2D(px, py) {
+  let bx = px, by = py, best = SNAP_TOL;
+  const gx = snap(px), gy = snap(py);
+  const dg = Math.hypot(px - gx, py - gy);
+  if (dg <= best) { bx = gx; by = gy; best = dg; }
+  for (const [vx, vy] of sketchVertexCandidates()) {
+    const d = Math.hypot(px - vx, py - vy);
+    if (d < best) { bx = vx; by = vy; best = d; }
+  }
+  return best < SNAP_TOL ? [round2(bx), round2(by)] : [round2(px), round2(py)];
+}
+
 /** 拾取模型（只认带 desc 的根对象） */
 function pick(e) {
   setRay(e);
@@ -6898,8 +6954,9 @@ function renderDraft() {
     if (state.hoverPoint && !state.closeReady) {
       const last = pts[pts.length - 1];
       const [hx, hy] = worldToPlane2D(state.hoverPoint);
-      const hp = at(hx, hy);
-      state.segHoverLocal = [hx, hy];
+      const [sx, sy] = magnetSnap2D(hx, hy);   // 预览与实际落点用同一吸附，所见即所得
+      const hp = at(sx, sy);
+      state.segHoverLocal = [sx, sy];
       if (last.distanceTo(hp) > 0.5) {
         draftGroup.add(sketchStroke([last, hp], n));
         draftGroup.add(sketchNodes([hp], n, 1.2));
@@ -6925,9 +6982,8 @@ function renderDraft() {
 /** 逐点绘制时追加一个点（仅线段工具）：世界点 → 绘制平面局部坐标 */
 function addSketchPoint(worldP) {
   const [px, py] = worldToPlane2D(worldP);
-  /* 线段端点不做格点吸附：保留两位小数，可画任意小数长度的线 */
-  const x = round2(px);
-  const y = round2(py);
+  /* 磁性吸附：靠近格点/实体顶点才吸（<=1.7mm），否则保留两位小数，可画任意小数长度 */
+  const [x, y] = magnetSnap2D(px, py);
   if (!state.draft || state.draft.type !== 'line') state.draft = { type: 'line', points: [] };
   const pts = state.draft.points;
 
@@ -8790,7 +8846,7 @@ function setTool(t) {
     syncToolUI();
     updateFirstRun();
     const tip = {
-      sketch: '线段：点起点→点终点，任意处再点一下确认并接着画下一段；端点不吸附格点，可填精确长度',
+      sketch: '线段：点起点→点终点，任意处再点一下确认并接着画下一段；靠近格点/顶点自动吸附，远处可画小数长度',
       'sketch-rect': '矩形：按住左键对角线拖出',
       'sketch-circle': '圆：从圆心往外拖出半径',
       'sketch-ellipse': '椭圆：从中心拖出长短轴',
@@ -10244,7 +10300,7 @@ window.Sketch3D = {
   buildObject, updateObject, select, pickFace, pickSketchFace,
   faceBoundary, buildFaceHighlight, faceExtrudeDesc, applyExtrude,
   sketchToPlate, commitSketch, addSketchPoint, closeSketch, shapePoints, booleanWith,
-  updateSegOverlay, clearSegOverlay,
+  updateSegOverlay, clearSegOverlay, magnetSnap2D, sketchVertexCandidates, worldToPlane2D,
   lockSketchPlane, backToPickPlane,
   openExtrudePanel, closeExtrudePanel, setTool, setMode,
   entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
