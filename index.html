@@ -7406,35 +7406,57 @@ function booleanWith(objA, descB, op) {
   const g = result.geometry;
   const posAttr = g.attributes && g.attributes.position;
   if (!posAttr || posAttr.count < 3) throw new Error('运算结果为空');
-
-  /* 世界坐标 → objA 局部坐标（本工具的实体只有平移） */
-  const ox = objA.position.x, oy = objA.position.y, oz = objA.position.z;
-  const p = [];
-  for (let i = 0; i < posAttr.count; i++) {
-    p.push(
-      Math.round((posAttr.getX(i) - ox) * 100) / 100,
-      Math.round((posAttr.getY(i) - oy) * 100) / 100,
-      Math.round((posAttr.getZ(i) - oz) * 100) / 100
-    );
-  }
-  const i = g.index ? Array.from(g.index.array) : null;
-
-  /* 保留 CSG 自带的平滑顶点法线：圆柱侧面法线沿圆周连续渐变（点积≈0.9988），
-     切面/端盖法线一致。曲面判定①靠它识别曲面小片；渲染也更光滑。
-     法线是方向（平移不影响），保留 4 位精度即可。 */
+  const idxAttr = g.index;
   const nAttr = g.attributes && g.attributes.normal;
-  let n = null;
-  if (nAttr && nAttr.count === posAttr.count) {
-    n = [];
-    for (let k = 0; k < nAttr.count; k++) {
-      n.push(
-        Math.round(nAttr.getX(k) * 10000) / 10000,
-        Math.round(nAttr.getY(k) * 10000) / 10000,
-        Math.round(nAttr.getZ(k) * 10000) / 10000
-      );
+
+  /* CSG 在共面/相切处会生成大量面积≈0 的退化三角，渲染出来就是截图里的细竖条。
+     先把所有三角读出来，按面积阈值剔除退化片，再重新打包顶点/法线/索引。 */
+  const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+  const vi = (k) => idxAttr ? idxAttr.getX(k) : k;
+  const triCount = idxAttr ? idxAttr.count / 3 : posAttr.count / 3;
+  const tris = [], areas = [];
+  let totalArea = 0;
+  for (let t = 0; t < triCount; t++) {
+    const ia = vi(t * 3), ib = vi(t * 3 + 1), ic = vi(t * 3 + 2);
+    va.fromBufferAttribute(posAttr, ia);
+    vb.fromBufferAttribute(posAttr, ib);
+    vc.fromBufferAttribute(posAttr, ic);
+    const area = vb.clone().sub(va).cross(vc.clone().sub(va)).length() / 2;
+    tris.push({ ia, ib, ic, area });
+    areas.push(area);
+    totalArea += area;
+  }
+  const minArea = Math.max(0.05, totalArea * 0.000005);
+  const kept = tris.filter((t) => t.area >= minArea);
+
+  /* 世界坐标 → objA 局部坐标（本工具的实体只有平移）。法线保留 CSG 的平滑值。 */
+  const ox = objA.position.x, oy = objA.position.y, oz = objA.position.z;
+  const p = [], n = [], index = [];
+  const vertMap = new Map();
+  for (const t of kept) {
+    for (const src of [t.ia, t.ib, t.ic]) {
+      let dst = vertMap.get(src);
+      if (dst === undefined) {
+        dst = p.length / 3;
+        vertMap.set(src, dst);
+        p.push(
+          Math.round((posAttr.getX(src) - ox) * 100) / 100,
+          Math.round((posAttr.getY(src) - oy) * 100) / 100,
+          Math.round((posAttr.getZ(src) - oz) * 100) / 100
+        );
+        if (nAttr) {
+          n.push(
+            Math.round(nAttr.getX(src) * 10000) / 10000,
+            Math.round(nAttr.getY(src) * 10000) / 10000,
+            Math.round(nAttr.getZ(src) * 10000) / 10000
+          );
+        }
+      }
+      index.push(dst);
     }
   }
-
+  if (p.length < 9) throw new Error('运算结果为空');
+  const i = index;
   geoA.dispose();
   geoB.dispose();
   return { p, i, n };
@@ -7482,6 +7504,44 @@ function entityBoolean(op) {
 }
 
 /** 执行拉伸（确定按钮） */
+/**
+ * 端面整圈切除的快速路径：圆柱/盒体从某个平面沿内法向挖掉一层，
+ * 等价于直接减小对应尺寸并把中心往里挪一半深度。
+ * 绕开 CSG，既没有共面碎片，也不必对 128 段圆柱做昂贵的布尔求值。
+ */
+function fastCapCut(obj, desc0, depth) {
+  if (state.ex.dir !== -1 || state.ex.dirVec || !state.face) return false;
+  const d = desc0, p = d.params;
+  if (!p || !d.pos || !Array.isArray(d.pos)) return false;
+  const nWorld = state.face.normal.clone().normalize();
+  const nLocal = nWorld.clone().applyQuaternion(obj.quaternion.clone().invert()).normalize();
+  let key = null, size = 0;
+  if (d.kind === 'cylinder') {
+    if (Math.abs(nLocal.z) < 0.999) return false;    // 侧面不按端面处理
+    key = 'h'; size = p.h;
+  } else if (d.kind === 'box') {
+    const ax = Math.abs(nLocal.x) > 0.999 ? 0 : Math.abs(nLocal.y) > 0.999 ? 1 : Math.abs(nLocal.z) > 0.999 ? 2 : -1;
+    if (ax < 0) return false;
+    key = ['w', 'd', 'h'][ax]; size = p[key];
+  } else {
+    return false;                                    // 锥/环/复合体仍走 CSG
+  }
+  if (!isFinite(size) || depth <= 0 || depth >= size - MIN_SIZE) return false;
+
+  beginEdit();
+  p[key] = round1(size - depth);
+  const shift = nWorld.multiplyScalar(-depth / 2);
+  d.pos[0] = round1(d.pos[0] + shift.x);
+  d.pos[1] = round1(d.pos[1] + shift.y);
+  d.pos[2] = round1(d.pos[2] + shift.z);
+  obj.position.set(d.pos[0], d.pos[1], d.pos[2]);
+  updateObject(obj);
+  state.face = null;
+  clearGroup(faceGroup);
+  commitEdit();
+  return true;
+}
+
 function applyExtrude() {
   const obj = state.selected;
   if (!obj || !state.face) return toast('请先选择一个面');
@@ -7579,6 +7639,17 @@ function applyExtrude() {
       toast('场景中暂无实体可合并，已直接把面拉伸成独立实体');
     }
   }
+  /* 端面整圈减运算：直接改尺寸，结果与 3D One 一致（圆柱高度降低），且瞬时完成 */
+  if (useOp === 'sub' && !isSheet && desc0.kind !== 'sketch'
+      && state.ex.dir === -1 && !state.ex.dirVec
+      && fastCapCut(obj, desc0, h)) {
+    syncPanel();
+    updateStatus();
+    closeExtrudePanel();
+    toast('已沿端面切除 ' + round1(h) + ' mm（等效降低高度）');
+    return;
+  }
+
   const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir,
     useOp !== 'new', state.ex.dirVec);   // 与母体布尔 → 焊接重叠，保证真实合并
   if (!bDesc) return toast('这个面的轮廓不闭合，无法拉伸');
