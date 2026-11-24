@@ -265,10 +265,11 @@
   .statusbar::before{content:"";width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.15);flex:none}
 
   /* ---------- 尺寸编辑 gizmo（3D One 式） ---------- */
-  .dimlayer{position:absolute;inset:0;z-index:3;pointer-events:none;display:none}
+  /* 浮层统一写四向定位 + 宽高：360 极速模式老内核不认 inset 简写，缺了会让箭头全消失 */
+  .dimlayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:3;pointer-events:none;display:none}
   .dimlayer.show{display:block}
-  .dimsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-  .dimlabels{position:absolute;inset:0;pointer-events:none}
+  .dimsvg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+  .dimlabels{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
   .dim-tag{
     position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
     background:rgba(255,255,255,.96);border:1px solid #d7dfea;border-radius:8px;
@@ -286,15 +287,15 @@
   .dim-hit{pointer-events:stroke;cursor:grab}
   .dim-hit:active{cursor:grabbing}
   /* 三轴移动 gizmo（X/Y/Z 箭头拖拽 + 可编辑坐标），视觉复用 .dim-tag 胶囊 */
-  .movelayer{position:absolute;inset:0;z-index:3;pointer-events:none;display:none}
+  .movelayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:3;pointer-events:none;display:none}
   .movelayer.show{display:block}
-  .movesvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .movesvg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
   .mv-hit{pointer-events:stroke;cursor:grab}
   .mv-hit:active{cursor:grabbing}
   .mv-tag{border-width:1.5px}
   .mv-ax{font-weight:800;margin-right:4px}
   /* 拉伸箭头：从选中面中心沿拉伸方向，可正向/反向拖拽改高度 */
-  .exarrowlayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none}
+  .exarrowlayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:4;pointer-events:none;display:none}
   .exarrowlayer.show{display:block}
   .ex-hit{pointer-events:stroke;cursor:grab}
   .ex-hit:active{cursor:grabbing}
@@ -311,7 +312,7 @@
   .dim-confirm svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 
   /* 线段长度提示浮层：绘制中显示实时长度，成线后可点标签输入、点绿勾确定 */
-  .seglayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none}
+  .seglayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:4;pointer-events:none;display:none}
   .seglayer.show{display:block}
   .seg-tag{pointer-events:auto}
   .seg-confirm{padding:6px;border-radius:50%}
@@ -526,12 +527,19 @@
   .mv-center-hit{pointer-events:all;cursor:move}
   .mv-center-on{cursor:move}
   .mv-ang{font-family:inherit;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:2.5px;stroke-linejoin:round}
+  /* 旋转角标 + 中心磁吸提示 */
+  .mv-badge{font-family:inherit;pointer-events:none;font-size:11px;font-weight:800;paint-order:stroke;stroke:none}
+  .mv-snap-hint{position:absolute;transform:translate(-50%,-140%);pointer-events:none;white-space:nowrap;
+    padding:4px 9px;border-radius:12px;background:rgba(245,158,11,.95);color:#fff;font-size:10.5px;font-weight:700;
+    box-shadow:0 3px 10px rgba(180,110,10,.3);z-index:6}
+  .mv-snap-hint::after{content:'';position:absolute;left:50%;bottom:-4px;width:8px;height:8px;
+    background:inherit;transform:translateX(-50%) rotate(45deg);border-radius:1px}
   /* 点到点拾取时，画布上的起点/终点标记 */
   .p2pmark{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:5;width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 2px #2f6fed,0 2px 8px rgba(28,42,70,.35)}
   .p2pmark::after{content:'';position:absolute;inset:5px;border-radius:50%;background:#2f6fed}
   .p2pmark.end{border-color:#fff;box-shadow:0 0 0 2px #16824a,0 2px 8px rgba(28,42,70,.35)}
   .p2pmark.end::after{background:#16824a}
-  .p2pline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4}
+  .p2pline{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:4}
 
   /* =========================================================
      06 · 拉伸面板（高度 + 4 张运算卡片）
@@ -610,7 +618,7 @@
   .demo-entry.on{border-color:#c21875;box-shadow:0 0 0 2px rgba(194,24,117,.15)}
 
   #demoOverlay{
-    position:fixed;inset:0;z-index:120;display:none;
+    position:fixed;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:120;display:none;
     background:radial-gradient(1200px 620px at 18% -8%,#fdeef7 0%,transparent 52%),
                radial-gradient(1000px 520px at 100% 0%,#eef3ff 0%,transparent 50%),#eef2f8;
   }
@@ -865,6 +873,7 @@
     <div class="movelayer" id="moveLayer" aria-hidden="true">
       <svg class="movesvg" id="moveSvg"></svg>
       <div class="dimlabels" id="moveLabels"></div>
+      <div class="mv-snap-hint" id="mvSnapHint" style="display:none"></div>
     </div>
 
     <!-- 点到点移动：起点/终点屏幕标记 + 连线 -->
@@ -922,28 +931,9 @@
             <button class="om-apply om-ghost" id="omP2pCancel">取消拾取</button>
           </div>
         </div>
-        <!-- 选项卡 2：动态移动（三轴箭头 + 三色扇形旋转 + 可移中心点） -->
+        <!-- 选项卡 2：动态移动（只保留中心点开关；平移拖箭头，旋转拖三色圆弧） -->
         <div id="omMvFree" style="display:none">
-          <div class="om-tip" style="margin-bottom:6px">拖箭头平移 · 拖彩色扇形绕轴旋转 · 按住实体也可拖动</div>
-          <label class="om-check"><input type="checkbox" id="omMoveCenter"> 移动中心点（三轴随之移动，靠边磁吸）</label>
-          <div class="om-row"><label>X 轴</label>
-            <button class="om-mini" data-mv="0" data-dir="-1">−</button><button class="om-mini" data-mv="0" data-dir="1">+</button>
-            <label style="min-width:0;margin-left:4px">Y 轴</label>
-            <button class="om-mini" data-mv="1" data-dir="-1">−</button><button class="om-mini" data-mv="1" data-dir="1">+</button>
-          </div>
-          <div class="om-row"><label>Z 轴</label>
-            <button class="om-mini" data-mv="2" data-dir="-1">−</button><button class="om-mini" data-mv="2" data-dir="1">+</button>
-            <label style="min-width:0;margin-left:4px">步进</label>
-            <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
-          </div>
-          <div class="om-row" style="margin-top:3px;border-top:1px solid #eef2f8;padding-top:5px">
-            <label style="color:#e5433e">旋转 X</label><input class="om-ang" id="omRotX" type="number" step="1" value="0">
-            <label style="color:#2fa84f;margin-left:5px">Y</label><input class="om-ang" id="omRotY" type="number" step="1" value="0">
-          </div>
-          <div class="om-row">
-            <label style="color:#2f80ed">旋转 Z</label><input class="om-ang" id="omRotZ" type="number" step="1" value="0">
-            <label style="margin-left:5px">°</label>
-          </div>
+          <label class="om-check" style="margin:2px 0 0"><input type="checkbox" id="omMoveCenter"> 移动中心点（靠边自动磁吸）</label>
         </div>
       </div>
       <button class="om-btn" data-om="scale" data-tip="缩放（S）" title="缩放（S）" aria-label="缩放">
@@ -5396,6 +5386,25 @@ const round1 = (v) => Math.round(v * 10) / 10;
 const round2 = (v) => Math.round(v * 100) / 100;   // 线段端点保留小数长度，不做格点吸附
 const snap = (v) => Math.round(v / SNAP) * SNAP;
 
+/**
+ * SVG 内容写入的跨内核兜底：360 / QQ 等双核浏览器的老 Chromium 对
+ * SVGElement.innerHTML 支持不一致，写进去却没有子节点 → 箭头整体消失。
+ * 检测到这种情况就用 DOMParser 在 SVG 命名空间里重建节点。
+ */
+function setSvgHtml(el, html) {
+  if (!el) return;
+  el.innerHTML = html;
+  if (html && html.trim() && !el.childNodes.length && typeof DOMParser !== 'undefined') {
+    try {
+      const doc = new DOMParser().parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg">' + html + '</svg>', 'image/svg+xml');
+      const nodes = Array.prototype.slice.call(doc.documentElement.childNodes);
+      while (el.firstChild) el.removeChild(el.firstChild);
+      nodes.forEach((n) => el.appendChild(document.importNode(n, true)));
+    } catch (err) { /* 解析失败就保留原样，不影响主流程 */ }
+  }
+}
+
 /* ============================================================================
    02 · 渲染器 / 场景 / 相机 / 轨道控制器
    ==========================================================================
@@ -7835,6 +7844,120 @@ function fastPrimitiveBoolean(objA, descB, op) {
 }
 
 /**
+ * 「精确面延伸」快速路径：拉伸体若正好铺满规则体的某个平面端面，
+ * 并集结果等价于把母体在这一侧延长一段。直接重建一个更大的规则体，
+ * 从数学上就不存在接触面：侧面法线、顶点拓扑全部连续，比 CSG 拼合更干净。
+ * 不满足严格重合条件返回 null，交由 CSG + 法线归并兜底。
+ */
+function exactExtrudeUnion(objA, bDesc) {
+  if (!bDesc || bDesc.kind !== 'extrude' || !objA || !objA.userData) return null;
+  const da = objA.userData.desc;
+  if (!da || (da.kind !== 'box' && da.kind !== 'cylinder') || da.quat) return null;
+  const pts = bDesc.pts2d || [], b = bDesc.basis, p = da.params || {};
+  if (pts.length < 3 || !b || !isFinite(p.h) || p.h <= 0) return null;
+  const n = new THREE.Vector3().fromArray(b.n).normalize();
+  const depth = Number(bDesc.params && bDesc.params.depth) || 0;
+  if (!(depth > 0)) return null;
+  const far = new THREE.Vector3().fromArray(bDesc.pos).addScaledVector(n, depth);
+  const DIMS = da.kind === 'box'
+    ? [Math.abs(p.w || 0), Math.abs(p.d || 0), Math.abs(p.h || 0)]
+    : [2 * (p.r || 0), 2 * (p.r || 0), Math.abs(p.h || 0)];
+  if (DIMS.some((v) => !(v > 0))) return null;
+
+  /* 拉伸方向必须是某一根世界轴（规则体未旋转） */
+  let axis = -1, sign = 0;
+  for (let i = 0; i < 3; i++) {
+    const c = n.getComponent(i);
+    if (Math.abs(c) > 0.999) { axis = i; sign = c > 0 ? 1 : -1; }
+    else if (Math.abs(c) > 0.02) return null;
+  }
+  if (axis < 0 || (da.kind === 'cylinder' && axis !== 2)) return null;
+  const tol = Math.max(0.08, WELD * 3);
+  const faceCoord = da.pos[axis] + sign * DIMS[axis] / 2;
+  const basePt = new THREE.Vector3().fromArray(bDesc.pos);
+  if (Math.abs(basePt.getComponent(axis) - faceCoord) > tol) return null;
+  for (let i = 0; i < 3; i++) {
+    if (i !== axis && Math.abs(basePt.getComponent(i) - da.pos[i]) > tol) return null;
+  }
+  const extend = (far.getComponent(axis) - faceCoord) * sign;
+  if (!(extend > 0.01)) return null;                 // 向体内拉伸属于差集，不走这里
+
+  /* 轮廓必须铺满整张端面：盒体是同尺寸矩形，圆柱是同半径圆 */
+  if (da.kind === 'box') {
+    if (pts.length < 4 || pts.length > 16) return null;
+    let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity, area2 = 0;
+    pts.forEach(([x, y], k) => {
+      minU = Math.min(minU, x); maxU = Math.max(maxU, x); minV = Math.min(minV, y); maxV = Math.max(maxV, y);
+      const next = pts[(k + 1) % pts.length];
+      area2 += x * next[1] - next[0] * y;
+    });
+    const ua = dominantAxis(b.u), va = dominantAxis(b.v);
+    if (ua === va || ua === axis || va === axis) return null;
+    const wantW = DIMS[ua], wantH = DIMS[va];
+    if (Math.abs((maxU - minU) - wantW) > tol || Math.abs((maxV - minV) - wantH) > tol) return null;
+    if (Math.abs(Math.abs(area2) / 2 - wantW * wantH) > Math.max(2, wantW * wantH * 0.01)) return null;
+  } else {
+    if (!isRoundishPts(pts)) return null;
+    let cx = 0, cy = 0;
+    pts.forEach(([x, y]) => { cx += x; cy += y; });
+    cx /= pts.length; cy /= pts.length;
+    let r = 0;
+    pts.forEach(([x, y]) => { r = Math.max(r, Math.hypot(x - cx, y - cy)); });
+    if (Math.abs(r - (p.r || 0)) > Math.max(0.15, (p.r || 0) * 0.01)) return null;
+  }
+
+  const params = Object.assign({}, p);
+  params[da.kind === 'box' ? ['w', 'd', 'h'][axis] : 'h'] = DIMS[axis] + extend;
+  const geo = makeGeometry({ kind: da.kind, params });
+  const off = new THREE.Vector3();
+  off.setComponent(axis, sign * extend / 2);
+  geo.translate(off.x, off.y, off.z);
+  return geometryPins(geo, 0);
+}
+
+function dominantAxis(v) {
+  const a = Array.isArray(v) ? v : [v.x, v.y, v.z];
+  let best = 0;
+  for (let i = 1; i < 3; i++) if (Math.abs(a[i]) > Math.abs(a[best])) best = i;
+  return best;
+}
+
+/**
+ * CSG 兜底结果的法线归并：同一空间位置的顶点若法线夹角很小（共面片被切成
+ * 不同三角扇时常见），统一成一条平滑法线；硬边（夹角大）保持不变。
+ * 这样接触面不会再出现一条因法线跳变产生的亮/暗接缝。
+ */
+function unifyBooleanNormals(pins) {
+  if (!pins || !pins.n || pins.n.length !== pins.p.length) return pins;
+  const groups = new Map();
+  for (let k = 0; k < pins.p.length / 3; k++) {
+    const key = pins.p[k * 3].toFixed(2) + ',' + pins.p[k * 3 + 1].toFixed(2) + ',' + pins.p[k * 3 + 2].toFixed(2);
+    let arr = groups.get(key);
+    if (!arr) { arr = []; groups.set(key, arr); }
+    arr.push(k);
+  }
+  const out = pins.n.slice();
+  groups.forEach((idx) => {
+    if (idx.length < 2) return;
+    const clusters = [];
+    idx.forEach((k) => {
+      const v = new THREE.Vector3(out[k * 3], out[k * 3 + 1], out[k * 3 + 2]);
+      let c = null;
+      for (const item of clusters) { if (item.n.dot(v) > 0.985) { c = item; break; } }
+      if (!c) { c = { n: v.clone(), idx: [] }; clusters.push(c); } else c.n.add(v);
+      c.idx.push(k);
+    });
+    clusters.forEach((c) => {
+      if (c.n.lengthSq() < 1e-8) return;
+      c.n.normalize();
+      c.idx.forEach((k) => { out[k * 3] = c.n.x; out[k * 3 + 1] = c.n.y; out[k * 3 + 2] = c.n.z; });
+    });
+  });
+  pins.n = out;
+  return pins;
+}
+
+/**
  * 草图布尔的母体（规则A）：
  *   1) 画在实体表面 → 用记录的宿主实体 uid
  *   2) 画在地面网格 → 取场景中距离草图最近的实体
@@ -7868,6 +7991,11 @@ function booleanWith(objA, descB, op) {
   /* 规则体相切/重叠的合成先走快速路径：无共面碎片、无接缝弧线，也快得多 */
   const fast = fastPrimitiveBoolean(objA, descB, op);
   if (fast) return fast;
+  /* 拉伸体铺满规则体端面 → 精确面延伸，直接生成单个规则体，从根源消除接触缝 */
+  if (op === 'add') {
+    const exact = exactExtrudeUnion(objA, descB);
+    if (exact) return exact;
+  }
   if (!CSG || !csgEvaluator) throw new Error('布尔运算库未加载（需联网）');
 
   objA.updateMatrixWorld();
@@ -7939,7 +8067,7 @@ function booleanWith(objA, descB, op) {
   const i = index;
   geoA.dispose();
   geoB.dispose();
-  return { p, i, n };
+  return unifyBooleanNormals({ p, i, n });
 }
 
 /**
@@ -8269,7 +8397,8 @@ function positionObjUI() {
 function nudgeSelected(axis, dir) {
   const obj = state.selected;
   if (!obj || !obj.userData.desc) return;
-  const step = Math.max(0.5, parseFloat($('omStep').value) || 5);
+  const stepEl = $('omStep');
+  const step = Math.max(0.5, parseFloat(stepEl && stepEl.value) || 5);
   beginEdit();
   const d = obj.userData.desc;
   d.pos[axis] = round1(d.pos[axis] + dir * step);
@@ -8491,7 +8620,7 @@ function updateExtrudeArrow() {
     + ` stroke="transparent" stroke-width="18" pointer-events="stroke"/>`;
   svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="5" fill="#fff" stroke="#2f6fed" stroke-width="2"/>`;
   exArrowSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
-  exArrowSvg.innerHTML = svg;
+  setSvgHtml(exArrowSvg, svg);
 
   if (!exArrowLabels.children.length) {
     exArrowLabels.innerHTML = '<div class="dim-tag ex-tag" id="exArrowTag"></div>';
@@ -10160,6 +10289,17 @@ function arrowHeadAt(tip, ux, uy, color) {
     + `fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`;
 }
 
+/** 旋转弧用的小箭头：比平移箭头轻，三色弧不会挤在一起 */
+function arcArrowHead(tip, ux, uy, color) {
+  const len = 11, half = 5;
+  const px = -uy, py = ux;
+  const bx = tip.x - ux * len, by = tip.y - uy * len;
+  return `<path d="M${tip.x.toFixed(1)},${tip.y.toFixed(1)} `
+    + `L${(bx + px * half).toFixed(1)},${(by + py * half).toFixed(1)} `
+    + `L${(bx - px * half).toFixed(1)},${(by - py * half).toFixed(1)} Z" `
+    + `fill="${color}" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>`;
+}
+
 function updateDimGizmo() {
   const obj = state.selected;
   const desc0 = obj && obj.userData.desc;
@@ -10241,7 +10381,7 @@ function updateDimGizmo() {
       + `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="3" fill="#e0453f"/>`;
 
   dimSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
-  dimSvg.innerHTML = svg;
+  setSvgHtml(dimSvg, svg);
 
   const confirm = $('dimConfirm');
   confirm.style.left = cS.x + 'px';
@@ -10449,8 +10589,8 @@ function p2pRenderMarks(hoverPt) {
   const target = p2pEnd || hoverPt;
   if (p2pStart && target) {
     const s = projectToScreen(p2pStart), t = projectToScreen(target);
-    lineEl.innerHTML = `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}"`
-      + ` stroke="#2f6fed" stroke-width="2" stroke-dasharray="6 4" opacity=".85"/>`;
+    setSvgHtml(lineEl, `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}"`
+      + ` stroke="#2f6fed" stroke-width="2" stroke-dasharray="6 4" opacity=".85"/>`);
   } else lineEl.innerHTML = '';
 }
 
@@ -10539,7 +10679,7 @@ const MOVE_WORLD = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new 
 const MOVE_LEN = 58;             // 箭头屏幕长度(px)
 const AXIS_NAME = ['X', 'Y', 'Z'];
 let moveDrag = null, moveEditing = false;
-let centerDrag = null, rotDrag = null, moveSnapInfo = null;
+let centerDrag = null, rotDrag = null, moveSnapInfo = null, lastRotAxis = 2;
 
 /** gizmo 中心：移动过中心点就用自定义中心，否则用包围盒中心 */
 function gizmoCenter(obj) {
@@ -10583,15 +10723,19 @@ function closestOnSegment(p, a, b) {
 
 /** 中心点磁吸：实体边/顶点优先，其次格点，都没有则自由落点 */
 function snapCenterPoint(p, segs) {
-  let best = null, bestD = SNAP * 0.8;
-  for (const [a, b] of segs || []) {
+  let best = null, bestD = SNAP * 0.8, bestSeg = null;
+  for (const seg of segs || []) {
+    const [a, b] = seg;
     const q = closestOnSegment(p, a, b), dd = q.distanceTo(p);
-    if (dd < bestD) { bestD = dd; best = q; }
+    if (dd < bestD) { bestD = dd; best = q; bestSeg = seg; }
   }
-  if (best) return { point: best, snapped: true };
+  if (best) {
+    const vertex = bestSeg && (best.distanceTo(bestSeg[0]) < 0.5 || best.distanceTo(bestSeg[1]) < 0.5);
+    return { point: best, snapped: true, label: vertex ? '已吸附到顶点' : '已吸附到边' };
+  }
   const gp = new THREE.Vector3(snap(p.x), snap(p.y), snap(p.z));
-  if (gp.distanceTo(p) <= SNAP * 0.5) return { point: gp, snapped: true };
-  return { point: p.clone(), snapped: false };
+  if (gp.distanceTo(p) <= SNAP * 0.5) return { point: gp, snapped: true, label: '已吸附到格点' };
+  return { point: p.clone(), snapped: false, label: '' };
 }
 
 /** 过指定点、正对相机的平面：把鼠标位移映射到世界空间 */
@@ -10674,7 +10818,8 @@ function moveGizmoVisible() {
 }
 
 function updateMoveGizmo() {
-  if (!moveGizmoVisible()) { moveLayer.classList.remove('show'); return; }
+  const hintEl = $('mvSnapHint');
+  if (!moveGizmoVisible()) { moveLayer.classList.remove('show'); if (hintEl) hintEl.style.display = 'none'; return; }
   if (moveEditing) { moveLayer.classList.add('show'); return; }   // 正在输入数值时冻结刷新
   const obj = state.selected, d = obj.userData.desc;
   obj.updateMatrixWorld();
@@ -10691,31 +10836,34 @@ function updateMoveGizmo() {
     return { ux, uy, pxPerMM: Math.max(0.35, ulen) };
   });
 
-  /* 三个扇形旋转平面：颜色取「旋转轴」颜色（X 红 / Y 绿 / Z 蓝） */
+  /* 三条旋转弧：参照 3D One 的白色箭头 + 彩色描边，拖弧即可绕对应轴旋转 */
   const ROT_PLANES = [
     { axis: 0, u: 1, v: 2 },   // YZ 平面 → 绕 X
     { axis: 1, u: 2, v: 0 },   // ZX 平面 → 绕 Y
     { axis: 2, u: 0, v: 1 }    // XY 平面 → 绕 Z
   ];
-  const fanR = MOVE_LEN * 0.78;
+  const arcR = MOVE_LEN * 0.85;
   let fanSvg = '';
   ROT_PLANES.forEach((P) => {
     const A = MOVE_AXES[P.axis], su = axisScreens[P.u], sv = axisScreens[P.v];
     const pts = [];
-    for (let i = 0; i <= 16; i++) {
-      const t = i / 16 * Math.PI / 2;
-      pts.push({ x: cS.x + fanR * (Math.cos(t) * su.ux + Math.sin(t) * sv.ux),
-                 y: cS.y + fanR * (Math.cos(t) * su.uy + Math.sin(t) * sv.uy) });
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20 * Math.PI / 2;
+      pts.push({ x: cS.x + arcR * (Math.cos(t) * su.ux + Math.sin(t) * sv.ux),
+                 y: cS.y + arcR * (Math.cos(t) * su.uy + Math.sin(t) * sv.uy) });
     }
-    const poly = [cS, ...pts].map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    fanSvg += `<polygon points="${poly}" fill="${A.color}" opacity=".11"/>`;
-    fanSvg += `<polyline points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}"`
-      + ` fill="none" stroke="${A.color}" stroke-width="2.2" opacity=".9"/>`;
-    /* 透明热区：整个扇形都能抓住旋转 */
-    fanSvg += `<polygon class="mv-rot-hit" data-axis="${P.axis}" points="${poly}" fill="transparent"/>`;
-    const mid = pts[8], label = `R${AXIS_NAME[P.axis]}`;
-    fanSvg += `<text class="mv-ang" x="${(mid.x * 1.06 - cS.x * .06).toFixed(1)}" y="${(mid.y * 1.06 - cS.y * .06).toFixed(1)}"`
-      + ` fill="${A.color}" font-size="10" font-weight="800" text-anchor="middle">${label}</text>`;
+    const pointStr = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    fanSvg += `<polyline points="${pointStr}" fill="none" stroke="${A.color}" stroke-width="6.4"`
+      + ` stroke-linecap="round" opacity=".88"/>`;
+    fanSvg += `<polyline points="${pointStr}" fill="none" stroke="#fff" stroke-width="2.4"`
+      + ` stroke-linecap="round" opacity=".95"/>`;
+    /* 首尾双向箭头：起点的反切线、终点的正切线 */
+    const t0 = pts[0], t1 = pts[pts.length - 1];
+    fanSvg += arcArrowHead(t0, -sv.ux, -sv.uy, A.color);
+    fanSvg += arcArrowHead(t1, -su.ux, -su.uy, A.color);
+    /* 沿弧的透明热区 */
+    fanSvg += `<polyline class="mv-rot-hit" data-axis="${P.axis}" points="${pointStr}"`
+      + ` fill="none" stroke="transparent" stroke-width="18" pointer-events="stroke"/>`;
   });
 
   let svg = fanSvg;
@@ -10747,8 +10895,30 @@ function updateMoveGizmo() {
     svg += `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5" fill="none" stroke="#f59e0b" stroke-width="2"/>`
       + `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="1.8" fill="#f59e0b"/>`;
   }
+  /* 旋转角标：跟随当前操作的轴，拖动时实时显示角度 */
+  const badgeAxis = rotDrag ? rotDrag.axis : lastRotAxis;
+  const badgeDeg = rotDrag ? rotDrag.total * 180 / Math.PI
+    : ((d.moveRot && d.moveRot[badgeAxis]) || 0);
+  const bx = cS.x + 68, by = cS.y + 46;
+  svg += `<rect x="${(bx - 27).toFixed(1)}" y="${(by - 12).toFixed(1)}" width="54" height="24" rx="9"`
+    + ` fill="#475569" opacity=".9"/>`;
+  svg += `<circle cx="${(bx - 17).toFixed(1)}" cy="${by.toFixed(1)}" r="3.6" fill="${MOVE_AXES[badgeAxis].color}"/>`;
+  svg += `<text class="mv-badge" x="${(bx + 5).toFixed(1)}" y="${(by + 4).toFixed(1)}"`
+    + ` text-anchor="middle" fill="#fff">${round1(badgeDeg).toFixed(1)}°</text>`;
+
   moveSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
-  moveSvg.innerHTML = svg;
+  setSvgHtml(moveSvg, svg);
+  /* 中心点磁吸提示：明确告诉用户吸到了边 / 顶点 / 格点 */
+  const hint = $('mvSnapHint');
+  if (hint) {
+    if (moveSnapInfo && moveSnapInfo.snapped) {
+      const hs = projectToScreen(moveSnapInfo.point);
+      hint.style.display = 'block';
+      hint.style.left = hs.x.toFixed(1) + 'px';
+      hint.style.top = hs.y.toFixed(1) + 'px';
+      hint.textContent = moveSnapInfo.label || '已吸附';
+    } else hint.style.display = 'none';
+  }
   /* 坐标标签：复用 .dim-tag 胶囊，DOM 复用避免打断输入 */
   const key = (d.kind || '') + '#' + (d.uid || '');
   if (moveLabels.children.length !== labels.length || moveLabels.dataset.key !== key) {
@@ -10830,6 +11000,7 @@ moveSvg.addEventListener('pointerdown', (e) => {
     if (!d) return;
     e.preventDefault(); e.stopPropagation();
     const axis = parseInt(rHit.dataset.axis, 10);
+    lastRotAxis = axis;
     const pivot = gizmoCenter(obj);
     const plane = rotationPlane(axis, pivot);
     const a0 = angleOnPlane(e, axis, pivot, plane);
@@ -11010,6 +11181,8 @@ window.Sketch3D = {
   get rotDragActive() { return !!rotDrag; },
   /* 点到点移动 + 顶点磁吸（探针） */
   startP2p, cancelP2p, setMoveTab, handleP2pClick, worldSnapPoint, magnetSnapMoveDelta, entityWorldVertsXY,
+  /* 精确面延伸 / 布尔法线归并 / 中心磁吸（探针） */
+  exactExtrudeUnion, unifyBooleanNormals, snapCenterPoint, setSvgHtml,
   get p2pState() { return { active: p2pActive, stage: p2pStage, tab: moveTab, start: p2pStart && p2pStart.toArray(), end: p2pEnd && p2pEnd.toArray() }; },
   get exArrowShown() { return exArrowLayer.classList.contains('show'); },
   get exArrowH() { return state.ex.h; },
@@ -11018,6 +11191,8 @@ window.Sketch3D = {
   get objMenuShown() { return objMenuEl.classList.contains('show'); },
   get faceMenuShown() { return faceMenuEl.classList.contains('show'); },
   get moveShown() { return moveLayer.classList.contains('show'); },
+  get moveRotArcs() { return moveSvg.querySelectorAll('.mv-rot-hit').length; },
+  get snapHint() { const h = $('mvSnapHint'); return h && h.style.display !== 'none' ? h.textContent : ''; },
   get moveAxes() {
     return Array.from(moveLabels.children).map((el) => ({
       value: el._data ? +el._data.value.toFixed(2) : null,
