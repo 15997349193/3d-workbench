@@ -285,6 +285,14 @@
   /* 箭头拖拽热区：透明粗线，鼠标抓住即可改尺寸 */
   .dim-hit{pointer-events:stroke;cursor:grab}
   .dim-hit:active{cursor:grabbing}
+  /* 三轴移动 gizmo（X/Y/Z 箭头拖拽 + 可编辑坐标），视觉复用 .dim-tag 胶囊 */
+  .movelayer{position:absolute;inset:0;z-index:3;pointer-events:none;display:none}
+  .movelayer.show{display:block}
+  .movesvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .mv-hit{pointer-events:stroke;cursor:grab}
+  .mv-hit:active{cursor:grabbing}
+  .mv-tag{border-width:1.5px}
+  .mv-ax{font-weight:800;margin-right:4px}
   /* 3D One 式绿色「确定」按钮：确认后收起标注，之后选中不再出现 */
   .dim-confirm{
     position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
@@ -805,6 +813,12 @@
       <div class="dim-confirm" id="dimConfirm" title="确定尺寸，之后选中不再显示标注">
         <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg><span>确定</span>
       </div>
+    </div>
+
+    <!-- 三轴移动 gizmo：选中实体后 X/Y/Z 三色箭头 + 可编辑坐标标签（3D One 式） -->
+    <div class="movelayer" id="moveLayer" aria-hidden="true">
+      <svg class="movesvg" id="moveSvg"></svg>
+      <div class="dimlabels" id="moveLabels"></div>
     </div>
 
     <!-- 线段长度：绘制中实时提示，成线后可输入精确长度 -->
@@ -5282,6 +5296,7 @@ const state = {
   draft: null,         // 草图草稿 { type, points:[[x,y],...] }（绘制平面局部坐标）
   closeReady: false,   // 是否已回到起点，可以闭合
   placing: null,       // 正在拖拽放置的基础实体
+  placeInfo: null,     // 本次放置锁定的基准面（按下瞬间检测，拖动阶段复用）
   shade: 'solid',      // 'solid' | 'wire'
   polyN: 6,            // 正多边形边数
   ex: { open: false, h: 10, dir: 1, op: 'new', dirVec: null, picking: false },  // 拉伸面板状态（dirVec=用户拾取的拉伸方向）
@@ -6031,10 +6046,46 @@ function planePoint(e) {
 }
 
 /**
- * 基本体「放置基准平面」：若已选中实体面（state.placeFace），就用该面；否则用地面 z=0。
- * 这样在实体面上选中面后切到基本体工具，新建实体默认贴附该面，无需再次确认（仿 3D One）。
+ * 放置时实时检测「光标正下方的实体平面」——直接在已有实体上拖放即可贴附（仿 3D One）。
+ * 只认平面：命中三角三顶点的平滑法向须一致，曲面（圆柱侧面等）一律跳过，避免贴到弧面上。
+ * 返回世界法向 / 命中点 / 宿主 uid；未命中实体返回 null（此时落地面）。
  */
-function placePlaneInfo() {
+function surfaceUnderCursor(e) {
+  const sh = pick(e);
+  if (!sh || !sh.hit || !sh.hit.face) return null;
+  const obj = sh.hit.object;
+  const desc = sh.root && sh.root.userData.desc;
+  if (!desc || desc.kind === 'sketch' || desc.kind === 'sheet') return null;
+  const nAttr = obj.geometry && obj.geometry.attributes && obj.geometry.attributes.normal;
+  if (nAttr) {
+    const f = sh.hit.face;
+    const nv = (i) => new THREE.Vector3(nAttr.getX(i), nAttr.getY(i), nAttr.getZ(i));
+    const v0 = nv(f.a), v1 = nv(f.b), v2 = nv(f.c);
+    if (v0.dot(v1) < 0.9995 || v0.dot(v2) < 0.9995 || v1.dot(v2) < 0.9995) return null;  // 曲面
+  }
+  const n = worldNormal(obj, sh.hit.face);
+  if (n.lengthSq() < 0.5) return null;
+  return { normal: n.clone(), point: sh.hit.point.clone(), hostUid: desc.uid != null ? desc.uid : null };
+}
+
+/**
+ * 基本体「放置基准平面」：
+ *  ① 放置中传入事件 e → 实时检测光标下的实体面（直接拖放即贴附，仿 3D One）；
+ *  ② 否则用事先选中的面 state.placeFace；
+ *  ③ 都没有 → 地面 z=0。
+ */
+function placePlaneInfo(e) {
+  if (e) {
+    const s = surfaceUnderCursor(e);
+    if (s) {
+      const n = s.normal.clone().normalize();
+      return {
+        o: s.point.clone(), n,
+        math: new THREE.Plane().setFromNormalAndCoplanarPoint(n, s.point),
+        hostUid: s.hostUid, isGround: false
+      };
+    }
+  }
   const pf = state.placeFace;
   if (pf && pf.normal && pf.point) {
     const n = pf.normal.clone().normalize();
@@ -6055,11 +6106,11 @@ function placePlaneInfo() {
   };
 }
 
-/** 射线与当前放置基准平面的交点 */
-function placePoint(e) {
+/** 射线与「给定基准平面 / 当前放置基准平面」的交点 */
+function placePoint(e, info) {
   setRay(e);
   const p = new THREE.Vector3();
-  return raycaster.ray.intersectPlane(placePlaneInfo().math, p) ? p : null;
+  return raycaster.ray.intersectPlane((info || placePlaneInfo()).math, p) ? p : null;
 }
 
 /** 世界点 → 绘制平面局部 2D 坐标 */
@@ -6940,8 +6991,11 @@ segConfirm.addEventListener('click', (e) => {
    09 · 基础实体拖拽放置
    ========================================================================== */
 function startPlacement(e) {
-  const info = placePlaneInfo();
-  const p = placePoint(e);
+  /* 关键：按下瞬间检测光标下的实体面并锁定为基准，此后拖动只用这同一平面，
+     既实现「直接拖到实体上就贴附」，又避免拖动中途基准面漂移。 */
+  const info = placePlaneInfo(e);
+  state.placeInfo = info;                 // 供 placePoint 在拖动阶段复用（不再重新射线检测实体）
+  const p = placePoint(e, info);
   if (!p) return;
   /* 面内基向量：把交点吸附到该平面内的 5mm 网格（地面时正好是 XY 网格） */
   const basis = planeBasis(info.n);
@@ -6957,6 +7011,7 @@ function startPlacement(e) {
     quat: info.isGround ? null : new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), info.n),
     hostUid: info.hostUid,
     isGround: info.isGround,
+    info,
     u: basis.u.clone(), v: basis.v.clone()
   };
   updateGhost();
@@ -6965,7 +7020,7 @@ function startPlacement(e) {
 function updatePlacement(e) {
   const pl = state.placing;
   if (!pl) return;
-  const p = placePoint(e);
+  const p = placePoint(e, pl.info);
   if (!p) return;
   /* 沿放置平面内的拖拽距离决定尺寸（斜面也按面内实际距离算） */
   const rel = p.clone().sub(pl.start);
@@ -7036,6 +7091,7 @@ function updateGhost() {
 function finishPlacement() {
   const pl = state.placing;
   state.placing = null;
+  state.placeInfo = null;
   clearGroup(ghostGroup);
   if (!pl) return;
 
@@ -8358,7 +8414,7 @@ viewport.addEventListener('pointerdown', (e) => {
     if (e.button !== 1) e.preventDefault();   // 中键(1)放行给 OrbitControls 平移，其余拦截默认行为
     return;
   }
-  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm')) return;  // 浮层上的点击按 DOM 处理
+  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit')) return;  // 浮层上的点击按 DOM 处理
 
   /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
   if (inViewCube(e)) {
@@ -9301,6 +9357,12 @@ function autoConfirmDim() {
     dimLabels.querySelectorAll('.editing').forEach((el) => el.classList.remove('editing'));
   }
   dimDrag = null;
+  /* 三轴移动 gizmo 同步清理：切换对象/工具时不能残留编辑态或半途拖拽 */
+  if (moveEditing) {
+    moveEditing = false;
+    moveLabels.querySelectorAll('.editing').forEach((el) => el.classList.remove('editing'));
+  }
+  moveDrag = null;
 }
 
 /** 点击绿色「确定」：收起标注，之后选中该模型不再出现尺寸和箭头 */
@@ -9315,6 +9377,166 @@ function confirmDim() {
 }
 $('dimConfirm').addEventListener('click', (e) => { e.stopPropagation(); confirmDim(); });
 
+/* ============================================================================
+   三轴移动 gizmo（3D One 式）：选中实体 → X/Y/Z 三色箭头拖拽 + 可编辑坐标标签
+   · X 红 / Y 绿 / Z 蓝，箭头从实体包围盒中心出发，尖端跟随鼠标
+   · 拖箭头 → 沿该世界轴平移实体；点标签 → 输入精确坐标
+   · 与尺寸 gizmo 互斥：刚放置(dimPending)先改尺寸，点确定后再显示移动箭头
+   ========================================================================== */
+const moveLayer = $('moveLayer'), moveSvg = $('moveSvg'), moveLabels = $('moveLabels');
+const MOVE_AXES = [
+  { idx: 0, color: '#e5433e' },   // X 红
+  { idx: 1, color: '#2fa84f' },   // Y 绿
+  { idx: 2, color: '#2f80ed' }    // Z 蓝
+];
+const MOVE_WORLD = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
+const MOVE_LEN = 58;             // 箭头屏幕长度(px)
+const AXIS_NAME = ['X', 'Y', 'Z'];
+let moveDrag = null, moveEditing = false;
+
+function moveGizmoVisible() {
+  const obj = state.selected, d = obj && obj.userData.desc;
+  if (!obj || !d || d.kind === 'sketch' || d.kind === 'sheet') return false;
+  if (state.face || state.ex.open || state.mode === 'sketch' || state.placing) return false;
+  if (d.dimPending === true) return false;   // 刚放置未确定：让尺寸 gizmo 先接管
+  return true;
+}
+
+function updateMoveGizmo() {
+  if (!moveGizmoVisible()) { moveLayer.classList.remove('show'); return; }
+  if (moveEditing) { moveLayer.classList.add('show'); return; }   // 正在输入数值时冻结刷新
+  const obj = state.selected, d = obj.userData.desc;
+  obj.updateMatrixWorld();
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.isEmpty() ? new THREE.Vector3().fromArray(d.pos) : box.getCenter(new THREE.Vector3());
+  const cS = projectToScreen(center);
+  let svg = '';
+  const labels = [];
+  MOVE_AXES.forEach((A, i) => {
+    const oneMM = projectToScreen(center.clone().add(MOVE_WORLD[A.idx]));
+    let ux = oneMM.x - cS.x, uy = oneMM.y - cS.y;
+    let ulen = Math.hypot(ux, uy);
+    if (ulen < 0.001) { ux = 0; uy = -1; ulen = 1; }   // 轴正对镜头时的退化方向
+    ux /= ulen; uy /= ulen;
+    const pxPerMM = Math.max(0.35, ulen);
+    let tipS;
+    if (moveDrag && moveDrag.idx === A.idx && moveDrag.tipS) tipS = moveDrag.tipS;
+    else tipS = { x: cS.x + ux * MOVE_LEN, y: cS.y + uy * MOVE_LEN };
+    /* 实线轴 + 固定大小箭头头 */
+    svg += `<line x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}"`
+      + ` stroke="${A.color}" stroke-width="2.6" opacity=".96"/>`;
+    svg += arrowHeadAt(tipS, ux, uy, A.color);
+    /* 透明拖拽热区：整条轴可抓 */
+    svg += `<line class="mv-hit" data-i="${i}" x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}"`
+      + ` x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}" stroke="transparent"`
+      + ` stroke-width="16" pointer-events="stroke"/>`;
+    labels.push({ idx: A.idx, color: A.color, value: d.pos[A.idx], ux, uy, pxPerMM, tipS });
+  });
+  /* 中心靶心 */
+  svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="6" fill="#fff" stroke="#334155" stroke-width="1.8"/>`;
+  moveSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
+  moveSvg.innerHTML = svg;
+  /* 坐标标签：复用 .dim-tag 胶囊，DOM 复用避免打断输入 */
+  const key = (d.kind || '') + '#' + (d.uid || '');
+  if (moveLabels.children.length !== labels.length || moveLabels.dataset.key !== key) {
+    moveLabels.dataset.key = key;
+    moveLabels.innerHTML = labels.map((_, i) => `<div class="dim-tag mv-tag" data-i="${i}"></div>`).join('');
+    moveLabels.querySelectorAll('.mv-tag').forEach((el) => {
+      el.addEventListener('click', (e) => { e.stopPropagation(); beginMoveEdit(parseInt(el.dataset.i, 10)); });
+    });
+  }
+  labels.forEach((L, i) => {
+    const el = moveLabels.children[i];
+    if (!el || el.classList.contains('editing')) return;
+    el.style.left = (L.tipS.x + L.ux * 26) + 'px';
+    el.style.top = (L.tipS.y + L.uy * 26) + 'px';
+    el.style.borderColor = L.color;
+    el._data = L;
+    el.innerHTML = `<span class="mv-ax" style="color:${L.color}">${AXIS_NAME[L.idx]}</span>`
+      + round1(L.value).toFixed(1) + '<span class="u"> mm</span>';
+  });
+  moveLayer.classList.add('show');
+}
+
+/** 点坐标标签 → 输入精确数值定位 */
+function beginMoveEdit(i) {
+  const el = moveLabels.children[i], L = el && el._data;
+  const obj = state.selected;
+  if (!L || !obj) return;
+  moveEditing = true;
+  el.classList.add('editing');
+  el.innerHTML = `<input type="number" step="0.5" value="${round1(L.value)}">`;
+  const input = el.querySelector('input');
+  input.focus(); input.select();
+  const finish = (commit) => {
+    if (!el.classList.contains('editing')) return;
+    const v = commit ? parseFloat(input.value) : NaN;
+    el.classList.remove('editing');
+    moveEditing = false;
+    if (isFinite(v)) {
+      const d = obj.userData.desc;
+      beginEdit();
+      d.pos[L.idx] = round1(v);
+      obj.position.set(d.pos[0], d.pos[1], d.pos[2]);
+      commitEdit();
+      syncPanel();
+      toast('已沿 ' + AXIS_NAME[L.idx] + ' 轴移到 ' + round1(v) + ' mm');
+    }
+    updateMoveGizmo();
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+/* 拖动三色箭头 → 沿世界轴平移 */
+moveSvg.addEventListener('pointerdown', (e) => {
+  const hit = e.target.closest && e.target.closest('.mv-hit');
+  if (!hit || moveEditing) return;
+  const i = parseInt(hit.dataset.i, 10);
+  const el = moveLabels.children[i], L = el && el._data;
+  const obj = state.selected;
+  if (!L || !obj) return;
+  e.preventDefault(); e.stopPropagation();
+  moveDrag = {
+    idx: L.idx, obj, L,
+    sx: e.clientX, sy: e.clientY,
+    startPos: obj.userData.desc.pos[L.idx],
+    tip0: L.tipS, tipS: L.tipS, ux: L.ux, uy: L.uy, pxPerMM: L.pxPerMM
+  };
+  beginEdit();
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!moveDrag) return;
+  const m = moveDrag;
+  const along = (e.clientX - m.sx) * m.ux + (e.clientY - m.sy) * m.uy;
+  const v = round1(m.startPos + along / m.pxPerMM);
+  const d = m.obj.userData.desc;
+  d.pos[m.idx] = v;
+  m.obj.position.set(d.pos[0], d.pos[1], d.pos[2]);
+  syncPanel();
+  m.tipS = { x: m.tip0.x + along * m.ux, y: m.tip0.y + along * m.uy };
+  const el = moveLabels.children[m.idx];
+  if (el && !el.classList.contains('editing')) {
+    el.innerHTML = `<span class="mv-ax" style="color:${m.L.color}">${AXIS_NAME[m.idx]}</span>`
+      + v.toFixed(1) + '<span class="u"> mm</span>';
+    el.style.left = (m.tipS.x + m.ux * 26) + 'px';
+    el.style.top = (m.tipS.y + m.uy * 26) + 'px';
+  }
+  updateMoveGizmo();
+});
+
+window.addEventListener('pointerup', () => {
+  if (!moveDrag) return;
+  moveDrag = null;
+  commitEdit();
+  updateMoveGizmo();
+});
+
 renderer.setAnimationLoop(() => {
   if (viewAnim) stepViewAnim();
   stabilizeCameraUp();          // 顶/底视角用 Y 作 up，避免网格歪斜
@@ -9322,6 +9544,7 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
   renderViewCube();
   updateDimGizmo();
+  updateMoveGizmo();
   updateSegOverlay();
   if (!drag) positionObjUI();   // 选中实体菜单跟随对象（拖动时避让）
 });
@@ -9357,8 +9580,17 @@ window.Sketch3D = {
   /* 本轮：面贴附放置 + 选中实体三功能（探针） */
   placePlaneInfo, placementTransform, showObjMenu, hideObjMenu,
   nudgeSelected, scaleSelected, flattenSelected,
+  surfaceUnderCursor, updateMoveGizmo, beginMoveEdit,
   get objMenuShown() { return objMenuEl.classList.contains('show'); },
-  get faceMenuShown() { return faceMenuEl.classList.contains('show'); }
+  get faceMenuShown() { return faceMenuEl.classList.contains('show'); },
+  get moveShown() { return moveLayer.classList.contains('show'); },
+  get moveAxes() {
+    return Array.from(moveLabels.children).map((el) => ({
+      value: el._data ? +el._data.value.toFixed(2) : null,
+      idx: el._data ? el._data.idx : null,
+      pxPerMM: el._data ? +el._data.pxPerMM.toFixed(3) : null
+    }));
+  }
 };
 
 /* 内部探针（只读，供自动化检查；不参与业务） */
