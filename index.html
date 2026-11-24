@@ -293,6 +293,12 @@
   .mv-hit:active{cursor:grabbing}
   .mv-tag{border-width:1.5px}
   .mv-ax{font-weight:800;margin-right:4px}
+  /* 拉伸箭头：从选中面中心沿拉伸方向，可正向/反向拖拽改高度 */
+  .exarrowlayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none}
+  .exarrowlayer.show{display:block}
+  .ex-hit{pointer-events:stroke;cursor:grab}
+  .ex-hit:active{cursor:grabbing}
+  .ex-tag{border-color:#2f6fed}
   /* 3D One 式绿色「确定」按钮：确认后收起标注，之后选中不再出现 */
   .dim-confirm{
     position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
@@ -471,21 +477,22 @@
 
   /* 选中实体浮出菜单（移动 / 缩放 / 置平） */
   .obj-menu{
-    position:absolute;z-index:6;display:none;flex-direction:column;gap:2px;
-    padding:5px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
+    position:absolute;z-index:6;display:none;flex-direction:row;flex-wrap:wrap;width:122px;gap:2px;
+    padding:4px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
     border:1px solid #d7e2f0;box-shadow:var(--shadow-lg),inset 0 1px 0 #fff;
-    transform-origin:0 0;animation:pop .13s ease-out;min-width:136px;
+    transform-origin:0 0;animation:pop .13s ease-out;
   }
   .obj-menu.show{display:flex}
+  .om-main{display:flex;gap:2px}
   .om-btn{
-    display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:8px;
     font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;
-    transition:background .13s,color .13s;text-align:left;width:100%;
+    transition:background .13s,color .13s;
   }
-  .om-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .om-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .om-btn:hover,.om-btn.on{background:linear-gradient(180deg,#f0f6ff,#e6efff);color:#1d6ae5}
-  .om-btn .k{font-size:10px;color:var(--text-3);margin-left:auto;background:#eef2f8;padding:1px 5px;border-radius:4px}
-  .om-sub{padding:8px 7px 6px;margin-top:2px;border-top:1px solid var(--line-soft)}
+  .om-btn .k{display:none}
+  .om-sub{padding:8px 7px 6px;margin-top:2px;border-top:1px solid var(--line-soft);width:236px}
   .om-row{display:flex;align-items:center;gap:5px;margin-bottom:7px;flex-wrap:wrap}
   .om-row:last-child{margin-bottom:0}
   .om-row label{font-size:10.5px;color:var(--text-3);min-width:46px}
@@ -535,16 +542,28 @@
   .ex-dbtn.on{background:#1d6ae5;border-color:#1d6ae5;color:#fff;font-weight:600}
   .ex-dinfo{font-size:10.5px;color:var(--text-3);flex:1;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  .ex-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:2px 0 11px}
+  .ex-modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:2px 0 11px}
   .ex-mode{
-    display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 4px 6px;
+    display:flex;align-items:center;justify-content:center;height:38px;
     border:1px solid var(--line);border-radius:9px;background:#fff;
-    font-size:11px;color:var(--text-2);transition:border-color .13s,background .13s,color .13s,box-shadow .13s;
+    color:var(--text-2);transition:border-color .13s,background .13s,color .13s,box-shadow .13s;
   }
   .ex-mode svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
   .ex-mode:hover{background:#f7faff;border-color:#cfdcee}
   .ex-mode.on{border-color:#2f6fed;background:#eef5ff;color:#1d6ae5;box-shadow:0 0 0 2px rgba(47,111,237,.13)}
   .ex-mode.on svg{stroke-width:1.7}
+  /* 运算图标的悬浮文字：挂在 body 上，不受弹窗 overflow 裁剪 */
+  .ex-mode-tip,.om-tip-bubble{
+    position:fixed;z-index:130;pointer-events:none;display:none;
+    padding:5px 9px;border-radius:7px;background:#26364f;color:#fff;
+    font-size:11.5px;line-height:1.3;white-space:nowrap;
+    box-shadow:0 6px 18px rgba(20,32,55,.22);
+  }
+  .ex-mode-tip.show,.om-tip-bubble.show{display:block}
+  .ex-mode-tip::before,.om-tip-bubble::before{
+    content:'';position:absolute;left:50%;bottom:-5px;transform:translateX(-50%) rotate(45deg);
+    width:9px;height:9px;background:#26364f;
+  }
   .ex-foot{display:flex;gap:7px}
   .ex-foot .btn{height:30px;font-size:12px}
   .ex-tip{font-size:10.5px;color:var(--text-3);line-height:1.6;margin-bottom:9px}
@@ -821,6 +840,12 @@
       <div class="dimlabels" id="moveLabels"></div>
     </div>
 
+    <!-- 拉伸箭头：从选中面中心沿拉伸方向，可正向 / 反向拖拽改变高度 -->
+    <div class="exarrowlayer" id="exArrowLayer" aria-hidden="true">
+      <svg class="movesvg" id="exArrowSvg"></svg>
+      <div class="dimlabels" id="exArrowLabels"></div>
+    </div>
+
     <!-- 线段长度：绘制中实时提示，成线后可输入精确长度 -->
     <div class="seglayer" id="segLayer" aria-hidden="true">
       <div class="dim-tag seg-tag" id="segLenTag"></div>
@@ -851,9 +876,8 @@
 
     <!-- 选中实体（未选面）时浮出的对象菜单：移动 / 缩放 / 置平 -->
     <div class="obj-menu" id="objMenu" style="left:-9999px;top:-9999px">
-      <button class="om-btn" data-om="move" title="移动实体（也可直接在视图里拖动）">
+      <button class="om-btn" data-om="move" data-tip="移动（拖拽三轴箭头）" title="移动（拖拽三轴箭头）" aria-label="移动">
         <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M3 12l2.4-2.4M3 12l2.4 2.4M21 12l-2.4-2.4M21 12l-2.4 2.4"/></svg>
-        移动 <span class="k">拖拽</span>
       </button>
       <div class="om-sub" id="omMoveSub" style="display:none">
         <div class="om-tip" style="margin-bottom:6px">沿轴微调（按住实体也可直接拖动）</div>
@@ -868,13 +892,11 @@
           <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
         </div>
       </div>
-      <button class="om-btn" data-om="scale" title="按比例缩放实体尺寸">
+      <button class="om-btn" data-om="scale" data-tip="缩放（S）" title="缩放（S）" aria-label="缩放">
         <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
-        缩放 <span class="k">S</span>
       </button>
-      <button class="om-btn" data-om="flatten" title="把实体旋转归正并放置到网格平面 z=0 上">
+      <button class="om-btn" data-om="flatten" data-tip="置平（落到网格）" title="置平（落到网格）" aria-label="置平">
         <svg viewBox="0 0 24 24"><path d="M3 19h18M6 15l6-6 6 6M12 9V4"/></svg>
-        置平
       </button>
       <div class="om-sub" id="omScaleSub" style="display:none">
         <div class="om-row">
@@ -924,25 +946,21 @@
         </div>
 
         <div class="ex-modes" id="exModes">
-          <button class="ex-mode on" data-op="new">
+          <button class="ex-mode on" data-op="new" data-tip="新建实体" title="新建实体" aria-label="新建实体">
             <svg viewBox="0 0 24 24"><path d="M12 3.6l7 4v8.8l-7 4-7-4V7.6z"/><path d="M5 7.6l7 4 7-4M12 11.6V20"/></svg>
-            新建实体
           </button>
-          <button class="ex-mode" data-op="add">
+          <button class="ex-mode" data-op="add" data-tip="加运算（合并）" title="加运算（合并）" aria-label="加运算">
             <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg>
-            加运算
           </button>
-          <button class="ex-mode" data-op="sub">
+          <button class="ex-mode" data-op="sub" data-tip="减运算（挖除）" title="减运算（挖除）" aria-label="减运算">
             <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5" stroke-dasharray="2.4 2.4"/></svg>
-            减运算
           </button>
-          <button class="ex-mode" data-op="int">
+          <button class="ex-mode" data-op="int" data-tip="交运算（保留公共部分）" title="交运算（保留公共部分）" aria-label="交运算">
             <svg viewBox="0 0 24 24">
               <circle cx="9" cy="12" r="5" stroke-dasharray="2.4 2.4"/>
               <circle cx="15" cy="12" r="5" stroke-dasharray="2.4 2.4"/>
               <path d="M12 7.6a6 6 0 0 1 0 8.8 6 6 0 0 1 0-8.8z" fill="currentColor" stroke="none" opacity=".6"/>
             </svg>
-            交运算
           </button>
         </div>
 
@@ -6222,6 +6240,26 @@ function setHighlight(obj, on, asB) {
   paintEntity(obj, look);
 }
 
+/** 选面时整块实体还原成未选中色，避免实体深黄与面高亮黄叠在一起分不清；
+    取消选面后自动恢复选中色。用状态键避免每帧重复刷材质。 */
+let facePaintKey = '';
+function syncEntityFacePaint() {
+  const obj = state.selected;
+  const key = obj
+    ? [obj.uuid, state.face ? 1 : 0, drag && drag.root === obj ? 1 : 0, state.selectedB === obj ? 1 : 0].join('|')
+    : '';
+  if (key === facePaintKey) return;
+  facePaintKey = key;
+  if (!obj) return;
+  if (drag && drag.root === obj) return;   // 拖动中的透明浅绿由 drag 自己接管
+  if (state.face) {
+    hoverEntity = null;
+    paintEntity(obj, 'normal');
+  } else if (state.selectedB !== obj) {
+    paintEntity(obj, 'selected');
+  }
+}
+
 /** 设置布尔运算的第二选中实体 B（Shift 加选），不影响 A 的高亮 */
 function selectB(obj) {
   if (state.selectedB && state.selectedB !== obj) setHighlight(state.selectedB, false, true);
@@ -7615,26 +7653,53 @@ function hideObjMenu(opts) {
   if (!opts || !opts.keepMove) moveActive = false;   // 关闭菜单即退出移动模式（点「移动」时例外）
 }
 
-/** 把对象菜单贴到「实体包围盒中心」的屏幕投影位置 */
+/** 实体在屏幕上的投影包围盒：菜单避让它，避免压住模型 */
+function projectedObjectRect(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) {
+    const c = projectToScreen(new THREE.Vector3().fromArray((obj.userData.desc || {}).pos || [0, 0, 0]));
+    return { left: c.x - 18, right: c.x + 18, top: c.y - 18, bottom: c.y + 18 };
+  }
+  let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const p = projectToScreen(new THREE.Vector3(x, y, z));
+    left = Math.min(left, p.x); right = Math.max(right, p.x);
+    top = Math.min(top, p.y); bottom = Math.max(bottom, p.y);
+  }
+  return { left, right, top, bottom };
+}
+
+/** 对象菜单贴着实体外侧摆放：优先左右，其次上下；始终贴近但不遮挡模型 */
 function positionObjUI() {
   const obj = state.selected;
   if (!obj || !objMenuEl.classList.contains('show')) return;
-  const rect = renderer.domElement.getBoundingClientRect();
   const vw = viewport.clientWidth, vh = viewport.clientHeight;
-  if (!rect.width || !rect.height) return;
-  const box = new THREE.Box3().setFromObject(obj);
-  const anchor = box.isEmpty() ? new THREE.Vector3().fromArray(obj.userData.desc.pos || [0, 0, 0]) : box.getCenter(new THREE.Vector3());
-  const p = anchor.project(camera);
-  const sx = (p.x * 0.5 + 0.5) * rect.width;
-  const sy = (-p.y * 0.5 + 0.5) * rect.height;
+  if (!vw || !vh) return;
+  const er = projectedObjectRect(obj);
   const w = objMenuEl.offsetWidth, h = objMenuEl.offsetHeight;
-  let x = sx + 18, y = sy - h / 2;
-  if (x + w > vw - 8) x = sx - w - 18;
-  if (y + h > vh - 8) y = sy - h - 8;
-  x = Math.max(8, Math.min(x, Math.max(8, vw - w - 8)));
-  y = Math.max(8, Math.min(y, Math.max(8, vh - h - 8)));
-  objMenuEl.style.left = x + 'px';
-  objMenuEl.style.top = y + 'px';
+  const gap = 12;
+  const midX = (er.left + er.right) / 2 - w / 2;
+  const midY = (er.top + er.bottom) / 2 - h / 2;
+  const candidates = [
+    { x: er.right + gap, y: midY }, { x: er.left - gap - w, y: midY },
+    { x: midX, y: er.top - gap - h }, { x: midX, y: er.bottom + gap },
+    { x: er.right + gap, y: er.top - 4 }, { x: er.left - gap - w, y: er.top - 4 },
+    { x: er.right + gap, y: er.bottom - h + 4 }, { x: er.left - gap - w, y: er.bottom - h + 4 }
+  ];
+  const clamp = (p) => ({
+    x: Math.max(8, Math.min(p.x, Math.max(8, vw - w - 8))),
+    y: Math.max(8, Math.min(p.y, Math.max(8, vh - h - 8)))
+  });
+  const overlap = (p) => Math.max(0, Math.min(p.x + w, er.right + 2) - Math.max(p.x, er.left - 2))
+    * Math.max(0, Math.min(p.y + h, er.bottom + 2) - Math.max(p.y, er.top - 2));
+  let best = null, bestArea = Infinity;
+  for (const raw of candidates) {
+    const p = clamp(raw), area = overlap(p);
+    if (area < 1) { best = p; break; }
+    if (area < bestArea) { best = p; bestArea = area; }
+  }
+  objMenuEl.style.left = best.x + 'px';
+  objMenuEl.style.top = best.y + 'px';
 }
 
 /** 「移动」：沿世界轴按步进微调选中实体（撤销友好） */
@@ -7823,6 +7888,128 @@ function syncExUI() {
   if (document.activeElement !== $('dvY')) $('dvY').value = dv ? round1(dv.y) : '';
   if (document.activeElement !== $('dvZ')) $('dvZ').value = dv ? round1(dv.z) : '';
 }
+
+/* ---------- 拉伸箭头：面中心出发，正向 / 反向拖拽直接改高度 ---------- */
+const exArrowLayer = $('exArrowLayer'), exArrowSvg = $('exArrowSvg'), exArrowLabels = $('exArrowLabels');
+let exArrowDrag = null;
+
+function extrudeArrowDir() {
+  if (state.ex.dirVec) return state.ex.dirVec.clone().normalize();
+  return state.face ? state.face.normal.clone().normalize() : new THREE.Vector3(0, 0, 1);
+}
+
+function updateExtrudeArrow() {
+  if (!state.ex.open || !state.face || state.ex.picking || !state.selected) {
+    exArrowLayer.classList.remove('show');
+    return;
+  }
+  /* 箭头严格沿选中面的法向：终点 = 面中心 + 法向 × 有符号高度，再投影到屏幕。
+     正向指法向外，反向（拖过面中心）指法向内，方向始终来自同一个三维法向。 */
+  const center = state.face.center;
+  const normal = extrudeArrowDir();
+  const signed = state.ex.h * state.ex.dir;
+  const cS = projectToScreen(center);
+  const tWorld = center.clone().addScaledVector(normal, signed);
+  const tS = projectToScreen(tWorld);
+  let ux = tS.x - cS.x, uy = tS.y - cS.y;
+  let len = Math.hypot(ux, uy);
+  if (len < 0.08) {
+    /* 法向几乎正对镜头：投影退化为一点，保留一个最小可见方向，不再假装它是法向投影 */
+    ux = 0; uy = -1; len = 0;
+  } else { ux /= len; uy /= len; }
+  const visualL = len > 0 ? Math.max(42, len) : 42;
+  const tip = { x: cS.x + ux * visualL, y: cS.y + uy * visualL };
+
+  let svg = '';
+  svg += `<line x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}"`
+    + ` stroke="#2f6fed" stroke-width="3" opacity=".95"/>`;
+  svg += arrowHeadAt(tip, ux, uy, '#2f6fed');
+  svg += `<line class="ex-hit" x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}"`
+    + ` stroke="transparent" stroke-width="18" pointer-events="stroke"/>`;
+  svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="5" fill="#fff" stroke="#2f6fed" stroke-width="2"/>`;
+  exArrowSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
+  exArrowSvg.innerHTML = svg;
+
+  if (!exArrowLabels.children.length) {
+    exArrowLabels.innerHTML = '<div class="dim-tag ex-tag" id="exArrowTag"></div>';
+    exArrowLabels.firstElementChild.addEventListener('click', (e) => {
+      e.stopPropagation();
+      $('exH').focus(); $('exH').select();
+    });
+  }
+  const tag = exArrowLabels.firstElementChild;
+  tag.title = '点击可输入精确高度';
+  tag.style.left = (tip.x + ux * 30) + 'px';
+  tag.style.top = (tip.y + uy * 30) + 'px';
+  tag.innerHTML = `<span class="mv-ax" style="color:#2f6fed">H</span>${round1(state.ex.h).toFixed(1)}<span class="u"> mm</span>`
+    + (state.ex.dir < 0 ? '<span class="u">·反向</span>' : '');
+  exArrowLayer.classList.add('show');
+}
+
+exArrowSvg.addEventListener('pointerdown', (e) => {
+  const hit = e.target.closest && e.target.closest('.ex-hit');
+  if (!hit || !state.ex.open || !state.face) return;
+  e.preventDefault(); e.stopPropagation();
+  const center = state.face.center, normal = extrudeArrowDir();
+  const cS = projectToScreen(center), oneS = projectToScreen(center.clone().add(normal));
+  let ux = oneS.x - cS.x, uy = oneS.y - cS.y;
+  const len = Math.hypot(ux, uy);
+  if (len < 0.08) { ux = 0; uy = -1; } else { ux /= len; uy /= len; }
+  exArrowDrag = {
+    sx: e.clientX, sy: e.clientY, ux, uy,
+    pxPerMM: Math.max(0.35, len),           // 法向在屏幕上的真实投影比例（1mm 对应像素）
+    signed0: state.ex.h * state.ex.dir
+  };
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!exArrowDrag || !state.ex.open) return;
+  const m = exArrowDrag;
+  const along = (e.clientX - m.sx) * m.ux + (e.clientY - m.sy) * m.uy;
+  const signed = round1(m.signed0 + along / m.pxPerMM);
+  state.ex.h = Math.max(0.5, Math.abs(signed));
+  state.ex.dir = signed < 0 ? -1 : 1;
+  $('exH').value = round1(state.ex.h);
+  syncExUI();
+  refreshExtrudePreview();
+  updateExtrudeArrow();
+});
+
+window.addEventListener('pointerup', () => {
+  if (!exArrowDrag) return;
+  exArrowDrag = null;
+  updateExtrudeArrow();
+});
+
+/** 运算图标的悬浮文字（原生 title 在部分浏览器延迟明显，这里自绘即时提示） */
+const exModeTip = document.createElement('div');
+exModeTip.className = 'ex-mode-tip';
+document.body.appendChild(exModeTip);
+document.querySelectorAll('#exModes .ex-mode').forEach((btn) => {
+  btn.addEventListener('pointerenter', () => {
+    exModeTip.textContent = btn.dataset.tip || btn.title;
+    exModeTip.classList.add('show');
+    const r = btn.getBoundingClientRect();
+    exModeTip.style.left = Math.round(r.left + r.width / 2 - exModeTip.offsetWidth / 2) + 'px';
+    exModeTip.style.top = Math.round(r.top - exModeTip.offsetHeight - 11) + 'px';
+  });
+  btn.addEventListener('pointerleave', () => exModeTip.classList.remove('show'));
+});
+
+/** 对象菜单图标的悬浮文字 */
+const omTip = document.createElement('div');
+omTip.className = 'om-tip-bubble';
+document.body.appendChild(omTip);
+document.querySelectorAll('#objMenu .om-btn').forEach((btn) => {
+  btn.addEventListener('pointerenter', () => {
+    omTip.textContent = btn.dataset.tip || btn.title;
+    omTip.classList.add('show');
+    const r = btn.getBoundingClientRect();
+    omTip.style.left = Math.round(r.left + r.width / 2 - omTip.offsetWidth / 2) + 'px';
+    omTip.style.top = Math.round(r.top - omTip.offsetHeight - 11) + 'px';
+  });
+  btn.addEventListener('pointerleave', () => omTip.classList.remove('show'));
+});
 
 function refreshExtrudePreview() {
   if (!state.ex.open || !state.selected || !state.face) return;
@@ -8454,7 +8641,7 @@ viewport.addEventListener('pointerdown', (e) => {
     if (e.button !== 1) e.preventDefault();
     return;
   }
-  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit')) return;  // 浮层上的点击按 DOM 处理
+  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
 
   /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
   if (inViewCube(e)) {
@@ -9020,6 +9207,20 @@ vcubeGeo.clearGroups();
 VC_GROUPS.forEach((g) => vcubeGeo.addGroup(g[0], g[1], g[2]));
 vcubeGeo.computeVertexNormals();
 
+/* 悬停分组：几何分组是「一个三角形一组」，直接拿 group 会把整面高亮缩成一个三角。
+   这里按相邻 + 同拾取方向把三角拼回完整的面 / 倒角棱 / 倒角角。 */
+const VC_HOVER_RUNS = [];
+(function buildVcHoverRuns() {
+  const dirs = VC_PICK_DIRS;
+  let start = 0;
+  for (let i = 1; i <= dirs.length; i++) {
+    if (i === dirs.length || Math.abs(dirs[i].dot(dirs[start]) - 1) > 1e-6) {
+      VC_HOVER_RUNS.push({ start, count: i - start });
+      start = i;
+    }
+  }
+})();
+
 const vcube = new THREE.Mesh(vcubeGeo, [
   vcubeFaceTexture('右', '#ff8f4d', '#e2641a'),   // 暖橙
   vcubeFaceTexture('左', '#38b6ff', '#1476c4'),   // 天蓝
@@ -9072,9 +9273,10 @@ function setViewCubeHover(hit) {
   if (fi < 0) { vcHoverMesh.visible = vcHoverLine.visible = false; return; }
   const geo = vcube.geometry;
   const pos = geo.attributes.position, nor = geo.attributes.normal;
-  const group = geo.groups.find((g) => fi * 3 >= g.start && fi * 3 < g.start + g.count);
-  const first = group ? group.start : fi * 3;
-  const tris = group ? group.count / 3 : 1;
+  /* 用「同方向相邻三角」拼出整面：主面 2 三角、倒角棱 2 三角、倒角角 1 三角 */
+  const run = VC_HOVER_RUNS.find((r) => fi >= r.start && fi < r.start + r.count);
+  const first = (run ? run.start : fi) * 3;
+  const tris = run ? run.count : 1;
   const n = new THREE.Vector3().fromBufferAttribute(nor, first);
   const offset = (i, d, out, k) => {
     out[k*3] = pos.getX(i) + n.x * d;
@@ -9093,9 +9295,9 @@ function setViewCubeHover(hit) {
       hu[j*2] = uvpair[0]; hu[j*2+1] = uvpair[1];
     }
   }
-  /* 轮廓沿整个面的外沿走一圈（两面三角：A→B→D→C） */
+  /* 轮廓沿整个面的外沿走一圈（两面三角共享 first→first+2 这条对角线，外沿是 0→1→4→5） */
   const rim = tris === 1 ? [first, first+1, first+2]
-                         : [first, first+1, first+5, first+4];
+                         : [first, first+1, first+4, first+5];
   rim.forEach((i, k) => offset(i, 0.010, lp, k));
   vcHoverGeo.setAttribute('position', new THREE.BufferAttribute(hp, 3));
   vcHoverGeo.setAttribute('uv', new THREE.BufferAttribute(hu, 2));
@@ -9709,8 +9911,10 @@ renderer.setAnimationLoop(() => {
   controls.update();
   renderer.render(scene, camera);
   renderViewCube();
+  syncEntityFacePaint();
   updateDimGizmo();
   updateMoveGizmo();
+  updateExtrudeArrow();
   updateSegOverlay();
   if (!drag) positionObjUI();   // 选中实体菜单跟随对象（拖动时避让）
 });
@@ -9746,7 +9950,11 @@ window.Sketch3D = {
   /* 本轮：面贴附放置 + 选中实体三功能（探针） */
   placePlaneInfo, placementTransform, showObjMenu, hideObjMenu,
   nudgeSelected, scaleSelected, flattenSelected,
-  surfaceUnderCursor, updateMoveGizmo, beginMoveEdit,
+  surfaceUnderCursor, updateMoveGizmo, beginMoveEdit, updateExtrudeArrow,
+  get exArrowShown() { return exArrowLayer.classList.contains('show'); },
+  get exArrowH() { return state.ex.h; },
+  get exArrowDir() { return state.ex.dir; },
+  get vcHoverRuns() { return VC_HOVER_RUNS.map((r) => ({ start: r.start, count: r.count })); },
   get objMenuShown() { return objMenuEl.classList.contains('show'); },
   get faceMenuShown() { return faceMenuEl.classList.contains('show'); },
   get moveShown() { return moveLayer.classList.contains('show'); },
