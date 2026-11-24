@@ -5686,6 +5686,41 @@ function isRoundishPts(pts) {
   return rDev < 0.12;
 }
 
+/**
+ * 近圆轮廓最小二乘拟合为理想圆并均匀重采样。
+ * 拾取得到的圆轮廓点被量化成 0.25mm 阶梯，直接拉伸会在端盖接缝和侧面留下锯齿；
+ * 拟合出圆心/半径后按 segments 个等角点重建，接缝与侧壁都真正光滑。返回逆时针环。
+ */
+function fitCircleRing(pts, segments) {
+  const n = pts.length;
+  let mx = 0, my = 0;
+  for (const p of pts) { mx += p[0]; my += p[1]; }
+  mx /= n; my /= n;
+  /* 中心化坐标 (u,v) 解 D·u + E·v + F = -(u²+v²)，圆心=(-D/2,-E/2) */
+  let suu = 0, suv = 0, svv = 0, suw = 0, svw = 0, sw = 0;
+  for (const p of pts) {
+    const u = p[0] - mx, v = p[1] - my, w = u * u + v * v;
+    suu += u * u; suv += u * v; svv += v * v;
+    suw += u * w; svw += v * w; sw += w;
+  }
+  const det = suu * svv - suv * suv;
+  if (!(Math.abs(det) > 1e-9)) return null;
+  const D = (-suw * svv + svw * suv) / det;
+  const E = (-svw * suu + suw * suv) / det;
+  const F = -sw / n;
+  const cx = mx - D / 2, cy = my - E / 2;
+  const rr = (D * D + E * E) / 4 - F;
+  if (!(rr > 0)) return null;
+  const R = Math.sqrt(rr);
+  const seg = segments || 128;
+  const out = [];
+  for (let k = 0; k < seg; k++) {
+    const a = (2 * Math.PI * k) / seg;   // 角度递增 = 逆时针
+    out.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]);
+  }
+  return out;
+}
+
 function smoothExtrudeSideNormals(geo, pts) {
   const nor = geo.attributes && geo.attributes.normal;
   const pos = geo.attributes && geo.attributes.position;
@@ -7424,6 +7459,13 @@ function faceExtrudeDesc(boundary, height, dir, weld, customDir) {
   }
   if (area < 0) pts.reverse();
 
+  /* 近圆轮廓（圆柱/圆孔端面）：最小二乘拟合为理想圆并均匀重采样，
+     消除拾取量化造成的端盖接缝锯齿；非圆轮廓保持原样。 */
+  if (isRoundishPts(pts)) {
+    const fitted = fitCircleRing(pts, 128);
+    if (fitted) pts = fitted;
+  }
+
   const thickness = Math.max(MIN_SIZE, Math.abs(height));
   const back = dir < 0 ? -thickness : 0;        // 反向：底面挪到法向的另一侧
   const weldOff = weld ? -WELD : 0;             // 焊接：整体再往母体里压一点点
@@ -7450,8 +7492,17 @@ function previewExtrudeGhost(desc) {
   }));
   mesh.position.fromArray(desc.pos);
   ghostGroup.add(mesh);
+  /* 近圆拉伸体只画上下端盖圆环，不画侧壁竖棱（量化阶梯会被 EdgesGeometry 当成棱画成一排竖线） */
+  const rec = desc.kind === 'extrude' ? roundExtrudeEdgeCoords(desc) : null;
+  let edgeGeo;
+  if (rec) {
+    edgeGeo = new THREE.BufferGeometry();
+    edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(rec, 3));
+  } else {
+    edgeGeo = new THREE.EdgesGeometry(geo, 24);
+  }
   const edge = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geo, 24),
+    edgeGeo,
     new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
   );
   edge.position.copy(mesh.position);
