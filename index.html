@@ -461,6 +461,36 @@
   .fm-btn:hover{background:linear-gradient(180deg,#f0f6ff,#e6efff);color:#1d6ae5}
   .fm-btn .k{font-size:10px;color:var(--text-3);margin-left:3px;background:#eef2f8;padding:1px 5px;border-radius:4px}
 
+  /* 选中实体浮出菜单（移动 / 缩放 / 置平） */
+  .obj-menu{
+    position:absolute;z-index:6;display:none;flex-direction:column;gap:2px;
+    padding:5px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
+    border:1px solid #d7e2f0;box-shadow:var(--shadow-lg),inset 0 1px 0 #fff;
+    transform-origin:0 0;animation:pop .13s ease-out;min-width:136px;
+  }
+  .obj-menu.show{display:flex}
+  .om-btn{
+    display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:8px;
+    font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;
+    transition:background .13s,color .13s;text-align:left;width:100%;
+  }
+  .om-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .om-btn:hover,.om-btn.on{background:linear-gradient(180deg,#f0f6ff,#e6efff);color:#1d6ae5}
+  .om-btn .k{font-size:10px;color:var(--text-3);margin-left:auto;background:#eef2f8;padding:1px 5px;border-radius:4px}
+  .om-sub{padding:8px 7px 6px;margin-top:2px;border-top:1px solid var(--line-soft)}
+  .om-row{display:flex;align-items:center;gap:5px;margin-bottom:7px;flex-wrap:wrap}
+  .om-row:last-child{margin-bottom:0}
+  .om-row label{font-size:10.5px;color:var(--text-3);min-width:46px}
+  .om-mini{
+    min-width:30px;padding:4px 7px;border-radius:6px;border:1px solid #d7e2f0;background:#fff;
+    font-size:11px;font-weight:700;color:#2f6fed;transition:background .12s;
+  }
+  .om-mini:hover{background:#eaf1ff}
+  .om-sub input.num{width:62px}
+  .om-apply{padding:5px 10px;border-radius:6px;background:#2f6fed;color:#fff;font-size:11px;font-weight:600}
+  .om-apply:hover{background:#245cd0}
+  .om-tip{font-size:10px;color:var(--text-3);line-height:1.5}
+
   /* =========================================================
      06 · 拉伸面板（高度 + 4 张运算卡片）
      ========================================================= */
@@ -803,6 +833,43 @@
         拉伸
         <span class="k">E</span>
       </button>
+    </div>
+
+    <!-- 选中实体（未选面）时浮出的对象菜单：移动 / 缩放 / 置平 -->
+    <div class="obj-menu" id="objMenu" style="left:-9999px;top:-9999px">
+      <button class="om-btn" data-om="move" title="移动实体（也可直接在视图里拖动）">
+        <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M3 12l2.4-2.4M3 12l2.4 2.4M21 12l-2.4-2.4M21 12l-2.4 2.4"/></svg>
+        移动 <span class="k">拖拽</span>
+      </button>
+      <div class="om-sub" id="omMoveSub" style="display:none">
+        <div class="om-tip" style="margin-bottom:6px">沿轴微调（按住实体也可直接拖动）</div>
+        <div class="om-row"><label>X 轴</label>
+          <button class="om-mini" data-mv="0" data-dir="-1">−</button><button class="om-mini" data-mv="0" data-dir="1">+</button>
+          <label style="min-width:0;margin-left:4px">Y 轴</label>
+          <button class="om-mini" data-mv="1" data-dir="-1">−</button><button class="om-mini" data-mv="1" data-dir="1">+</button>
+        </div>
+        <div class="om-row"><label>Z 轴</label>
+          <button class="om-mini" data-mv="2" data-dir="-1">−</button><button class="om-mini" data-mv="2" data-dir="1">+</button>
+          <label style="min-width:0;margin-left:4px">步进</label>
+          <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
+        </div>
+      </div>
+      <button class="om-btn" data-om="scale" title="按比例缩放实体尺寸">
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        缩放 <span class="k">S</span>
+      </button>
+      <button class="om-btn" data-om="flatten" title="把实体旋转归正并放置到网格平面 z=0 上">
+        <svg viewBox="0 0 24 24"><path d="M3 19h18M6 15l6-6 6 6M12 9V4"/></svg>
+        置平
+      </button>
+      <div class="om-sub" id="omScaleSub" style="display:none">
+        <div class="om-row">
+          <label>比例</label>
+          <input class="num" id="omScaleVal" type="number" value="1.2" min="0.1" max="20" step="0.1">
+          <button class="om-apply" id="omScaleApply">应用</button>
+        </div>
+        <div class="om-tip">按倍数缩放实体长宽高（0.1–20）</div>
+      </div>
     </div>
 
     <!-- 拉伸设置面板：高度 + 4 张运算卡片 -->
@@ -5219,7 +5286,8 @@ const state = {
   polyN: 6,            // 正多边形边数
   ex: { open: false, h: 10, dir: 1, op: 'new', dirVec: null, picking: false },  // 拉伸面板状态（dirVec=用户拾取的拉伸方向）
   sketchStage: 'plane',   // 草图两段式：'plane' 选绘制平面 | 'draw' 开始绘制
-  sketchPlane: null       // 已锁定的绘制平面（见 lockSketchPlane）
+  sketchPlane: null,      // 已锁定的绘制平面（见 lockSketchPlane）
+  placeFace: null         // 新建实体时的默认贴附面：从当前选中面派生 { normal:Vector3, point:Vector3, hostUid }
 };
 
 let drag = null;                 // 当前指针拖拽会话
@@ -5818,6 +5886,8 @@ function buildObject(desc) {
   }
   obj.userData.desc = desc;
   obj.position.set(desc.pos[0], desc.pos[1], desc.pos[2]);
+  /* 贴面放置的实体带方向四元数（局部 +Z 对齐所在面法向）；置平后删除 quat 归正 */
+  if (desc.quat) obj.quaternion.fromArray(desc.quat);
   modelGroup.add(obj);
   return obj;
 }
@@ -5855,6 +5925,7 @@ function updateObject(obj) {
     applyBodyAppearance(obj);
   }
   obj.position.set(desc.pos[0], desc.pos[1], desc.pos[2]);
+  if (desc.quat) obj.quaternion.fromArray(desc.quat); else obj.quaternion.identity();
 }
 
 /** 递归释放几何 / 材质 */
@@ -5959,6 +6030,38 @@ function planePoint(e) {
   return raycaster.ray.intersectPlane(mathPlane, p) ? p : null;
 }
 
+/**
+ * 基本体「放置基准平面」：若已选中实体面（state.placeFace），就用该面；否则用地面 z=0。
+ * 这样在实体面上选中面后切到基本体工具，新建实体默认贴附该面，无需再次确认（仿 3D One）。
+ */
+function placePlaneInfo() {
+  const pf = state.placeFace;
+  if (pf && pf.normal && pf.point) {
+    const n = pf.normal.clone().normalize();
+    return {
+      o: pf.point.clone(),
+      n,
+      math: new THREE.Plane().setFromNormalAndCoplanarPoint(n, pf.point),
+      hostUid: pf.hostUid == null ? null : pf.hostUid,
+      isGround: false
+    };
+  }
+  return {
+    o: new THREE.Vector3(0, 0, 0),
+    n: new THREE.Vector3(0, 0, 1),
+    math: groundPlane,
+    hostUid: null,
+    isGround: true
+  };
+}
+
+/** 射线与当前放置基准平面的交点 */
+function placePoint(e) {
+  setRay(e);
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(placePlaneInfo().math, p) ? p : null;
+}
+
 /** 世界点 → 绘制平面局部 2D 坐标 */
 function worldToPlane2D(p) {
   const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0] };
@@ -6059,14 +6162,17 @@ function select(obj) {
   state.selected = obj || null;
   state.face = null;
   state.faceHit = null;
+  state.placeFace = null;   // 选中对象变化 → 旧的贴附面基准失效
   closeExtrudePanel(true);
   clearGroup(faceGroup);
   clearGroup(ghostGroup);
   hideFaceMenu();
+  hideObjMenu();
   if (obj) setHighlight(obj, true);
   syncPanel();
   updateStatus();
   updateBoolButtons();
+  showObjMenu();   // 选中实体（未选面）→ 浮出「移动/缩放/置平」菜单
 }
 
 /** 点选一个面：识别整面 → 橙色高亮 + 浮出「拉伸」菜单 */
@@ -6077,7 +6183,14 @@ function pickFace(obj, hit) {
   clearGroup(faceGroup);
   state.face = { normal: boundary.normal.clone(), point: hit.point.clone(), loop: boundary.loop, center: boundary.center };
   state.faceHit = hit;
+  /* 记录为「新建实体的默认贴附面」：此后切到基本体工具，直接在该面上放置（仿 3D One） */
+  state.placeFace = {
+    normal: boundary.normal.clone(),
+    point: boundary.center.clone(),
+    hostUid: obj.userData.desc && obj.userData.desc.uid != null ? obj.userData.desc.uid : null
+  };
   buildFaceHighlight(boundary.loop, boundary.normal, boundary.loopsWorld, boundary.fillCoords);
+  hideObjMenu();      // 选面 → 由面菜单接管，隐藏对象菜单
   syncFaceHint();
   showFaceMenu();
 }
@@ -6827,21 +6940,36 @@ segConfirm.addEventListener('click', (e) => {
    09 · 基础实体拖拽放置
    ========================================================================== */
 function startPlacement(e) {
-  const p = groundPoint(e);
+  const info = placePlaneInfo();
+  const p = placePoint(e);
   if (!p) return;
+  /* 面内基向量：把交点吸附到该平面内的 5mm 网格（地面时正好是 XY 网格） */
+  const basis = planeBasis(info.n);
+  const rel = p.clone().sub(info.o);
+  const a = snap(rel.dot(basis.u)), b = snap(rel.dot(basis.v));
+  const start = info.o.clone().addScaledVector(basis.u, a).addScaledVector(basis.v, b);
   state.placing = {
     kind: state.tool,
-    start: new THREE.Vector3(snap(p.x), snap(p.y), 0),
-    size: 20
+    start,
+    size: 20,
+    /* 贴面放置：记录法向 / 朝向 / 是否地面，供预览与落盘使用 */
+    normal: info.n.clone(),
+    quat: info.isGround ? null : new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), info.n),
+    hostUid: info.hostUid,
+    isGround: info.isGround,
+    u: basis.u.clone(), v: basis.v.clone()
   };
   updateGhost();
 }
 
 function updatePlacement(e) {
-  const p = groundPoint(e);
   const pl = state.placing;
-  if (!p || !pl) return;
-  const dist = Math.hypot(p.x - pl.start.x, p.y - pl.start.y) * 2;
+  if (!pl) return;
+  const p = placePoint(e);
+  if (!p) return;
+  /* 沿放置平面内的拖拽距离决定尺寸（斜面也按面内实际距离算） */
+  const rel = p.clone().sub(pl.start);
+  const dist = Math.hypot(rel.dot(pl.u), rel.dot(pl.v)) * 2;
   pl.size = Math.max(5, snap(dist));
   updateGhost();
 }
@@ -6865,18 +6993,35 @@ function primitiveDesc(kind, s, pos) {
   }
 }
 
+/**
+ * 由放置会话求基本体的落盘位置 / 朝向：
+ * 地面放置与旧逻辑一致（几何中心在 start + Z·s/2）；
+ * 贴面放置时几何中心 = 面上锚点 + 法向·s/2，并让局部 +Z 对齐法向，使底面贴合所选面。
+ */
+function placementTransform(pl, s) {
+  const half = s / 2;
+  const pos = [
+    round1(pl.start.x + (pl.normal ? pl.normal.x * half : 0)),
+    round1(pl.start.y + (pl.normal ? pl.normal.y * half : 0)),
+    round1(pl.start.z + (pl.normal ? pl.normal.z * half : 0))
+  ];
+  return { pos, quat: pl.quat ? pl.quat.toArray() : null };
+}
+
 /** 拖拽过程中的半透明预览 */
 function updateGhost() {
   clearGroup(ghostGroup);
   const pl = state.placing;
   if (!pl) return;
   const s = pl.size;
-  const desc = primitiveDesc(pl.kind, s, [pl.start.x, pl.start.y, s / 2]);
+  const { pos, quat } = placementTransform(pl, s);
+  const desc = primitiveDesc(pl.kind, s, pos);
   const geo = makeGeometry(desc);
   const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
     color: ACCENT, transparent: true, opacity: 0.16, depthWrite: false
   }));
-  mesh.position.set(pl.start.x, pl.start.y, s / 2);
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  if (quat) mesh.quaternion.fromArray(quat);
   ghostGroup.add(mesh);
 
   const edge = new THREE.LineSegments(
@@ -6884,6 +7029,7 @@ function updateGhost() {
     new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.85 })
   );
   edge.position.copy(mesh.position);
+  if (quat) edge.quaternion.fromArray(quat);
   ghostGroup.add(edge);
 }
 
@@ -6894,8 +7040,9 @@ function finishPlacement() {
   if (!pl) return;
 
   const s = Math.max(5, pl.size);
-  const pos = [pl.start.x, pl.start.y, round1(s / 2)];
+  const { pos, quat } = placementTransform(pl, s);
   const desc = primitiveDesc(pl.kind, s, pos);
+  if (quat) desc.quat = quat;
 
   beginEdit();
   const obj = buildObject(desc);
@@ -6906,7 +7053,9 @@ function finishPlacement() {
   applyBodyAppearance(obj);   // 待确定期间用透明浅绿预览
   updateFirstRun();
   updateStatus();
-  toast('已放置' + (PRIMITIVES[pl.kind] ? PRIMITIVES[pl.kind].label : '实体'));
+  /* 贴面放置是一次性的：落盘后清掉基准面，后续放置回到地面，避免误粘在旧面上 */
+  state.placeFace = null;
+  toast((pl.isGround ? '已放置' : '已贴面放置') + (PRIMITIVES[pl.kind] ? PRIMITIVES[pl.kind].label : '实体'));
 }
 
 /* ============================================================================
@@ -7351,6 +7500,126 @@ function applyExtrude() {
    ========================================================================== */
 const faceMenuEl = $('faceMenu');
 const exPopEl = $('exPop');
+const objMenuEl = $('objMenu');
+
+/* ---------- 选中实体浮出菜单：移动 / 缩放 / 置平 ---------- */
+function showObjMenu() {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc || state.face || state.ex.open) return;
+  const kd = obj.userData.desc.kind;
+  if (kd === 'sketch' || kd === 'sheet') return;   // 草图/面走各自的菜单
+  objMenuEl.classList.add('show');
+  positionObjUI();
+}
+
+function hideObjMenu() {
+  objMenuEl.classList.remove('show');
+  const ms = $('omMoveSub'), ss = $('omScaleSub');
+  if (ms) ms.style.display = 'none';
+  if (ss) ss.style.display = 'none';
+  objMenuEl.querySelectorAll('.om-btn').forEach((b) => b.classList.remove('on'));
+}
+
+/** 把对象菜单贴到「实体包围盒中心」的屏幕投影位置 */
+function positionObjUI() {
+  const obj = state.selected;
+  if (!obj || !objMenuEl.classList.contains('show')) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  if (!rect.width || !rect.height) return;
+  const box = new THREE.Box3().setFromObject(obj);
+  const anchor = box.isEmpty() ? new THREE.Vector3().fromArray(obj.userData.desc.pos || [0, 0, 0]) : box.getCenter(new THREE.Vector3());
+  const p = anchor.project(camera);
+  const sx = (p.x * 0.5 + 0.5) * rect.width;
+  const sy = (-p.y * 0.5 + 0.5) * rect.height;
+  const w = objMenuEl.offsetWidth, h = objMenuEl.offsetHeight;
+  let x = sx + 18, y = sy - h / 2;
+  if (x + w > vw - 8) x = sx - w - 18;
+  if (y + h > vh - 8) y = sy - h - 8;
+  x = Math.max(8, Math.min(x, Math.max(8, vw - w - 8)));
+  y = Math.max(8, Math.min(y, Math.max(8, vh - h - 8)));
+  objMenuEl.style.left = x + 'px';
+  objMenuEl.style.top = y + 'px';
+}
+
+/** 「移动」：沿世界轴按步进微调选中实体（撤销友好） */
+function nudgeSelected(axis, dir) {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc) return;
+  const step = Math.max(0.5, parseFloat($('omStep').value) || 5);
+  beginEdit();
+  const d = obj.userData.desc;
+  d.pos[axis] = round1(d.pos[axis] + dir * step);
+  obj.position.set(d.pos[0], d.pos[1], d.pos[2]);
+  state.face = null; clearGroup(faceGroup); hideFaceMenu();
+  commitEdit();
+  syncPanel();
+  positionObjUI();
+}
+
+/** 「缩放」：按比例缩放实体所有尺寸参数；位置随包围盒中心保持，使缩放就地发生 */
+function scaleSelected(factor) {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc) return;
+  const d = obj.userData.desc;
+  const k = Math.max(0.1, Math.min(20, factor));
+  /* 先记录世界包围盒中心，缩放后把中心复位，保证就地缩放 */
+  obj.updateMatrixWorld(true);
+  const boxBefore = new THREE.Box3().setFromObject(obj);
+  const cBefore = boxBefore.isEmpty() ? new THREE.Vector3().fromArray(d.pos) : boxBefore.getCenter(new THREE.Vector3());
+
+  beginEdit();
+  if (d.params) {
+    const spec = SIZE_SPEC[d.kind] || Object.keys(d.params).map((k2) => [k2]);
+    const skip = new Set(['turns', 'rings']);   // 圈数/纹数是计数，不参与尺寸缩放
+    spec.forEach(([key]) => {
+      if (skip.has(key) || !(key in d.params)) return;
+      d.params[key] = round1(Math.max(MIN_SIZE, d.params[key] * k));
+    });
+  }
+  if (d.kind === 'solid' && d.geo && d.geo.p) {
+    /* 布尔复合体的 geo.p 是绝对顶点数组：相对 pos 就地缩放 */
+    const g = d.geo;
+    for (let i = 0; i < g.p.length; i += 3) {
+      g.p[i] = (g.p[i] - d.pos[0]) * k + d.pos[0];
+      g.p[i + 1] = (g.p[i + 1] - d.pos[1]) * k + d.pos[1];
+      g.p[i + 2] = (g.p[i + 2] - d.pos[2]) * k + d.pos[2];
+    }
+  }
+  updateObject(obj);
+  obj.updateMatrixWorld(true);
+  const boxAfter = new THREE.Box3().setFromObject(obj);
+  const cAfter = boxAfter.isEmpty() ? new THREE.Vector3().fromArray(d.pos) : boxAfter.getCenter(new THREE.Vector3());
+  const shift = cBefore.clone().sub(cAfter);
+  d.pos[0] = round1(d.pos[0] + shift.x);
+  d.pos[1] = round1(d.pos[1] + shift.y);
+  d.pos[2] = round1(d.pos[2] + shift.z);
+  obj.position.set(d.pos[0], d.pos[1], d.pos[2]);
+  state.face = null; clearGroup(faceGroup); hideFaceMenu(); hideObjMenu();
+  commitEdit();
+  syncPanel();
+  toast('已缩放 ' + round1(k) + '×');
+}
+
+/** 「置平」：清除朝向四元数归正，并把实体最低点贴合网格平面 z=0 */
+function flattenSelected() {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc) return;
+  const d = obj.userData.desc;
+  beginEdit();
+  if (d.quat) delete d.quat;              // 归正：局部 +Z 回到世界 Z
+  updateObject(obj);
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj);
+  if (!box.isEmpty()) {
+    d.pos[2] = round1(d.pos[2] - box.min.z);   // 最低点落到 z=0
+  }
+  obj.position.set(d.pos[0], d.pos[1], d.pos[2]);
+  state.face = null; clearGroup(faceGroup); hideFaceMenu(); hideObjMenu();
+  commitEdit();
+  syncPanel();
+  toast('已归正并放置到网格平面');
+}
 
 function showFaceMenu() {
   if (!state.face || state.ex.open) return;
@@ -7481,6 +7750,45 @@ function refreshExtrudePreview() {
 faceMenuEl.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-fm]');
   if (btn && btn.dataset.fm === 'extrude') openExtrudePanel();
+});
+
+/* ---------- 对象菜单事件：移动 / 缩放 / 置平 ---------- */
+objMenuEl.addEventListener('click', (e) => {
+  /* 子面板里的轴微调按钮 */
+  const mv = e.target.closest('[data-mv]');
+  if (mv) { e.stopPropagation(); nudgeSelected(Number(mv.dataset.mv), Number(mv.dataset.dir)); return; }
+  const btn = e.target.closest('[data-om]');
+  if (!btn) return;
+  e.stopPropagation();
+  const act = btn.dataset.om;
+  const moveSub = $('omMoveSub'), scaleSub = $('omScaleSub');
+  if (act === 'move') {
+    const willOpen = moveSub.style.display !== 'flex';
+    moveSub.style.display = willOpen ? 'flex' : 'none';
+    scaleSub.style.display = 'none';
+    btn.classList.toggle('on', willOpen);
+    objMenuEl.querySelector('[data-om="scale"]').classList.remove('on');
+    if (willOpen) positionObjUI();
+  } else if (act === 'scale') {
+    const willOpen = scaleSub.style.display !== 'block';
+    scaleSub.style.display = willOpen ? 'block' : 'none';
+    moveSub.style.display = 'none';
+    btn.classList.toggle('on', willOpen);
+    objMenuEl.querySelector('[data-om="move"]').classList.remove('on');
+    if (willOpen) { positionObjUI(); setTimeout(() => { const el = $('omScaleVal'); el.focus(); el.select(); }, 30); }
+  } else if (act === 'flatten') {
+    flattenSelected();
+  }
+});
+
+$('omScaleApply').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const k = parseFloat($('omScaleVal').value);
+  if (isFinite(k) && k > 0) scaleSelected(k);
+  else toast('请输入有效的缩放比例');
+});
+$('omScaleVal').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); $('omScaleApply').click(); }
 });
 
 $('exClose').addEventListener('click', () => closeExtrudePanel());
@@ -7855,6 +8163,7 @@ function syncToolUI() {
 function setMode(m) {
   autoConfirmDim();
   clearSegOverlay();
+  hideObjMenu();
   const prev = state.mode;
   state.mode = m;
 
@@ -7911,6 +8220,13 @@ function setTool(t) {
   state.sketchPlane = null;
   cancelDraft();
   clearGroup(faceGroup);
+  hideObjMenu();
+  hideFaceMenu();
+  /* 已选中实体面 → 新建基本体时把它作为默认贴附面，并重建高亮让用户看清基准面 */
+  if (isPrimitive(t) && state.face && state.placeFace) {
+    buildFaceHighlight(state.face.loop, state.face.normal);
+    toast('将以选中的面为基准放置新实体（点空白处可改回地面）');
+  }
   syncToolUI();
   updateFirstRun();
 }
@@ -7980,6 +8296,13 @@ window.addEventListener('keydown', (e) => {
       backToPickPlane();          // 从绘制状态退回「选平面」
       return;
     }
+    if (objMenuEl.classList.contains('show')) { hideObjMenu(); return; }
+    if (state.placeFace) {         // 放弃贴附基准，回到地面放置
+      state.placeFace = null;
+      clearGroup(faceGroup);
+      toast('已取消贴面基准，下次放置回到地面');
+      return;
+    }
     setTool('select');
     return;
   }
@@ -8035,7 +8358,7 @@ viewport.addEventListener('pointerdown', (e) => {
     if (e.button !== 1) e.preventDefault();   // 中键(1)放行给 OrbitControls 平移，其余拦截默认行为
     return;
   }
-  if (e.target.closest('.face-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm')) return;  // 浮层上的点击按 DOM 处理
+  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm')) return;  // 浮层上的点击按 DOM 处理
 
   /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
   if (inViewCube(e)) {
@@ -8357,6 +8680,7 @@ function pickSketchFace(root) {
     );
     hl.renderOrder = 4;
     faceGroup.add(hl);
+    hideObjMenu();
     syncFaceHint();
     showFaceMenu();
     return;
@@ -8373,6 +8697,7 @@ function pickSketchFace(root) {
   const normal = n.clone();
   state.face = { normal, point: center.clone(), loop, center: center.clone() };
   buildFaceHighlight(loop, normal);
+  hideObjMenu();
   syncFaceHint();
   showFaceMenu();
 }
@@ -8998,6 +9323,7 @@ renderer.setAnimationLoop(() => {
   renderViewCube();
   updateDimGizmo();
   updateSegOverlay();
+  if (!drag) positionObjUI();   // 选中实体菜单跟随对象（拖动时避让）
 });
 
 /* 启动 */
@@ -9027,7 +9353,12 @@ window.Sketch3D = {
   primitiveDesc, makeGeometry, hornGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
   confirmDim, autoConfirmDim, applyBodyAppearance,
   serializeScene, restoreScene, undo,
-  saveZ1, openZ1, exportSTL, exportSTEP, buildSTEP, buildSTLBinary, collectExportTriangles, download
+  saveZ1, openZ1, exportSTL, exportSTEP, buildSTEP, buildSTLBinary, collectExportTriangles, download,
+  /* 本轮：面贴附放置 + 选中实体三功能（探针） */
+  placePlaneInfo, placementTransform, showObjMenu, hideObjMenu,
+  nudgeSelected, scaleSelected, flattenSelected,
+  get objMenuShown() { return objMenuEl.classList.contains('show'); },
+  get faceMenuShown() { return faceMenuEl.classList.contains('show'); }
 };
 
 /* 内部探针（只读，供自动化检查；不参与业务） */
