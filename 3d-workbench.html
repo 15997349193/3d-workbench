@@ -5327,6 +5327,11 @@ const state = {
 
 let drag = null;                 // 当前指针拖拽会话
 let hoverEntity = null;          // 当前悬停的实体（浅黄预览）
+/* 连续点击计数：左键单击实体 = 只选中实体；连续第二次点同一实体才进入选面。
+   不用「是否已选中」判断，因为新建/拉伸后实体会自动选中，那样首次点击就会误选面。 */
+let clickStreakRoot = null;      // 上一次左键单击命中的实体根对象
+let clickStreakTime = 0;         // 上次单击时间（超时视为新序列）
+const CLICK_STREAK_MS = 2500;
 let vcHoverTri = -1;             // 当前悬停的魔方三角（白绿渐变预览）
 let editBase = null;             // 撤销快照的事务起点
 const undoStack = [];            // 撤销栈（存整个场景快照）
@@ -9123,14 +9128,20 @@ viewport.addEventListener('pointerdown', (e) => {
   if (!toolActive) {
     const hit = pick(e);
     if (!hit) {
+      clickStreakRoot = null;                                 // 点空白 → 打断连续点击序列
       drag = { kind: 'click', x: e.clientX, y: e.clientY };   // 空白处：交给控制器旋转
       return;
     }
     /* 命中实体：拦下左键 → 选中 + 进入拖动移动 */
     e.preventDefault();
     e.stopPropagation();
-    const wasSelected = state.selected === hit.root;
-    if (!wasSelected) select(hit.root);
+    /* 连续第二次点同一实体 → 选面；否则只选中实体（即便它此前已被新建/拉伸自动选中） */
+    const now = performance.now();
+    const isSecondClick = clickStreakRoot === hit.root && (now - clickStreakTime) < CLICK_STREAK_MS;
+    clickStreakRoot = hit.root;
+    clickStreakTime = now;
+    if (!isSecondClick) select(hit.root);
+    else if (state.selected !== hit.root) select(hit.root);   // 选中态若被别处改过，补一次
 
     beginEdit();
     const grabZ = hit.hit.point.z;
@@ -9142,7 +9153,7 @@ viewport.addEventListener('pointerdown', (e) => {
       moved: false,
       root: hit.root,
       faceHit: hit.hit,
-      wasSelected,
+      isSecondClick,
       grabZ,
       origin: hit.root.userData.desc.pos.slice(),
       startXZ: g ? [g.x, g.y] : null,
@@ -9238,6 +9249,7 @@ window.addEventListener('pointerup', (e) => {
   } else if (d.kind === 'click') {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
       /* 空白处单击 → 取消选择 */
+      clickStreakRoot = null;
       select(null);
     }
   } else if (d.kind === 'pickplane') {
@@ -9257,13 +9269,15 @@ window.addEventListener('pointerup', (e) => {
     /* 松手：拖动态浅绿 → 选中态深黄（未选中则恢复原色） */
     paintEntity(d.root, state.selected === d.root ? 'selected' : 'normal');
     if (d.moved) {
+      clickStreakRoot = null;   // 拖动过 → 打断连续点击序列，下次点击只选中实体
       commitEdit();
       updateStatus();
       toast('已移动');
     } else {
-      /* 没有位移 = 一次单击：已选中的对象再点一次 → 选面（闭合草图 = 蓝色平面本身） */
-      if (d.wasSelected && d.faceHit.face) {
+      /* 没有位移 = 一次单击：连续第二次点同一实体 → 选面（闭合草图 = 蓝色平面本身） */
+      if (d.isSecondClick && d.faceHit.face) {
         const kd = d.root.userData.desc.kind;
+        clickStreakRoot = null;   // 已进入选面 → 重置，避免第三次点击又选面
         if (kd === 'sketch') pickSketchFace(d.root);
         else pickFace(d.root, d.faceHit);
       }
