@@ -505,6 +505,24 @@
   .om-apply{padding:5px 10px;border-radius:6px;background:#2f6fed;color:#fff;font-size:11px;font-weight:600}
   .om-apply:hover{background:#245cd0}
   .om-tip{font-size:10px;color:var(--text-3);line-height:1.5}
+  /* 移动面板选项卡：点到点 / 动态移动（仿 3D One） */
+  .om-tabs{display:flex;gap:3px;background:#eef2f8;border-radius:8px;padding:3px;margin-bottom:8px}
+  .om-tab{flex:1;padding:5px 3px;border-radius:6px;font-size:10.5px;font-weight:600;color:var(--text-3);white-space:nowrap;transition:background .13s,color .13s}
+  .om-tab:hover{color:#1d6ae5}
+  .om-tab.on{background:#fff;color:#1d6ae5;box-shadow:0 1px 4px rgba(28,42,70,.12)}
+  .om-p2p-tip{font-size:10px;line-height:1.5;color:var(--text-3);min-height:30px;padding:5px 7px;background:#f7f9fd;border:1px dashed #cdd9ea;border-radius:7px;margin-bottom:7px}
+  .om-p2p-tip b{color:#1d6ae5}
+  .om-p2p-tip .p2p-done{color:#16824a;font-weight:600}
+  .om-p2p-actions{display:flex;gap:5px}
+  .om-p2p-actions .om-apply{flex:1;padding:5px 6px;font-size:10.5px}
+  .om-p2p-actions .om-ghost{background:#fff;color:#5b6675;border:1px solid #d7e2f0}
+  .om-p2p-actions .om-ghost:hover{background:#eef2f8}
+  /* 点到点拾取时，画布上的起点/终点标记 */
+  .p2pmark{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:5;width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 2px #2f6fed,0 2px 8px rgba(28,42,70,.35)}
+  .p2pmark::after{content:'';position:absolute;inset:5px;border-radius:50%;background:#2f6fed}
+  .p2pmark.end{border-color:#fff;box-shadow:0 0 0 2px #16824a,0 2px 8px rgba(28,42,70,.35)}
+  .p2pmark.end::after{background:#16824a}
+  .p2pline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4}
 
   /* =========================================================
      06 · 拉伸面板（高度 + 4 张运算卡片）
@@ -840,6 +858,10 @@
       <div class="dimlabels" id="moveLabels"></div>
     </div>
 
+    <!-- 点到点移动：起点/终点屏幕标记 + 连线 -->
+    <svg class="p2pline" id="p2pLine" aria-hidden="true"></svg>
+    <div id="p2pMarks" aria-hidden="true"></div>
+
     <!-- 拉伸箭头：从选中面中心沿拉伸方向，可正向 / 反向拖拽改变高度 -->
     <div class="exarrowlayer" id="exArrowLayer" aria-hidden="true">
       <svg class="movesvg" id="exArrowSvg"></svg>
@@ -880,16 +902,31 @@
         <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M3 12l2.4-2.4M3 12l2.4 2.4M21 12l-2.4-2.4M21 12l-2.4 2.4"/></svg>
       </button>
       <div class="om-sub" id="omMoveSub" style="display:none">
-        <div class="om-tip" style="margin-bottom:6px">沿轴微调（按住实体也可直接拖动）</div>
-        <div class="om-row"><label>X 轴</label>
-          <button class="om-mini" data-mv="0" data-dir="-1">−</button><button class="om-mini" data-mv="0" data-dir="1">+</button>
-          <label style="min-width:0;margin-left:4px">Y 轴</label>
-          <button class="om-mini" data-mv="1" data-dir="-1">−</button><button class="om-mini" data-mv="1" data-dir="1">+</button>
+        <div class="om-tabs">
+          <button class="om-tab on" data-mvtab="p2p">点到点</button>
+          <button class="om-tab" data-mvtab="free">动态移动</button>
         </div>
-        <div class="om-row"><label>Z 轴</label>
-          <button class="om-mini" data-mv="2" data-dir="-1">−</button><button class="om-mini" data-mv="2" data-dir="1">+</button>
-          <label style="min-width:0;margin-left:4px">步进</label>
-          <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
+        <!-- 选项卡 1：点到点（用户点选起点 → 终点，实体平移对齐） -->
+        <div id="omMvP2P">
+          <div class="om-p2p-tip" id="omP2pTip">点选实体上的<b>起点</b>，再点选<b>终点</b>，实体即按两点平移</div>
+          <div class="om-p2p-actions">
+            <button class="om-apply" id="omP2pStart">选起点</button>
+            <button class="om-apply om-ghost" id="omP2pCancel">取消</button>
+          </div>
+        </div>
+        <!-- 选项卡 2：动态移动（保留原三箭头） -->
+        <div id="omMvFree" style="display:none">
+          <div class="om-tip" style="margin-bottom:6px">拖动 X/Y/Z 箭头，或按住实体直接拖动</div>
+          <div class="om-row"><label>X 轴</label>
+            <button class="om-mini" data-mv="0" data-dir="-1">−</button><button class="om-mini" data-mv="0" data-dir="1">+</button>
+            <label style="min-width:0;margin-left:4px">Y 轴</label>
+            <button class="om-mini" data-mv="1" data-dir="-1">−</button><button class="om-mini" data-mv="1" data-dir="1">+</button>
+          </div>
+          <div class="om-row"><label>Z 轴</label>
+            <button class="om-mini" data-mv="2" data-dir="-1">−</button><button class="om-mini" data-mv="2" data-dir="1">+</button>
+            <label style="min-width:0;margin-left:4px">步进</label>
+            <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
+          </div>
         </div>
       </div>
       <button class="om-btn" data-om="scale" data-tip="缩放（S）" title="缩放（S）" aria-label="缩放">
@@ -8083,6 +8120,12 @@ const faceMenuEl = $('faceMenu');
 const exPopEl = $('exPop');
 const objMenuEl = $('objMenu');
 let moveActive = false;   // 是否处于「移动模式」：只有点了「移动」才显示三轴箭头
+/* 点到点移动（仿 3D One）：用户点选起点 → 终点，实体按两点差值平移 */
+let p2pActive = false;    // 是否正在点到点拾取
+let p2pStage = 0;         // 0 = 等起点，1 = 已选起点等终点
+let p2pStart = null;      // 起点世界坐标 THREE.Vector3
+let p2pRoot = null;       // 被移动的实体
+let moveTab = 'p2p';      // 当前移动选项卡：'p2p' | 'free'
 
 /* ---------- 选中实体浮出菜单：移动 / 缩放 / 置平 ---------- */
 function showObjMenu() {
@@ -8101,6 +8144,7 @@ function hideObjMenu(opts) {
   if (ss) ss.style.display = 'none';
   objMenuEl.querySelectorAll('.om-btn').forEach((b) => b.classList.remove('on'));
   if (!opts || !opts.keepMove) moveActive = false;   // 关闭菜单即退出移动模式（点「移动」时例外）
+  if (!opts || !opts.keepMove) cancelP2p();          // 关闭菜单同时取消点到点拾取
 }
 
 /** 实体在屏幕上的投影包围盒：菜单避让它，避免压住模型 */
@@ -8489,23 +8533,47 @@ objMenuEl.addEventListener('click', (e) => {
   /* 子面板里的轴微调按钮 */
   const mv = e.target.closest('[data-mv]');
   if (mv) { e.stopPropagation(); nudgeSelected(Number(mv.dataset.mv), Number(mv.dataset.dir)); return; }
+  /* 移动面板内的选项卡 / 点到点按钮（它们没有 data-om，必须在 btn 检查之前处理） */
+  const tabBtn = e.target.closest('[data-mvtab]');
+  if (tabBtn) { e.stopPropagation(); setMoveTab(tabBtn.dataset.mvtab); return; }
+  if (e.target.closest('#omP2pStart')) {
+    e.stopPropagation();
+    if (p2pStage === 1) { p2pStart = null; p2pEnd = null; p2pStage = 0; updateP2pTip(); p2pRenderMarks(); toast('已清除起点，请重新点选'); }
+    else toast('请直接在画布上点选起点');
+    return;
+  }
+  if (e.target.closest('#omP2pCancel')) {
+    e.stopPropagation(); cancelP2p(); updateP2pTip(); toast('已取消点到点拾取'); return;
+  }
   const btn = e.target.closest('[data-om]');
   if (!btn) return;
   e.stopPropagation();
   const act = btn.dataset.om;
   const moveSub = $('omMoveSub'), scaleSub = $('omScaleSub');
   if (act === 'move') {
-    /* 点「移动」→ 三个操作菜单立即收起，改由 X/Y/Z 三轴箭头接管，避免视觉打架 */
-    hideObjMenu({ keepMove: true });
-    moveActive = true;
-    updateMoveGizmo();
-    toast('移动模式：拖动 X/Y/Z 箭头，或点坐标标签输入数值 · Esc 退出');
+    /* 点「移动」→ 展开移动面板，默认「点到点」选项卡（三箭头在「动态移动」选项卡） */
+    const willOpen = moveSub.style.display !== 'block';
+    scaleSub.style.display = 'none';
+    objMenuEl.querySelector('[data-om="scale"]').classList.remove('on');
+    if (willOpen) {
+      moveSub.style.display = 'block';
+      btn.classList.add('on');
+      setMoveTab('p2p');
+      positionObjUI();
+    } else {
+      moveSub.style.display = 'none';
+      btn.classList.remove('on');
+      cancelP2p();
+      moveActive = false;
+      moveLayer.classList.remove('show');
+    }
   } else if (act === 'scale') {
     const willOpen = scaleSub.style.display !== 'block';
     scaleSub.style.display = willOpen ? 'block' : 'none';
     moveSub.style.display = 'none';
     btn.classList.toggle('on', willOpen);
     objMenuEl.querySelector('[data-om="move"]').classList.remove('on');
+    cancelP2p(); moveActive = false; moveLayer.classList.remove('show');
     if (willOpen) { positionObjUI(); setTimeout(() => { const el = $('omScaleVal'); el.focus(); el.select(); }, 30); }
   } else if (act === 'flatten') {
     flattenSelected();
@@ -9027,6 +9095,7 @@ window.addEventListener('keydown', (e) => {
       backToPickPlane();          // 从绘制状态退回「选平面」
       return;
     }
+    if (p2pActive) { cancelP2p(); updateP2pTip(); toast('已取消点到点'); return; }
     if (moveActive) { hideObjMenu(); toast('已退出移动模式'); return; }
     if (objMenuEl.classList.contains('show')) { hideObjMenu(); return; }
     if (state.placeFace) {         // 放弃贴附基准，回到地面放置
@@ -9123,6 +9192,14 @@ viewport.addEventListener('pointerdown', (e) => {
     return;
   }
 
+  /* 点到点移动拾取模式：这次点击作为起点 / 终点，不走选中实体 */
+  if (p2pActive) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.shiftKey) handleP2pClick(e);
+    return;
+  }
+
   const toolActive = state.mode === 'sketch' || isPrimitive(state.tool);
 
   if (!toolActive) {
@@ -9156,6 +9233,7 @@ viewport.addEventListener('pointerdown', (e) => {
       isSecondClick,
       grabZ,
       origin: hit.root.userData.desc.pos.slice(),
+      baseVerts: kd === 'sketch' ? null : entityWorldVertsXY(hit.root),  // 拖动起始顶点快照（磁吸用）
       startXZ: g ? [g.x, g.y] : null,
       sketchOrigin: null,
       planeLocked: kd === 'sketch' && !(hit.root.userData.desc.plane || {}).isGround
@@ -9196,6 +9274,11 @@ function groundPointAt(e, h) {
 }
 
 window.addEventListener('pointermove', (e) => {
+  /* 点到点：已设起点后，鼠标移动实时画预览虚线 */
+  if (p2pActive && p2pStage === 1 && !drag) {
+    const hp = p2pPickPoint(e);
+    if (hp) p2pRenderMarks(hp);
+  }
   if (!drag) return;
   if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
   if (drag.kind === 'vcube' && drag.moved) {
@@ -9208,7 +9291,38 @@ window.addEventListener('pointermove', (e) => {
   if (drag.kind === 'move' && drag.moved) moveByDrag(e);
 });
 
-/** 拖动移动：地面平移量按 5mm 吸附，实体改 pos，地面草图整体平移原点 */
+/** 收集实体的世界坐标顶点（XY 去重，供拖动时顶点磁吸用） */
+function entityWorldVertsXY(obj) {
+  obj.updateMatrixWorld(true);
+  const g = obj.geometry;
+  if (!g || !g.attributes || !g.attributes.position) return [];
+  const pos = g.attributes.position, out = [], seen = new Set(), tmp = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    tmp.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+    const k = Math.round(tmp.x * 100) + ',' + Math.round(tmp.y * 100);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push([tmp.x, tmp.y]);
+  }
+  return out;
+}
+
+/** 实体拖动顶点磁吸：基于「按下时的初始顶点」+ 原始位移，若某顶点接近格点则微调让它精确落格。
+    baseVerts 必须是拖动开始时的顶点快照，否则每帧读当前位置会与累计位移叠加导致错位。 */
+function magnetSnapMoveDelta(baseVerts, rawDx, rawDy) {
+  if (!baseVerts || !baseVerts.length) return [rawDx, rawDy];
+  const tol = SNAP * 0.5;   // 顶点吸附半径（半个格距，近才吸）
+  let best = null, bestD = tol;
+  for (const [vx, vy] of baseVerts) {
+    const tx = vx + rawDx, ty = vy + rawDy;
+    const gx = snap(tx), gy = snap(ty);
+    const dd = Math.hypot(tx - gx, ty - gy);
+    if (dd < bestD) { bestD = dd; best = [gx - vx, gy - vy]; }
+  }
+  return best || [rawDx, rawDy];   // 未命中顶点 → 保留自由落点（可小数摆放）
+}
+
+/** 拖动移动：带顶点实体磁吸格点；地面草图整体平移原点 */
 function moveByDrag(e) {
   const d = drag;
   if (!d || !d.startXZ) return;
@@ -9216,9 +9330,14 @@ function moveByDrag(e) {
   const p = groundPointAt(e, d.grabZ);
   if (!p) return;
 
-  const dx = snap(p.x - d.startXZ[0]);
-  const dy = snap(p.y - d.startXZ[1]);
   const desc = d.root.userData.desc;
+  let dx, dy;
+  if (desc.kind === 'sketch') {
+    dx = snap(p.x - d.startXZ[0]);
+    dy = snap(p.y - d.startXZ[1]);
+  } else {
+    [dx, dy] = magnetSnapMoveDelta(d.baseVerts, p.x - d.startXZ[0], p.y - d.startXZ[1]);
+  }
 
   if (desc.kind === 'sketch') {
     if (!d.sketchOrigin) d.sketchOrigin = [...desc.pos];
@@ -10210,6 +10329,142 @@ $('dimConfirm').addEventListener('click', (e) => { e.stopPropagation(); confirmD
    · 拖箭头 → 沿该世界轴平移实体；点标签 → 输入精确坐标
    · 与尺寸 gizmo 互斥：刚放置(dimPending)先改尺寸，点确定后再显示移动箭头
    ========================================================================== */
+/* ---------- 点到点移动（仿 3D One）：点选起点 → 终点，实体按差值平移 ---------- */
+let p2pEnd = null;        // 终点世界坐标
+
+/** 世界点磁吸：优先吸到实体顶点，其次吸到格点 */
+function worldSnapPoint(p) {
+  const tol = SNAP * 0.5;
+  let best = null, bestD = tol, tmp = new THREE.Vector3();
+  for (const obj of modelGroup.children) {
+    const d = obj.userData.desc;
+    if (!d || d.kind === 'sketch' || d.kind === 'sheet') continue;
+    const g = obj.geometry;
+    if (!g || !g.attributes || !g.attributes.position) continue;
+    obj.updateMatrixWorld(true);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      tmp.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+      const dd = tmp.distanceTo(p);
+      if (dd < bestD) { bestD = dd; best = tmp.clone(); }
+    }
+  }
+  if (best) return best;
+  return new THREE.Vector3(snap(p.x), snap(p.y), snap(p.z));
+}
+
+/** 拾取画布上的世界点：命中实体表面取命中点，否则取地面点；再磁吸 */
+function p2pPickPoint(e) {
+  setRay(e);
+  const hits = raycaster.intersectObjects(modelGroup.children, true);
+  let p = null;
+  for (const h of hits) {
+    if (rootOf(h.object)) { p = h.point.clone(); break; }
+  }
+  if (!p) {
+    p = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(groundPlane, p)) return null;
+  }
+  return worldSnapPoint(p);
+}
+
+/** 渲染起点/终点标记与连线（hoverPt = 鼠标当前世界点，画虚线预览） */
+function p2pRenderMarks(hoverPt) {
+  const lineEl = $('p2pLine'), marksEl = $('p2pMarks');
+  if (!lineEl || !marksEl) return;
+  let html = '';
+  if (p2pStart) {
+    const s = projectToScreen(p2pStart);
+    html += `<div class="p2pmark" style="left:${s.x.toFixed(1)}px;top:${s.y.toFixed(1)}px"></div>`;
+  }
+  if (p2pEnd) {
+    const t = projectToScreen(p2pEnd);
+    html += `<div class="p2pmark end" style="left:${t.x.toFixed(1)}px;top:${t.y.toFixed(1)}px"></div>`;
+  }
+  marksEl.innerHTML = html;
+  const target = p2pEnd || hoverPt;
+  if (p2pStart && target) {
+    const s = projectToScreen(p2pStart), t = projectToScreen(target);
+    lineEl.innerHTML = `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}"`
+      + ` stroke="#2f6fed" stroke-width="2" stroke-dasharray="6 4" opacity=".85"/>`;
+  } else lineEl.innerHTML = '';
+}
+
+function updateP2pTip() {
+  const el = $('omP2pTip');
+  if (!el) return;
+  el.innerHTML = p2pStage === 0
+    ? '点选<b>起点</b>（实体顶点或格点），再点<b>终点</b>，实体按两点平移'
+    : '已设起点 · 现在点选<b>终点</b>（点空白处吸附格点）';
+}
+
+/** 启动点到点拾取 */
+function startP2p() {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc || ['sketch', 'sheet'].includes(obj.userData.desc.kind)) {
+    toast('请先选中一个实体再移动'); return false;
+  }
+  p2pRoot = obj; p2pActive = true; p2pStage = 0; p2pStart = null; p2pEnd = null;
+  moveActive = false;
+  moveLayer.classList.remove('show');
+  updateP2pTip(); p2pRenderMarks();
+  return true;
+}
+
+/** 取消点到点并清理标记 */
+function cancelP2p() {
+  p2pActive = false; p2pStage = 0; p2pStart = null; p2pEnd = null; p2pRoot = null;
+  const l = $('p2pLine'), m = $('p2pMarks');
+  if (l) l.innerHTML = '';
+  if (m) m.innerHTML = '';
+}
+
+/** 点到点画布点击：第一次落起点，第二次落终点并执行平移 */
+function handleP2pClick(e) {
+  const root = p2pRoot || state.selected;
+  if (!root || !root.userData.desc || !modelGroup.children.includes(root)) {
+    cancelP2p(); toast('实体已失效，请重新选中'); return;
+  }
+  const p = p2pPickPoint(e);
+  if (!p) return;
+  if (p2pStage === 0) {
+    p2pStart = p; p2pEnd = null; p2pStage = 1;
+    updateP2pTip(); p2pRenderMarks(p);
+    toast('已设起点，现在点终点');
+  } else {
+    p2pEnd = p;
+    const delta = p2pEnd.clone().sub(p2pStart);
+    const d = root.userData.desc;
+    beginEdit();
+    d.pos = [d.pos[0] + delta.x, d.pos[1] + delta.y, d.pos[2] + delta.z];
+    updateObject(root);
+    if (state.selected === root) paintEntity(root, 'selected');
+    commitEdit();
+    syncPanel(); updateStatus();
+    p2pRenderMarks();
+    p2pStart = null; p2pEnd = null; p2pStage = 0;   // 连续操作：可继续点新起点
+    updateP2pTip();
+    toast('已按两点平移，可继续点新起点');
+  }
+}
+
+/** 切换移动选项卡：点到点 / 动态移动（三箭头） */
+function setMoveTab(tab) {
+  moveTab = tab;
+  document.querySelectorAll('#omMoveSub .om-tab').forEach((b) => b.classList.toggle('on', b.dataset.mvtab === tab));
+  const p2p = $('omMvP2P'), free = $('omMvFree');
+  if (p2p) p2p.style.display = tab === 'p2p' ? '' : 'none';
+  if (free) free.style.display = tab === 'free' ? '' : 'none';
+  if (tab === 'p2p') {
+    startP2p();
+  } else {
+    cancelP2p();
+    moveActive = true;
+    updateMoveGizmo();
+  }
+  positionObjUI();
+}
+
 const moveLayer = $('moveLayer'), moveSvg = $('moveSvg'), moveLabels = $('moveLabels');
 const MOVE_AXES = [
   { idx: 0, color: '#e5433e' },   // X 红
@@ -10421,6 +10676,9 @@ window.Sketch3D = {
   placePlaneInfo, placementTransform, showObjMenu, hideObjMenu,
   nudgeSelected, scaleSelected, flattenSelected,
   surfaceUnderCursor, updateMoveGizmo, beginMoveEdit, updateExtrudeArrow,
+  /* 点到点移动 + 顶点磁吸（探针） */
+  startP2p, cancelP2p, setMoveTab, handleP2pClick, worldSnapPoint, magnetSnapMoveDelta, entityWorldVertsXY,
+  get p2pState() { return { active: p2pActive, stage: p2pStage, tab: moveTab, start: p2pStart && p2pStart.toArray(), end: p2pEnd && p2pEnd.toArray() }; },
   get exArrowShown() { return exArrowLayer.classList.contains('show'); },
   get exArrowH() { return state.ex.h; },
   get exArrowDir() { return state.ex.dir; },
