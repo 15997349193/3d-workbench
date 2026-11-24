@@ -1159,7 +1159,7 @@
 
     <div class="dm-card">
       <h4><svg viewBox="0 0 24 24"><path d="M4 7.5l8-4.5 8 4.5-8 4.5z"/><path d="M4 7.5v9l8 4.5M20 7.5v9l-8 4.5"/></svg>视角</h4>
-      <div class="dm-note">在视口中 <b>左键拖动</b>旋转观察，<b>滚轮</b>缩放，<b>中键</b>平移。</div>
+      <div class="dm-note">在视口中 <b>右键拖动</b>旋转观察（左键拖动空白也可），<b>滚轮</b>缩放，<b>中键</b>平移。</div>
       <div class="dm-btns" style="margin-top:9px">
         <button class="dm-btn" id="dmView1">默认视角</button>
         <button class="dm-btn" id="dmView2">正对板面</button>
@@ -5408,12 +5408,12 @@ const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
 camera.up.set(0, 0, 1);                       // Z 朝上
 camera.position.set(190, -235, 165);
 
-/* 轨道控制器：左键拖拽（空白处）旋转视图 / 中键拖拽平移 / 滚轮缩放；右键禁用 */
+/* 轨道控制器：右键拖拽（任意位置）旋转视图 / 左键拖拽空白处也可旋转 / 中键拖拽平移 / 滚轮缩放 */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.mouseButtons = {
   LEFT: THREE.MOUSE.ROTATE,
   MIDDLE: THREE.MOUSE.PAN,
-  RIGHT: null
+  RIGHT: THREE.MOUSE.ROTATE
 };
 controls.target.set(0, 0, 12);
 controls.enableDamping = true;
@@ -9133,18 +9133,19 @@ window.addEventListener('keydown', (e) => {
 
 /* ============================================================================
    13 · 指针交互（对齐 3D One 的手感）
-   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键拖动空白 = 旋转视图
-   · 中键拖动 = 平移视图；滚轮 = 缩放；右键禁用
+   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；右键拖动（或左键拖动空白）= 旋转视图
+   · 中键拖动 = 平移视图；滚轮 = 缩放；右键只用于旋转，不弹菜单
    · 悬停实体 = 浅黄预览，选中 = 深黄，拖动中 = 透明浅绿
    · 草图模式两段式：第一次点击选绘制平面（地面或实体面），第二次起才开始绘制
    · 视口左下角 ViewCube 区域的左键事件归视角立方体处理，悬停呈白绿渐变预览
    ========================================================================== */
-/* 全页面彻底禁用右键：菜单 + 浏览器「按住右键拖拽 = 前进/后退」手势。
-   关键：手势由 mousedown 触发，必须在捕获阶段拦掉，仅在 contextmenu 阶段拦来不及。 */
+/* 右键启用为旋转视图：只拦掉右键菜单与浏览器「按住右键拖拽」手势，不阻断事件传给 OrbitControls；
+   侧键(3/4)仍彻底禁用。关键：手势由 mousedown 触发，必须在捕获阶段处理。 */
 document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
 document.addEventListener('auxclick', (e) => { if (e.button !== 0) e.preventDefault(); }, true);
 document.addEventListener('mousedown', (e) => {
-  if (e.button === 2 || e.button === 3 || e.button === 4) {
+  if (e.button === 2) { e.preventDefault(); return; }   // 右键：禁菜单/手势，放行给轨道控制器旋转
+  if (e.button === 3 || e.button === 4) {
     e.preventDefault();
     e.stopPropagation();
   }
@@ -9155,9 +9156,9 @@ document.addEventListener('dragstart', (e) => {
 }, true);
 
 viewport.addEventListener('pointerdown', (e) => {
-  /* 右键 / 侧键：一律禁用，不弹菜单、不触发前进后退、不产生任何建模动作 */
-  if (e.button !== 0) {                 // 中键(1)交给 OrbitControls 平移，其余拦截
-    if (e.button !== 1) e.preventDefault();
+  /* 右键(2)交给 OrbitControls 旋转视图；中键(1)平移；侧键/其他一律忽略 */
+  if (e.button !== 0) {
+    if (e.button !== 1 && e.button !== 2) e.preventDefault();
     return;
   }
   if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
@@ -9639,11 +9640,11 @@ function updateHints() {
       html = `<b>第 2 步 · ${SKETCH_TOOL_HINT[state.tool] || '拖拽绘制'}</b>${dots}按住左键在所选平面上拖出尺寸${dots}松开生成草图${dots}<kbd>Esc</kbd> 重新选平面`;
     }
   } else if (isPrimitive(state.tool)) {
-    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>左键</kbd>拖动空白处旋转视角${dots}<kbd>Esc</kbd> 取消`;
+    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>右键</kbd>拖动旋转视角${dots}<kbd>Esc</kbd> 取消`;
   } else if (state.face) {
     html = `<b>已选面</b>${dots}点浮出的「<b>拉伸</b>」或按 <kbd>E</kbd>${dots}可选 新建 / 加 / 减 / 交 运算${dots}<kbd>Esc</kbd> 取消`;
   } else {
-    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}悬停浅黄、选中深黄、拖动透明浅绿${dots}<b>左键拖动空白处</b> 旋转${dots}<b>中键拖动</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
+    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}悬停浅黄、选中深黄、拖动透明浅绿${dots}<b>右键拖动</b> 旋转${dots}<b>中键拖动</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
   }
   $('hintbar').innerHTML = html;
 }
@@ -10993,7 +10994,7 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
       · 布尔运算结果同样可以继续选面、拉伸、再运算，反复叠加造型。
 
    五、视角与坐标系
-      · 左键拖拽（空白处）= 旋转视图；中键按住拖动 = 平移；滚轮 = 缩放；右键已禁用。
+      · 右键拖拽（任意位置）= 旋转视图；左键拖拽空白处也可旋转；中键按住拖动 = 平移；滚轮 = 缩放。
       · 实体交互色：鼠标悬停 = 浅黄；单击选中 = 深黄；按住拖动 = 透明浅绿。
       · 选中实体后点浮出菜单的「移动」才会出现 X/Y/Z 三轴箭头；点坐标标签可输入精确数值，
         Esc / 点空白处退出移动模式。
@@ -11717,7 +11718,7 @@ function openDemo() {
   stageEl.appendChild(dRenderer.domElement);
   if (!dControls) {
     dControls = new OrbitControls(dCamera, dRenderer.domElement);
-    dControls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: null };
+    dControls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     dControls.target.copy(TARGET);
     dControls.enableDamping = true; dControls.dampingFactor = .09;
     dControls.minDistance = 90; dControls.maxDistance = 1400;
