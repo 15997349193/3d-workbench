@@ -517,6 +517,15 @@
   .om-p2p-actions .om-apply{flex:1;padding:5px 6px;font-size:10.5px}
   .om-p2p-actions .om-ghost{background:#fff;color:#5b6675;border:1px solid #d7e2f0}
   .om-p2p-actions .om-ghost:hover{background:#eef2f8}
+  /* 动态移动：中心点开关 + 三轴角度输入 */
+  .om-check{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text-2);margin:1px 0 7px;cursor:pointer;user-select:none}
+  .om-check input{width:13px;height:13px;accent-color:#2f6fed;margin:0;cursor:pointer}
+  .om-ang{width:46px;min-width:0;height:25px;padding:0 4px;text-align:right;font-size:11px;border:1px solid #d7e2f0;border-radius:5px;background:#fff;color:var(--text)}
+  .mv-rot-hit{pointer-events:all;cursor:grab}
+  .mv-rot-hit:active{cursor:grabbing}
+  .mv-center-hit{pointer-events:all;cursor:move}
+  .mv-center-on{cursor:move}
+  .mv-ang{font-family:inherit;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:2.5px;stroke-linejoin:round}
   /* 点到点拾取时，画布上的起点/终点标记 */
   .p2pmark{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:5;width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 2px #2f6fed,0 2px 8px rgba(28,42,70,.35)}
   .p2pmark::after{content:'';position:absolute;inset:5px;border-radius:50%;background:#2f6fed}
@@ -906,17 +915,17 @@
           <button class="om-tab on" data-mvtab="p2p">点到点</button>
           <button class="om-tab" data-mvtab="free">动态移动</button>
         </div>
-        <!-- 选项卡 1：点到点（用户点选起点 → 终点，实体平移对齐） -->
+        <!-- 选项卡 1：点到点（用户直接在画布上点选起点 → 终点，实体平移对齐） -->
         <div id="omMvP2P">
-          <div class="om-p2p-tip" id="omP2pTip">点选实体上的<b>起点</b>，再点选<b>终点</b>，实体即按两点平移</div>
+          <div class="om-p2p-tip" id="omP2pTip">直接在画布上点选<b>起点</b>与<b>终点</b>，实体即按两点平移</div>
           <div class="om-p2p-actions">
-            <button class="om-apply" id="omP2pStart">选起点</button>
-            <button class="om-apply om-ghost" id="omP2pCancel">取消</button>
+            <button class="om-apply om-ghost" id="omP2pCancel">取消拾取</button>
           </div>
         </div>
-        <!-- 选项卡 2：动态移动（保留原三箭头） -->
+        <!-- 选项卡 2：动态移动（三轴箭头 + 三色扇形旋转 + 可移中心点） -->
         <div id="omMvFree" style="display:none">
-          <div class="om-tip" style="margin-bottom:6px">拖动 X/Y/Z 箭头，或按住实体直接拖动</div>
+          <div class="om-tip" style="margin-bottom:6px">拖箭头平移 · 拖彩色扇形绕轴旋转 · 按住实体也可拖动</div>
+          <label class="om-check"><input type="checkbox" id="omMoveCenter"> 移动中心点（三轴随之移动，靠边磁吸）</label>
           <div class="om-row"><label>X 轴</label>
             <button class="om-mini" data-mv="0" data-dir="-1">−</button><button class="om-mini" data-mv="0" data-dir="1">+</button>
             <label style="min-width:0;margin-left:4px">Y 轴</label>
@@ -926,6 +935,14 @@
             <button class="om-mini" data-mv="2" data-dir="-1">−</button><button class="om-mini" data-mv="2" data-dir="1">+</button>
             <label style="min-width:0;margin-left:4px">步进</label>
             <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
+          </div>
+          <div class="om-row" style="margin-top:3px;border-top:1px solid #eef2f8;padding-top:5px">
+            <label style="color:#e5433e">旋转 X</label><input class="om-ang" id="omRotX" type="number" step="1" value="0">
+            <label style="color:#2fa84f;margin-left:5px">Y</label><input class="om-ang" id="omRotY" type="number" step="1" value="0">
+          </div>
+          <div class="om-row">
+            <label style="color:#2f80ed">旋转 Z</label><input class="om-ang" id="omRotZ" type="number" step="1" value="0">
+            <label style="margin-left:5px">°</label>
           </div>
         </div>
       </div>
@@ -6811,6 +6828,54 @@ function rasterFaceLoops(picked, vx, vy, vz, mw, normal) {
   return { loops: filtered, best };
 }
 
+/** 把光栅追踪得到的近似边界点吸附回真实三角边，消除栅格中心带来的半格偏移。
+    栅格点落在格子中心，最多偏离真实边半个格子；直接拿它拉伸会让新实体
+    与基体侧面错开一小截。这里先投影回共面三角的真实边，再做圆拟合。 */
+function alignLoopsToFaceEdges(loops, picked, vx, vy, vz, mw) {
+  if (!loops || !loops.length) return loops;
+  const seen = new Set(), edges = [];
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const wv = (i) => {
+    const p = new THREE.Vector3(vx(i), vy(i), vz(i)).applyMatrix4(mw);
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+    return p;
+  };
+  for (let j = 0; j < picked.length; j += 3) {
+    const tri = [picked[j], picked[j + 1], picked[j + 2]], wp = tri.map(wv);
+    for (let k = 0; k < 3; k++) {
+      const ia = tri[k], ib = tri[(k + 1) % 3];
+      const ek = ia < ib ? ia + '_' + ib : ib + '_' + ia;
+      if (seen.has(ek)) continue;
+      seen.add(ek);
+      edges.push([wp[k], wp[(k + 1) % 3]]);
+    }
+  }
+  const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+  const tol = Math.max(0.08, span * 0.012);   // 覆盖栅格半格误差，又不至于跨到别的边
+  const clean = (pts) => {
+    const out = [];
+    for (const p of pts) {
+      if (out.length && out[out.length - 1].distanceToSquared(p) < 1e-10) continue;
+      out.push(p);
+    }
+    if (out.length > 2 && out[0].distanceToSquared(out[out.length - 1]) < 1e-10) out.pop();
+    return out;
+  };
+  return loops.map((lp) => {
+    const snapped = clean(lp.map((p) => {
+      let best = null, bd = tol;
+      for (const [a, b] of edges) {
+        const q = closestOnSegment(p, a, b), d = q.distanceTo(p);
+        if (d < bd) { bd = d; best = q; }
+      }
+      return best || p;
+    }));
+    return snapped.length >= 3 ? snapped : lp;
+  });
+}
+
 /**
  * 从命中面提取「整个面」：局部坐标里做共面三角形聚类 + 边界环提取，
  * 返回值全部为世界坐标。
@@ -6945,8 +7010,12 @@ function faceBoundary(obj, hit) {
   const mw = obj.matrixWorld;
   const worldNormal = new THREE.Vector3(nx, ny, nz)
     .applyMatrix3(new THREE.Matrix3().getNormalMatrix(mw)).normalize();
-  const traced = rasterFaceLoops(picked, vx, vy, vz, mw, worldNormal);
-  if (!traced) return null;
+  const traced0 = rasterFaceLoops(picked, vx, vy, vz, mw, worldNormal);
+  if (!traced0) return null;
+  /* 关键：栅格边界先吸附回真实三角边，拉伸体才能与基体侧面严丝合缝 */
+  const aligned = alignLoopsToFaceEdges(traced0.loops, picked, vx, vy, vz, mw);
+  const bestIdx = traced0.loops.indexOf(traced0.best);
+  const traced = { loops: aligned, best: aligned[bestIdx >= 0 ? bestIdx : 0] };
 
   /* —— 近圆轮廓拟合：栅格追踪得到的圆环带 0.2mm 阶梯，选面高亮会看出锯齿。
      在面平面内做最小二乘圆拟合，重建为 128 点等角环；矩形/异形轮廓不受影响。
@@ -7653,7 +7722,7 @@ function faceExtrudeDesc(boundary, height, dir, weld, customDir) {
     pos: [origin.x, origin.y, origin.z],
     params: { depth: thickness + (weld ? WELD : 0) },
     basis: { u: u.toArray(), v: v.toArray(), n: n.toArray() },
-    pts2d: pts.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]),
+    pts2d: pts.map(([x, y]) => [Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]),
     tone: (state.selected && state.selected.userData.desc.tone) || 0
   };
 }
@@ -8536,12 +8605,6 @@ objMenuEl.addEventListener('click', (e) => {
   /* 移动面板内的选项卡 / 点到点按钮（它们没有 data-om，必须在 btn 检查之前处理） */
   const tabBtn = e.target.closest('[data-mvtab]');
   if (tabBtn) { e.stopPropagation(); setMoveTab(tabBtn.dataset.mvtab); return; }
-  if (e.target.closest('#omP2pStart')) {
-    e.stopPropagation();
-    if (p2pStage === 1) { p2pStart = null; p2pEnd = null; p2pStage = 0; updateP2pTip(); p2pRenderMarks(); toast('已清除起点，请重新点选'); }
-    else toast('请直接在画布上点选起点');
-    return;
-  }
   if (e.target.closest('#omP2pCancel')) {
     e.stopPropagation(); cancelP2p(); updateP2pTip(); toast('已取消点到点拾取'); return;
   }
@@ -9161,7 +9224,7 @@ viewport.addEventListener('pointerdown', (e) => {
     if (e.button !== 1 && e.button !== 2) e.preventDefault();
     return;
   }
-  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
+  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .mv-rot-hit, .mv-center-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
 
   /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
   if (inViewCube(e)) {
@@ -10395,7 +10458,7 @@ function updateP2pTip() {
   const el = $('omP2pTip');
   if (!el) return;
   el.innerHTML = p2pStage === 0
-    ? '点选<b>起点</b>（实体顶点或格点），再点<b>终点</b>，实体按两点平移'
+    ? '直接在画布上点<b>起点</b>（实体顶点或格点），再点<b>终点</b>，实体按两点平移'
     : '已设起点 · 现在点选<b>终点</b>（点空白处吸附格点）';
 }
 
@@ -10476,6 +10539,130 @@ const MOVE_WORLD = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new 
 const MOVE_LEN = 58;             // 箭头屏幕长度(px)
 const AXIS_NAME = ['X', 'Y', 'Z'];
 let moveDrag = null, moveEditing = false;
+let centerDrag = null, rotDrag = null, moveSnapInfo = null;
+
+/** gizmo 中心：移动过中心点就用自定义中心，否则用包围盒中心 */
+function gizmoCenter(obj) {
+  const d = obj && obj.userData.desc;
+  if (d && Array.isArray(d.moveCenter) && d.moveCenter.length === 3) {
+    return new THREE.Vector3().fromArray(d.moveCenter);
+  }
+  if (!obj) return new THREE.Vector3();
+  obj.updateMatrixWorld();
+  const box = new THREE.Box3().setFromObject(obj);
+  return box.isEmpty() ? new THREE.Vector3().fromArray(d ? d.pos : [0, 0, 0]) : box.getCenter(new THREE.Vector3());
+}
+
+/** 收集场景实体的世界空间边线段，供中心点磁吸（上限避免大场景卡顿） */
+function collectSnapSegments() {
+  const segs = [], va = new THREE.Vector3(), vb = new THREE.Vector3();
+  for (const obj of modelGroup.children) {
+    const d = obj.userData.desc;
+    if (!d || d.kind === 'sketch' || d.kind === 'sheet') continue;
+    if (!obj.geometry || !obj.geometry.attributes || !obj.geometry.attributes.position) continue;
+    obj.updateMatrixWorld(true);
+    const eg = new THREE.EdgesGeometry(obj.geometry, 24);
+    const arr = eg.attributes.position.array;
+    eg.dispose();
+    for (let i = 0; i + 5 < arr.length; i += 6) {
+      va.fromArray(arr, i).applyMatrix4(obj.matrixWorld);
+      vb.fromArray(arr, i + 3).applyMatrix4(obj.matrixWorld);
+      segs.push([va.clone(), vb.clone()]);
+      if (segs.length >= 2400) return segs;
+    }
+  }
+  return segs;
+}
+
+function closestOnSegment(p, a, b) {
+  const ab = b.clone().sub(a), len2 = ab.lengthSq();
+  if (len2 < 1e-9) return a.clone();
+  const t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / len2, 0, 1);
+  return a.clone().addScaledVector(ab, t);
+}
+
+/** 中心点磁吸：实体边/顶点优先，其次格点，都没有则自由落点 */
+function snapCenterPoint(p, segs) {
+  let best = null, bestD = SNAP * 0.8;
+  for (const [a, b] of segs || []) {
+    const q = closestOnSegment(p, a, b), dd = q.distanceTo(p);
+    if (dd < bestD) { bestD = dd; best = q; }
+  }
+  if (best) return { point: best, snapped: true };
+  const gp = new THREE.Vector3(snap(p.x), snap(p.y), snap(p.z));
+  if (gp.distanceTo(p) <= SNAP * 0.5) return { point: gp, snapped: true };
+  return { point: p.clone(), snapped: false };
+}
+
+/** 过指定点、正对相机的平面：把鼠标位移映射到世界空间 */
+function camFacingPlaneAt(p) {
+  const n = new THREE.Vector3();
+  camera.getWorldDirection(n);
+  return new THREE.Plane().setFromNormalAndCoplanarPoint(n, p);
+}
+
+/** 射线与平面交点，接近平行时返回 null */
+function rayPlanePoint(e, plane) {
+  setRay(e);
+  if (Math.abs(raycaster.ray.direction.dot(plane.normal)) < 0.06) return null;
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(plane, p) ? p : null;
+}
+
+/** 旋转平面的局部基：绕 X 用(Y,Z)，绕 Y 用(Z,X)，绕 Z 用(X,Y)，保证右手正向 */
+const ROT_BASIS = [[1, 2], [2, 0], [0, 1]];
+function rotationPlane(axis, pivot) {
+  return new THREE.Plane().setFromNormalAndCoplanarPoint(MOVE_WORLD[axis], pivot);
+}
+function angleOnPlane(e, axis, pivot, plane) {
+  const p = rayPlanePoint(e, plane);
+  if (!p) return null;
+  const bi = ROT_BASIS[axis], v = p.clone().sub(pivot);
+  return Math.atan2(v.dot(MOVE_WORLD[bi[1]]), v.dot(MOVE_WORLD[bi[0]]));
+}
+function screenAngleAround(e, pivot) {
+  const cS = projectToScreen(pivot), rect = renderer.domElement.getBoundingClientRect();
+  return Math.atan2(e.clientY - rect.top - cS.y, e.clientX - rect.left - cS.x);
+}
+
+/** 把累计旋转写回模型：绕世界轴转，同时让中心点保持不动 */
+function applyRotation(r) {
+  const obj = r.obj, d = obj.userData.desc;
+  const q = new THREE.Quaternion().setFromAxisAngle(MOVE_WORLD[r.axis], r.total);
+  const nq = q.clone().multiply(r.baseQuat);
+  d.quat = nq.toArray();
+  obj.quaternion.copy(nq);
+  const p = new THREE.Vector3().fromArray(r.basePos).sub(r.pivot).applyQuaternion(q).add(r.pivot);
+  d.pos = p.toArray();
+  obj.position.copy(p);
+  if (!Array.isArray(d.moveRot) || d.moveRot.length !== 3) d.moveRot = [0, 0, 0];
+  d.moveRot = r.baseRot.slice();
+  d.moveRot[r.axis] += THREE.MathUtils.radToDeg(r.total);
+  syncPanel();
+  const el = $('omRot' + AXIS_NAME[r.axis]);
+  if (el && document.activeElement !== el) el.value = round1(d.moveRot[r.axis]).toFixed(1);
+}
+
+/** 手动输入角度：相对当前角度的增量绕对应世界轴旋转 */
+function setAxisRotation(axis, deg) {
+  const obj = state.selected, d = obj && obj.userData.desc;
+  if (!d) return;
+  if (!Array.isArray(d.moveRot) || d.moveRot.length !== 3) d.moveRot = [0, 0, 0];
+  const delta = deg - d.moveRot[axis];
+  if (Math.abs(delta) < 1e-6) return;
+  const pivot = gizmoCenter(obj);
+  beginEdit();
+  applyRotation({
+    obj, axis, pivot,
+    total: THREE.MathUtils.degToRad(delta),
+    baseQuat: obj.quaternion.clone(),
+    basePos: d.pos.slice(),
+    baseRot: d.moveRot.slice()
+  });
+  commitEdit();
+  updateMoveGizmo();
+  toast('已绕 ' + AXIS_NAME[axis] + ' 轴旋转 ' + round1(deg) + '°');
+}
 
 function moveGizmoVisible() {
   const obj = state.selected, d = obj && obj.userData.desc;
@@ -10491,33 +10678,75 @@ function updateMoveGizmo() {
   if (moveEditing) { moveLayer.classList.add('show'); return; }   // 正在输入数值时冻结刷新
   const obj = state.selected, d = obj.userData.desc;
   obj.updateMatrixWorld();
-  const box = new THREE.Box3().setFromObject(obj);
-  const center = box.isEmpty() ? new THREE.Vector3().fromArray(d.pos) : box.getCenter(new THREE.Vector3());
+  const center = gizmoCenter(obj);
   const cS = projectToScreen(center);
-  let svg = '';
-  const labels = [];
-  MOVE_AXES.forEach((A, i) => {
+
+  /* 先算出三个轴在屏幕上的方向，后面箭头与扇形共用 */
+  const axisScreens = MOVE_AXES.map((A) => {
     const oneMM = projectToScreen(center.clone().add(MOVE_WORLD[A.idx]));
     let ux = oneMM.x - cS.x, uy = oneMM.y - cS.y;
     let ulen = Math.hypot(ux, uy);
     if (ulen < 0.001) { ux = 0; uy = -1; ulen = 1; }   // 轴正对镜头时的退化方向
     ux /= ulen; uy /= ulen;
-    const pxPerMM = Math.max(0.35, ulen);
+    return { ux, uy, pxPerMM: Math.max(0.35, ulen) };
+  });
+
+  /* 三个扇形旋转平面：颜色取「旋转轴」颜色（X 红 / Y 绿 / Z 蓝） */
+  const ROT_PLANES = [
+    { axis: 0, u: 1, v: 2 },   // YZ 平面 → 绕 X
+    { axis: 1, u: 2, v: 0 },   // ZX 平面 → 绕 Y
+    { axis: 2, u: 0, v: 1 }    // XY 平面 → 绕 Z
+  ];
+  const fanR = MOVE_LEN * 0.78;
+  let fanSvg = '';
+  ROT_PLANES.forEach((P) => {
+    const A = MOVE_AXES[P.axis], su = axisScreens[P.u], sv = axisScreens[P.v];
+    const pts = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16 * Math.PI / 2;
+      pts.push({ x: cS.x + fanR * (Math.cos(t) * su.ux + Math.sin(t) * sv.ux),
+                 y: cS.y + fanR * (Math.cos(t) * su.uy + Math.sin(t) * sv.uy) });
+    }
+    const poly = [cS, ...pts].map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    fanSvg += `<polygon points="${poly}" fill="${A.color}" opacity=".11"/>`;
+    fanSvg += `<polyline points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}"`
+      + ` fill="none" stroke="${A.color}" stroke-width="2.2" opacity=".9"/>`;
+    /* 透明热区：整个扇形都能抓住旋转 */
+    fanSvg += `<polygon class="mv-rot-hit" data-axis="${P.axis}" points="${poly}" fill="transparent"/>`;
+    const mid = pts[8], label = `R${AXIS_NAME[P.axis]}`;
+    fanSvg += `<text class="mv-ang" x="${(mid.x * 1.06 - cS.x * .06).toFixed(1)}" y="${(mid.y * 1.06 - cS.y * .06).toFixed(1)}"`
+      + ` fill="${A.color}" font-size="10" font-weight="800" text-anchor="middle">${label}</text>`;
+  });
+
+  let svg = fanSvg;
+  const labels = [];
+  MOVE_AXES.forEach((A, i) => {
+    const S = axisScreens[i];
     let tipS;
     if (moveDrag && moveDrag.idx === A.idx && moveDrag.tipS) tipS = moveDrag.tipS;
-    else tipS = { x: cS.x + ux * MOVE_LEN, y: cS.y + uy * MOVE_LEN };
+    else tipS = { x: cS.x + S.ux * MOVE_LEN, y: cS.y + S.uy * MOVE_LEN };
     /* 实线轴 + 固定大小箭头头 */
     svg += `<line x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}"`
       + ` stroke="${A.color}" stroke-width="2.6" opacity=".96"/>`;
-    svg += arrowHeadAt(tipS, ux, uy, A.color);
+    svg += arrowHeadAt(tipS, S.ux, S.uy, A.color);
     /* 透明拖拽热区：整条轴可抓 */
     svg += `<line class="mv-hit" data-i="${i}" x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}"`
       + ` x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}" stroke="transparent"`
       + ` stroke-width="16" pointer-events="stroke"/>`;
-    labels.push({ idx: A.idx, color: A.color, value: d.pos[A.idx], ux, uy, pxPerMM, tipS });
+    labels.push({ idx: A.idx, color: A.color, value: d.pos[A.idx], ux: S.ux, uy: S.uy, pxPerMM: S.pxPerMM, tipS });
   });
-  /* 中心靶心 */
+  /* 中心靶心：开启「移动中心点」时加外环与拖拽热区 */
+  const centerOn = !!($('omMoveCenter') && $('omMoveCenter').checked);
   svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="6" fill="#fff" stroke="#334155" stroke-width="1.8"/>`;
+  if (centerOn) {
+    svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="3 2" opacity=".8"/>`;
+    svg += `<circle class="mv-center-hit" data-center="1" cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="13" fill="transparent"/>`;
+  }
+  if (moveSnapInfo && moveSnapInfo.snapped) {
+    const s = projectToScreen(moveSnapInfo.point);
+    svg += `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="5" fill="none" stroke="#f59e0b" stroke-width="2"/>`
+      + `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="1.8" fill="#f59e0b"/>`;
+  }
   moveSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
   moveSvg.innerHTML = svg;
   /* 坐标标签：复用 .dim-tag 胶囊，DOM 复用避免打断输入 */
@@ -10538,6 +10767,11 @@ function updateMoveGizmo() {
     el._data = L;
     el.innerHTML = `<span class="mv-ax" style="color:${L.color}">${AXIS_NAME[L.idx]}</span>`
       + round1(L.value).toFixed(1) + '<span class="u"> mm</span>';
+  });
+  /* 角度输入框跟随模型状态（用户正在输入时不打断） */
+  ['X', 'Y', 'Z'].forEach((name, i) => {
+    const el = $('omRot' + name);
+    if (el && document.activeElement !== el) el.value = round1((d.moveRot && d.moveRot[i]) || 0).toFixed(1);
   });
   moveLayer.classList.add('show');
 }
@@ -10578,6 +10812,40 @@ function beginMoveEdit(i) {
 
 /* 拖动三色箭头 → 沿世界轴平移 */
 moveSvg.addEventListener('pointerdown', (e) => {
+  /* 中心点拖拽：三轴与扇形整体跟随，磁吸到实体边/顶点或格点 */
+  const cHit = e.target.closest && e.target.closest('.mv-center-hit');
+  if (cHit && $('omMoveCenter') && $('omMoveCenter').checked) {
+    const obj = state.selected;
+    if (!obj) return;
+    e.preventDefault(); e.stopPropagation();
+    const pivot = gizmoCenter(obj);
+    centerDrag = { obj, pivot0: pivot.clone(), plane: camFacingPlaneAt(pivot), segs: collectSnapSegments() };
+    moveSnapInfo = null;
+    return;
+  }
+  /* 扇形平面拖拽：绕该平面的法向轴旋转模型 */
+  const rHit = e.target.closest && e.target.closest('.mv-rot-hit');
+  if (rHit && !moveEditing) {
+    const obj = state.selected, d = obj && obj.userData.desc;
+    if (!d) return;
+    e.preventDefault(); e.stopPropagation();
+    const axis = parseInt(rHit.dataset.axis, 10);
+    const pivot = gizmoCenter(obj);
+    const plane = rotationPlane(axis, pivot);
+    const a0 = angleOnPlane(e, axis, pivot, plane);
+    rotDrag = {
+      obj, axis, pivot: pivot.clone(), plane,
+      useScreen: a0 === null,
+      a0: a0 === null ? screenAngleAround(e, pivot) : a0,
+      lastA: a0 === null ? screenAngleAround(e, pivot) : a0,
+      total: 0,
+      baseQuat: obj.quaternion.clone(),
+      basePos: d.pos.slice(),
+      baseRot: Array.isArray(d.moveRot) ? d.moveRot.slice() : [0, 0, 0]
+    };
+    beginEdit();
+    return;
+  }
   const hit = e.target.closest && e.target.closest('.mv-hit');
   if (!hit || moveEditing) return;
   const i = parseInt(hit.dataset.i, 10);
@@ -10595,6 +10863,27 @@ moveSvg.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
+  if (centerDrag) {
+    const p = rayPlanePoint(e, centerDrag.plane);
+    if (!p) return;
+    const res = snapCenterPoint(p, centerDrag.segs);
+    moveSnapInfo = res;
+    centerDrag.obj.userData.desc.moveCenter = res.point.toArray();
+    updateMoveGizmo();
+    return;
+  }
+  if (rotDrag) {
+    let a = rotDrag.useScreen ? null : angleOnPlane(e, rotDrag.axis, rotDrag.pivot, rotDrag.plane);
+    if (rotDrag.useScreen || a === null) a = screenAngleAround(e, rotDrag.pivot);
+    let da = a - rotDrag.lastA;
+    if (da > Math.PI) da -= Math.PI * 2;
+    else if (da < -Math.PI) da += Math.PI * 2;
+    rotDrag.total += da;
+    rotDrag.lastA = a;
+    applyRotation(rotDrag);
+    updateMoveGizmo();
+    return;
+  }
   if (!moveDrag) return;
   const m = moveDrag;
   const along = (e.clientX - m.sx) * m.ux + (e.clientY - m.sy) * m.uy;
@@ -10615,10 +10904,44 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', () => {
+  if (centerDrag) { centerDrag = null; moveSnapInfo = null; updateMoveGizmo(); return; }
+  if (rotDrag) { rotDrag = null; commitEdit(); updateMoveGizmo(); return; }
   if (!moveDrag) return;
   moveDrag = null;
   commitEdit();
   updateMoveGizmo();
+});
+
+/* 「移动中心点」开关：开启后中心靶心可拖拽，三轴与扇形整体跟随 */
+const centerChk = $('omMoveCenter');
+if (centerChk) centerChk.addEventListener('change', () => {
+  const obj = state.selected, d = obj && obj.userData.desc;
+  if (!d || (d.kind === 'sketch' || d.kind === 'sheet')) return;
+  if (centerChk.checked) {
+    if (!Array.isArray(d.moveCenter)) d.moveCenter = gizmoCenter(obj).toArray();
+    toast('中心点可拖动了，靠近实体边缘会自动磁吸');
+  } else {
+    delete d.moveCenter;
+    moveSnapInfo = null;
+    toast('中心点已恢复为模型中心');
+  }
+  updateMoveGizmo();
+});
+
+/* 三轴角度手动输入：回车/失焦即应用到模型 */
+['X', 'Y', 'Z'].forEach((name, i) => {
+  const el = $('omRot' + name);
+  if (!el) return;
+  const commit = () => {
+    const v = parseFloat(el.value);
+    if (isFinite(v)) setAxisRotation(i, v);
+    else updateMoveGizmo();
+  };
+  el.addEventListener('change', commit);
+  el.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+  });
 });
 
 let _lastFrameT = performance.now();
@@ -10670,6 +10993,7 @@ window.Sketch3D = {
   entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
   animateView, viewCubeRect,
   primitiveDesc, makeGeometry, hornGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
+  alignLoopsToFaceEdges,
   confirmDim, autoConfirmDim, applyBodyAppearance,
   serializeScene, restoreScene, undo,
   saveZ1, openZ1, exportSTL, exportSTEP, buildSTEP, buildSTLBinary, collectExportTriangles, download,
@@ -10677,6 +11001,13 @@ window.Sketch3D = {
   placePlaneInfo, placementTransform, showObjMenu, hideObjMenu,
   nudgeSelected, scaleSelected, flattenSelected,
   surfaceUnderCursor, updateMoveGizmo, beginMoveEdit, updateExtrudeArrow,
+  /* 动态移动：中心点磁吸 + 扇形旋转（探针） */
+  gizmoCenter, collectSnapSegments, snapCenterPoint, rotationPlane, angleOnPlane,
+  setAxisRotation, applyRotation,
+  get moveCenter() { const o = state.selected; return o ? gizmoCenter(o).toArray() : null; },
+  get moveRot() { const d = state.selected && state.selected.userData.desc; return d && Array.isArray(d.moveRot) ? d.moveRot.slice() : null; },
+  get centerDragActive() { return !!centerDrag; },
+  get rotDragActive() { return !!rotDrag; },
   /* 点到点移动 + 顶点磁吸（探针） */
   startP2p, cancelP2p, setMoveTab, handleP2pClick, worldSnapPoint, magnetSnapMoveDelta, entityWorldVertsXY,
   get p2pState() { return { active: p2pActive, stage: p2pStage, tab: moveTab, start: p2pStart && p2pStart.toArray(), end: p2pEnd && p2pEnd.toArray() }; },
