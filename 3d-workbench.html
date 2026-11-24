@@ -5332,6 +5332,7 @@ const undoStack = [];            // 撤销栈（存整个场景快照）
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
 const round1 = (v) => Math.round(v * 10) / 10;
+const round2 = (v) => Math.round(v * 100) / 100;   // 线段端点保留小数长度，不做格点吸附
 const snap = (v) => Math.round(v / SNAP) * SNAP;
 
 /* ============================================================================
@@ -5996,7 +5997,7 @@ function sketchStroke(pts, n, width = 1.2) {
 }
 
 /** 草图端点：线段/矩形这类低点数轮廓画深蓝实心圆点；圆/椭圆的高密度采样点不画 */
-function sketchNodes(pts, n, radius = 1.8) {
+function sketchNodes(pts, n, radius = 1.2) {
   const g = new THREE.Group();
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n.clone().normalize());
   pts.forEach((p) => {
@@ -6888,71 +6889,23 @@ function renderDraft() {
     .addScaledVector(u, x).addScaledVector(v, y).addScaledVector(n, 0.08);
   const pts = d.points.map(([x, y]) => at(x, y));
   const isLine = (d.type || 'line') === 'line';
-  const lineMat = new THREE.LineBasicMaterial({ color: SKETCH_C });
 
   if (isLine) {
-    if (pts.length > 1) {
-      draftGroup.add(sketchStroke(pts, n));
-      draftGroup.add(sketchNodes(pts, n));
-    }
-    /* 橡皮筋：最后一点 → 自动吸附到 5mm 格点的落点（带锚定提示） */
+    if (pts.length > 1) draftGroup.add(sketchStroke(pts, n));
+    if (pts.length) draftGroup.add(sketchNodes(pts, n, 1.2));
+    /* 橡皮筋：跟随真实光标落点（不再吸附 5mm 格点），实线 + 实心小点。
+       去掉了原来的虚线、格点准星环、正交辅助线和起点空心环，视觉与成线后一致。 */
     if (state.hoverPoint && !state.closeReady) {
       const last = pts[pts.length - 1];
       const [hx, hy] = worldToPlane2D(state.hoverPoint);
-      const gx = snap(hx), gy = snap(hy);
-      const hp = at(gx, gy);
-      state.segHoverLocal = [gx, gy];
+      const hp = at(hx, hy);
+      state.segHoverLocal = [hx, hy];
       if (last.distanceTo(hp) > 0.5) {
-        const lastLocal = d.points[d.points.length - 1];
-        const ortho = lastLocal[0] === gx || lastLocal[1] === gy;
-        const rubber = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([last, hp]),
-          new THREE.LineDashedMaterial({
-            color: ortho ? 0x8b5cf6 : ACCENT, dashSize: 3, gapSize: 3,
-            transparent: true, opacity: 0.9
-          })
-        );
-        rubber.computeLineDistances();
-        draftGroup.add(rubber);
-
-        /* 格点锚定提示：小圆环准星；与起点水平/垂直时变紫并延长虚线 */
-        const marker = new THREE.Mesh(
-          new THREE.RingGeometry(1.5, 2.5, 20),
-          new THREE.MeshBasicMaterial({
-            color: ortho ? 0x8b5cf6 : ACCENT, transparent: true, opacity: 0.95,
-            side: THREE.DoubleSide, depthWrite: false
-          })
-        );
-        marker.position.copy(hp).addScaledVector(n, 0.03);
-        marker.lookAt(n);
-        draftGroup.add(marker);
-        if (ortho) {
-          const ext = at(gx + (lastLocal[0] === gx ? 0 : 6), gy + (lastLocal[1] === gy ? 0 : 6));
-          const guide = new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints([hp, ext]),
-            new THREE.LineDashedMaterial({ color: 0x8b5cf6, dashSize: 2.5, gapSize: 2.5, transparent: true, opacity: 0.75 })
-          );
-          guide.computeLineDistances();
-          draftGroup.add(guide);
-        }
+        draftGroup.add(sketchStroke([last, hp], n));
+        draftGroup.add(sketchNodes([hp], n, 1.2));
       }
     } else {
       state.segHoverLocal = null;
-    }
-    /* 不渲染采样顶点：线段轮廓只保留连线，起点闭合提示环保留 */
-    /* 起点闭合提示 */
-    if (pts.length >= 3) {
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(2.4, 3.6, 26),
-        new THREE.MeshBasicMaterial({
-          color: state.closeReady ? FACE_C : ACCENT,
-          transparent: true, opacity: state.closeReady ? 0.95 : 0.3,
-          depthWrite: false, side: THREE.DoubleSide
-        })
-      );
-      ring.lookAt(n);   // 圆环立到绘制平面上
-      ring.position.copy(pts[0]).addScaledVector(n, 0.02);
-      draftGroup.add(ring);
     }
     return;
   }
@@ -6972,8 +6925,9 @@ function renderDraft() {
 /** 逐点绘制时追加一个点（仅线段工具）：世界点 → 绘制平面局部坐标 */
 function addSketchPoint(worldP) {
   const [px, py] = worldToPlane2D(worldP);
-  const x = snap(px);
-  const y = snap(py);
+  /* 线段端点不做格点吸附：保留两位小数，可画任意小数长度的线 */
+  const x = round2(px);
+  const y = round2(py);
   if (!state.draft || state.draft.type !== 'line') state.draft = { type: 'line', points: [] };
   const pts = state.draft.points;
 
@@ -6989,12 +6943,14 @@ function addSketchPoint(worldP) {
   pts.push([x, y]);
   state.closeReady = false;
   renderDraft();
-  /* 两点即成线：第二点落下就结束绘制，提交为开放线段（无需双击） */
+  /* 两点即成线：第二点落下就提交为开放线段；不退出线段工具，
+     下一次在画布任意位置点击即确认，并直接开始画下一段。 */
   if (pts.length === 2) {
     const linePts = pts.map((p) => [...p]);
     state.draft = null;
     clearGroup(draftGroup);
-    commitSketch(linePts, null, false);
+    const made = commitSketch(linePts, null, false, true);
+    if (made) { segObj = made; linePendingConfirm = true; }
     updateFirstRun();
   }
 }
@@ -7084,7 +7040,7 @@ function finishShapeSketch() {
 }
 
 /** 生成草图对象（所有草图工具的公共出口）：点集存绘制平面局部坐标 */
-function commitSketch(points, tip, closed = true) {
+function commitSketch(points, tip, closed = true, stayInLine = false) {
   if (!points || points.length < (closed ? 3 : 2)) {
     return toast(closed ? '至少需要 3 个点才能闭合' : '至少需要 2 个点才能成线');
   }
@@ -7102,16 +7058,20 @@ function commitSketch(points, tip, closed = true) {
   state.closeReady = false;
   clearGroup(draftGroup);
   const obj = buildObject(desc);
-  setMode('object');
+  /* 线段工具保持在线段模式，确认后可直接画下一段；其它形状照旧回对象模式 */
+  if (!stayInLine) setMode('object');
   clearSegOverlay();
   select(obj);
   commitEdit();
-  if (!closed) segObj = obj;   // 线段：显示长度标签，可输入精确值 / 绿勾确定
+  if (!closed) segObj = obj;   // 线段：显示长度标签，可输入精确值
   updateFirstRun();
   updateStatus();
   toast(tip || (closed
     ? '闭合草图已成面（蓝色阴影）：点它或右侧面板都能拉伸成实体'
-    : '线段已生成：选中它，可拉伸成面'));
+    : stayInLine
+      ? '线段已画好：在任意位置再点一下确认，接着画下一段'
+      : '线段已生成：选中它，可拉伸成面'));
+  return obj;
 }
 
 function closeSketch() {
@@ -7129,12 +7089,13 @@ function cancelDraft() {
 
 /* ============================================================================
    08.5 · 线段长度浮层
-   · 绘制中：橡皮筋中点显示实时长度（端点已吸附 5mm 格点）
-   · 成线后：点白色标签可输入精确长度，点绿色对勾确定
+   · 绘制中：橡皮筋中点显示实时长度（端点不吸附，保留小数）
+   · 成线后：点白色标签可输入精确长度；下一次在画布任意位置点击即确认并继续画
    ========================================================================== */
 const segLayer = $('segLayer'), segLenTag = $('segLenTag'), segConfirm = $('segConfirm');
-let segObj = null;          // 刚生成、还没点绿勾的线段
+let segObj = null;          // 刚生成、等待确认的线段
 let segEditing = false;
+let linePendingConfirm = false;   // 线段工具连画模式：等待任意处点击确认
 
 function planeLocalWorld(sp, x, y, lift = 0) {
   return new THREE.Vector3().fromArray(sp.o || [0, 0, 0])
@@ -7146,8 +7107,22 @@ function planeLocalWorld(sp, x, y, lift = 0) {
 function clearSegOverlay() {
   segObj = null;
   segEditing = false;
+  linePendingConfirm = false;
   segLenTag.classList.remove('editing');
   segLayer.classList.remove('show');
+}
+
+/** 确认刚画的线段并立刻重新武装线段工具：下一次点击从新起点开始 */
+function confirmPendingLine() {
+  if (!linePendingConfirm) return false;
+  clearSegOverlay();
+  if (state.tool === 'sketch' && state.sketchStage === 'draw') {
+    state.draft = { type: 'line', points: [] };
+    state.closeReady = false;
+    state.segHoverLocal = null;
+    renderDraft();
+  }
+  return true;
 }
 
 /** 每帧跟随相机更新长度标签位置与数值 */
@@ -7155,7 +7130,7 @@ function updateSegOverlay() {
   if (segEditing) { segLayer.classList.add('show'); return; }
   let a = null, b = null, editable = false;
   if (segObj) {
-    if (state.selected !== segObj || state.mode !== 'object') { clearSegOverlay(); }
+    if (state.selected !== segObj || (state.mode !== 'object' && !linePendingConfirm)) { clearSegOverlay(); }
     else {
       const d = segObj.userData.desc;
       const sp = d.plane || { o: d.pos, u: [1,0,0], v: [0,1,0], n: [0,0,1] };
@@ -7175,11 +7150,11 @@ function updateSegOverlay() {
   const len = a.distanceTo(b);
   segLenTag.style.left = ((sa.x + sb.x) / 2) + 'px';
   segLenTag.style.top = ((sa.y + sb.y) / 2 - 18) + 'px';
-  segLenTag.innerHTML = len.toFixed(1) + '<span class="u"> mm</span>';
+  segLenTag.innerHTML = len.toFixed(2) + '<span class="u"> mm</span>';
   segLenTag._len = len;
   segConfirm.style.left = (sb.x + 24) + 'px';
   segConfirm.style.top = (sb.y - 6) + 'px';
-  segConfirm.style.display = editable ? '' : 'none';
+  segConfirm.style.display = (editable && !linePendingConfirm) ? '' : 'none';
   segLayer.classList.add('show');
 }
 
@@ -7188,7 +7163,7 @@ segLenTag.addEventListener('click', (e) => {
   if (!segObj || segEditing) return;
   segEditing = true;
   segConfirm.style.display = 'none';
-  segLenTag.innerHTML = `<input type="number" step="1" min="1" value="${round1(segLenTag._len || 1)}">`;
+  segLenTag.innerHTML = `<input type="number" step="0.01" min="0.01" value="${round2(segLenTag._len || 1)}">`;
   const input = segLenTag.querySelector('input');
   input.focus(); input.select();
   const finish = (commit) => {
@@ -7202,11 +7177,11 @@ segLenTag.addEventListener('click', (e) => {
       const old = Math.hypot(dx, dy);
       if (old > 0) {
         beginEdit();
-        d.points[1] = [round1(x0 + dx / old * v), round1(y0 + dy / old * v)];
+        d.points[1] = [round2(x0 + dx / old * v), round2(y0 + dy / old * v)];
         updateObject(segObj);
         commitEdit();
         syncPanel();
-        toast('线段长度已改为 ' + round1(v) + ' mm');
+        toast('线段长度已改为 ' + round2(v) + ' mm');
       }
     }
     updateSegOverlay();
@@ -7221,8 +7196,8 @@ segLenTag.addEventListener('click', (e) => {
 
 segConfirm.addEventListener('click', (e) => {
   e.stopPropagation();
-  clearSegOverlay();
-  toast('线段长度已确定');
+  if (confirmPendingLine()) toast('线段长度已确定，继续画下一段');
+  else { clearSegOverlay(); toast('线段长度已确定'); }
 });
 
 /* ============================================================================
@@ -8815,7 +8790,7 @@ function setTool(t) {
     syncToolUI();
     updateFirstRun();
     const tip = {
-      sketch: '线段：点起点→点终点，端点自动吸附格点，标签可填长度，点✓确定',
+      sketch: '线段：点起点→点终点，任意处再点一下确认并接着画下一段；端点不吸附格点，可填精确长度',
       'sketch-rect': '矩形：按住左键对角线拖出',
       'sketch-circle': '圆：从圆心往外拖出半径',
       'sketch-ellipse': '椭圆：从中心拖出长短轴',
@@ -9128,6 +9103,8 @@ window.addEventListener('pointerup', (e) => {
     if (!d.moved) chooseSketchPlane(e);
   } else if (d.kind === 'sketch') {
     if (!d.moved) {
+      /* 线段工具：成线后的下一次点击 = 确认，并立即开始画下一段（不需要回菜单） */
+      if (confirmPendingLine()) return;
       const p = planePoint(e);
       if (p) addSketchPoint(p);
     }
