@@ -623,6 +623,12 @@
   .p2pmark.hover,.measuremark.hover{opacity:.6;transform:translate(-50%,-50%) scale(.78)}
   .p2pline{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:4}
   .measure-tag{display:none;pointer-events:none;z-index:6;border-color:#2f6fed;color:#1d4ed8;font-variant-numeric:tabular-nums}
+  /* 测量四选项卡 */
+  .measure-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin:2px 6px 4px}
+  .measure-tab{padding:7px 4px;border:1px solid #d7e2f0;border-radius:8px;background:#f7faff;
+    color:#475569;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}
+  .measure-tab:hover{background:#e9f1ff;border-color:#93c5fd}
+  .measure-tab.on{border-color:#2f6fed;background:#eef5ff;color:#1d6ae5;font-weight:600;box-shadow:0 0 0 2px rgba(47,111,237,.12)}
 
   /* =========================================================
      06 · 拉伸面板（高度 + 4 张运算卡片）
@@ -935,11 +941,17 @@
           <svg viewBox="0 0 24 24"><path d="M5 3l6.6 16.2 2.3-6.4 6.4-2.3z"/></svg><span>选面拉伸</span></button>
       </div>
 
-      <!-- 测量 -->
+      <!-- 测量：四个选项卡 -->
       <div class="fly-panel" data-panel="measure">
         <div class="fly-head">测量</div>
-        <button class="fly-btn" data-measure="1">测距（点选两点）</button>
-        <div class="fly-hint">点选起点与终点显示距离，靠近顶点 / 格点自动吸附；右侧「尺寸 (mm)」仍可查看实体精确参数。</div>
+        <div class="measure-tabs">
+          <button class="measure-tab on" data-mmeasure="p2p" title="点到点距离">点到点</button>
+          <button class="measure-tab" data-mmeasure="p2face" title="点到面距离">点到面</button>
+          <button class="measure-tab" data-mmeasure="faceface" title="面与面夹角">面面角</button>
+          <button class="measure-tab" data-mmeasure="lineline" title="线与线夹角">线线角</button>
+        </div>
+        <button class="fly-btn" data-measure="1">开始测量（依次点选两个对象）</button>
+        <div class="fly-hint" id="measureHint">依次点选起点与终点显示两点距离，靠近顶点 / 格点自动吸附。</div>
       </div>
     </div>
   </nav>
@@ -5737,6 +5749,7 @@ originMarker.traverse((o) => { o.raycast = () => {}; });   // 不参与拾取
 scene.add(originMarker);
 let originPulseT = 0;
 function stepOriginMarker(dt) {
+  if (!originMarker.visible) return;                       // 随网格隐藏时连闪烁/浮动一起停用
   originPulseT = (originPulseT + dt * 0.00055) % 1;        // ~1.8s 一个脉冲周期
   const t = performance.now() * 0.001;
   const breathe = 0.78 + 0.22 * Math.sin(t * 1.9);         // 呼吸闪烁 0.56~1.0
@@ -5850,6 +5863,17 @@ function makeEdgeLines(coords, desc) {
   edges.userData.isEdge = true;
   edges.raycast = () => {};
   return edges;
+}
+
+/** 轮廓边坐标：按二面角阈值提取硬边/轮廓，共面的 CSG 剖分三角二面角≈0 会被自动过滤，
+    因此布尔复合体（solid）也能得到干净的外轮廓，不会残留放射状碎线。 */
+function edgeCoordsFor(desc, geo) {
+  if (desc.kind === 'extrude') {
+    const rec = roundExtrudeEdgeCoords(desc);
+    if (rec) return rec;
+  }
+  if (!geo || !geo.attributes || !geo.attributes.position) return [];
+  return Array.from(new THREE.EdgesGeometry(geo, 24).attributes.position.array);
 }
 
 /**
@@ -6169,13 +6193,14 @@ function makeGeometry(desc) {
        轮廓 (x, y) 是平面局部坐标，高度沿局部 +Z，再经 basis 映到世界。 */
     const prof = desc.profile || [];
     if (prof.length < 2) return new THREE.BufferGeometry();
-    const h = p.height;
+    const z0 = p.z0 != null ? p.z0 : 0;          // 两边/对称：负向起点（兼容老数据默认 0）
+    const z1 = p.z1 != null ? p.z1 : p.height;   // 正向终点
     const pos = [];
     for (let i = 0; i < prof.length - 1; i++) {
       const [ax, ay] = prof[i];
       const [bx, by] = prof[i + 1];
-      pos.push(ax, ay, 0, bx, by, 0, bx, by, h);
-      pos.push(ax, ay, 0, bx, by, h, ax, ay, h);
+      pos.push(ax, ay, z0, bx, by, z0, bx, by, z1);
+      pos.push(ax, ay, z0, bx, by, z1, ax, ay, z1);
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
@@ -6416,7 +6441,8 @@ function ensureWireRim(obj) {
   }
   return rim;
 }
-/** 线框 / 实体切换：只隐藏填充面，保留硬边与轮廓，不产生三角网格碎线 */
+/** 线框 / 实体切换：线框模式只显示轮廓边（EdgesGeometry 硬边），隐藏填充面；
+    不再使用掠射角 fresnel 面片（旋转时才隐约闪现的那层膜）。 */
 function applyWireStyle(obj) {
   if (!obj || !obj.isMesh || !obj.userData.desc) return;
   obj.material.wireframe = false;
@@ -6424,8 +6450,9 @@ function applyWireStyle(obj) {
   obj.material.visible = !wire;
   const e = obj.children.find((c) => c.userData.isEdge);
   if (e) e.visible = true;
-  const rim = wire ? ensureWireRim(obj) : obj.userData.wireRim;
-  if (rim) rim.visible = wire;
+  /* 停用 fresnel 边缘光面片：线框只要干净的轮廓边，不要旋转才闪现的半透明膜 */
+  const rim = obj.userData.wireRim;
+  if (rim) rim.visible = false;
 }
 
 let uidSeq = 0;                 // 对象稳定 id（布尔母体引用 / 目标定位用）
@@ -6440,14 +6467,10 @@ function buildObject(desc) {
     /* 默认统一青蓝（3D One 同款），色板仍可手动为每个实体单独换色 */
     if (desc.tone == null) desc.tone = 0;
     obj = new THREE.Mesh(makeGeometry(desc), bodyMaterial(desc));
-    /* 布尔复合体不画边线：CSG 切割会把平面切成扇形三角汤，任何基于边的过滤都会残留
-       放射状碎边（蛛网）。靠平滑法线 + 环境反射塑形，视觉最干净。普通实体用 EdgesGeometry。 */
-    if (desc.kind !== 'solid') {
-      const rec = desc.kind === 'extrude' ? roundExtrudeEdgeCoords(desc) : null;
-      const ec = rec || new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array;
-      const edges = makeEdgeLines(ec, desc);
-      obj.add(edges);
-    }
+    /* 所有实体（含布尔复合体 solid）都生成轮廓边，线框模式据此只显示外轮廓。
+       EdgesGeometry 按 24° 二面角提取，共面 CSG 剖分三角被过滤，不会残留放射碎线。 */
+    const ec = edgeCoordsFor(desc, obj.geometry);
+    if (ec && ec.length) obj.add(makeEdgeLines(ec, desc));
   }
   obj.userData.desc = desc;
   applyWireStyle(obj);
@@ -6471,24 +6494,15 @@ function updateObject(obj) {
     obj.geometry = makeGeometry(desc);
     old.dispose();
     const edges = obj.children.find((c) => c.userData.isEdge);
-    /* 几何变了，重建轮廓线。solid 不画边线（见 buildObject 注释）；
-       对象由普通实体转为 solid 时要移除旧边线。 */
-    if (desc.kind === 'solid') {
-      if (edges) {
-        obj.remove(edges);
-        edges.geometry.dispose();
-        edges.material.dispose();
-      }
-    } else {
-      const rec = desc.kind === 'extrude' ? roundExtrudeEdgeCoords(desc) : null;
-      const ec = rec || Array.from(new THREE.EdgesGeometry(obj.geometry, 24).attributes.position.array);
-      if (edges) {
-        edges.geometry.dispose();
-        edges.geometry = new THREE.BufferGeometry();
-        edges.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ec), 3));
-      } else {
-        obj.add(makeEdgeLines(ec, desc));
-      }
+    /* 几何变了，重建轮廓线——布尔复合体 solid 同样需要轮廓边供线框模式显示 */
+    const ec = edgeCoordsFor(desc, obj.geometry);
+    if (edges) {
+      edges.geometry.dispose();
+      edges.geometry = new THREE.BufferGeometry();
+      edges.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ec), 3));
+      edges.visible = state.shade !== 'wire';   // 由 applyWireStyle 统一接管
+    } else if (ec && ec.length) {
+      obj.add(makeEdgeLines(ec, desc));
     }
     /* 几何换了，线框轮廓要跟着换成同一份几何 */
     if (obj.userData.wireRim) obj.userData.wireRim.geometry = obj.geometry;
@@ -7121,6 +7135,38 @@ function select(obj) {
   updateStatus();
   updateBoolButtons();
   showObjMenu();   // 选中实体（未选面）→ 浮出「移动/缩放/置平」菜单
+}
+
+/** 左键从空白处拖动刷选：光标扫过的对象依次成组选中（3D One 式刷选）。
+    第一次刷到时先清掉旧的选中/选面/浮层；草图会话成组；A/B 只取前两个真实实体。 */
+function brushPick(e) {
+  const d = drag;
+  if (!d || !d.picked) return;
+  const hit = pick(e);
+  if (!hit || !hit.root) return;
+  const root = hit.root;
+  if (!root.userData || !root.userData.desc) return;
+  if (state.selected === root || state.selectedB === root || state.multi.indexOf(root) >= 0) return;
+
+  if (!d.picked.size) select(null);   // 首次命中：清干净旧选择，以本次刷选为准
+
+  d.picked.add(root);
+  sketchGroupOf(root).forEach((o) => {
+    if (o === state.selected || o === state.selectedB || state.multi.indexOf(o) >= 0) return;
+    state.multi.push(o);
+    setHighlight(o, true);
+  });
+
+  /* A=第一个实体、B=第二个实体；草图/面只高亮，不参与布尔 */
+  const solids = state.multi.filter((o) => {
+    const k = o.userData && o.userData.desc && o.userData.desc.kind;
+    return k && k !== 'sketch' && k !== 'sheet';
+  });
+  state.selected = solids[0] || state.multi[0] || null;
+  state.selectedB = solids[1] || null;
+  if (state.selectedB) setHighlight(state.selectedB, true, true);
+  updateBoolButtons();
+  updateStatus();
 }
 
 /** 点选一个面：识别整面 → 橙色高亮 + 浮出「拉伸」菜单 */
@@ -8349,7 +8395,7 @@ function sketchToPlate(sketchDesc, thickness) {
  * @param dirSign  1 = 正向 / -1 = 反向
  * @param dirVec   用户拾取的方向（世界坐标，可空 = 默认沿草图平面法向）
  */
-function linesToSheetDir(sketchDesc, height, dirSign, dirVec) {
+function linesToSheetDir(sketchDesc, height, dirSign, dirVec, span) {
   const pts = sketchDesc.points;
   let cx = 0, cy = 0;
   pts.forEach(([x, y]) => { cx += x; cy += y; });
@@ -8359,10 +8405,17 @@ function linesToSheetDir(sketchDesc, height, dirSign, dirVec) {
   if (dirSign < 0) D.negate();
   const o = new THREE.Vector3().fromArray(sketchDesc.pos || [0, 0, 0])
     .addScaledVector(u, cx).addScaledVector(v, cy);
+  /* 一边：z0=0、z1=height（沿用 dirSign 决定正负）。
+     两边/对称：D 方向取 front、反方向取 back，以草图中心为起点两侧展开。 */
+  let z0 = 0, z1 = Math.max(MIN_SIZE, height);
+  if (span) {
+    z0 = -Math.max(MIN_SIZE, span.back);
+    z1 = Math.max(MIN_SIZE, span.front);
+  }
   return {
     kind: 'sheet',
     pos: [round1(o.x), round1(o.y), round1(o.z)],
-    params: { height: Math.max(MIN_SIZE, height) },
+    params: { height: Math.max(MIN_SIZE, z1 - z0), z0: round1(z0), z1: round1(z1) },
     profile: pts.map(([x, y]) => [round1(x - cx), round1(y - cy)]),
     basis: { u: u.toArray(), v: v.toArray(), n: [round1(D.x), round1(D.y), round1(D.z)] },
     hostUid: sketchDesc.hostUid == null ? null : sketchDesc.hostUid,
@@ -8880,7 +8933,7 @@ function applyExtrude() {
     if (!desc0.closed) {
       /* 开放线段 → 拉伸成面：默认方向 = 地面竖直向上 / 空间沿绘制平面法向，可拾取自定义方向 */
       if (desc0.points.length < 2) return toast('线段至少要 2 个点，无法拉伸');
-      const sDesc = linesToSheetDir(desc0, h, state.ex.dir, state.ex.dirVec);
+      const sDesc = linesToSheetDir(desc0, h, state.ex.dir, state.ex.dirVec, extrudeSpan());
       beginEdit();
       const created = buildObject(sDesc);
       modelGroup.remove(obj);
@@ -9517,7 +9570,7 @@ function refreshExtrudePreview() {
   const d0 = state.selected.userData.desc;
   if (d0.kind === 'sketch' && !d0.closed) {
     /* 开放线段：沿方向扫掠成带状面的预览 */
-    previewExtrudeGhost(linesToSheetDir(d0, h, state.ex.dir, state.ex.dirVec));
+    previewExtrudeGhost(linesToSheetDir(d0, h, state.ex.dir, state.ex.dirVec, extrudeSpan()));
     return;
   }
   previewExtrudeGhost(faceExtrudeDesc(
@@ -10114,13 +10167,15 @@ function setTool(t) {
   updateFirstRun();
 }
 
-/** 隐藏 / 显现地面网格：只改可见性，格点吸附与步距不受影响（右键轻点或 G） */
+/** 隐藏 / 显现地面网格：网格连同中心原点标记（含闪烁脉冲提示）一起显隐；
+    只改可见性，格点吸附与步距不受影响（右键轻点或 G） */
 function toggleGrid() {
   grid.visible = !grid.visible;
+  if (typeof originMarker !== 'undefined') originMarker.visible = grid.visible;
   const label = $('vmGridText');
   if (label) label.textContent = grid.visible ? '隐藏网格' : '显现网格';
-  toast(grid.visible ? '地面网格已显现（G / 右键菜单可再隐藏）'
-                     : '地面网格已隐藏（格点吸附仍可用）');
+  toast(grid.visible ? '地面网格与原点已显现（G / 右键菜单可再隐藏）'
+                     : '地面网格与原点已隐藏（格点吸附仍可用）');
 }
 
 const viewMenuEl = $('viewMenu');
@@ -10167,7 +10222,13 @@ $('toolbar').addEventListener('click', (e) => {
   else if (btn.dataset.act === 'shade') toggleShade();
   else if (btn.dataset.act === 'hide') hideSelected();
   else if (btn.dataset.act === 'reveal') toggleRevealMode();
-  else if (btn.dataset.measure) { if (measureActive) cancelMeasure(); else startMeasure(); }
+  else if (btn.dataset.mmeasure) {
+    /* 测量选项卡：切换模式并以该模式开始测量 */
+    document.querySelectorAll('.measure-tab').forEach((t) => t.classList.toggle('on', t === btn));
+    measureMode = btn.dataset.mmeasure;
+    startMeasure(measureMode);
+  }
+  else if (btn.dataset.measure) { if (measureActive) cancelMeasure(); else startMeasure(measureMode); }
 });
 
 $('modeSwitch').addEventListener('click', (e) => {
@@ -10398,7 +10459,9 @@ viewport.addEventListener('pointerdown', (e) => {
     const hit = pick(e);
     if (!hit) {
       clickStreakRoot = null;                                 // 点空白 → 打断连续点击序列
-      drag = { kind: 'click', x: e.clientX, y: e.clientY };   // 空白处：交给控制器旋转
+      /* 左键从空白处拖动 = 刷选：光标扫过的对象依次选中（3D One 式）。
+         左键已不参与视图旋转，故空白处拖动安全；单击空白（无位移）仍在 pointerup 里取消选择。 */
+      drag = { kind: 'brush', x: e.clientX, y: e.clientY, moved: false, picked: new Set() };
       return;
     }
     /* 显现模式：隐藏对象已临时可见，点中它 → 恢复显现，不走选中/拖动 */
@@ -10563,6 +10626,7 @@ window.addEventListener('pointermove', (e) => {
   if (drag.kind === 'place' && drag.moved) updatePlacement(e);
   if (drag.kind === 'shape' && drag.moved) updateShapeSketch(e);
   if (drag.kind === 'move' && drag.moved) moveByDrag(e);
+  if (drag.kind === 'brush' && drag.moved) brushPick(e);
 });
 
 /** 收集实体的世界坐标顶点（XY 去重，供拖动时顶点磁吸用） */
@@ -10647,6 +10711,16 @@ window.addEventListener('pointerup', (e) => {
     controls.enabled = true;    // 松手恢复主视图控制
     /* 点击（无位移）= 跳转到该面的标准视角；拖动过 = 保持在当前角度（不回弹） */
     if (!d.moved) viewCubeClick(e);
+  } else if (d.kind === 'brush') {
+    /* 刷选松手：扫到过对象就保留多选；没扫到任何对象且几乎没移动 → 视为点空白，取消选择 */
+    if (!d.picked.size && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
+      clickStreakRoot = null;
+      select(null);
+    } else if (d.picked.size) {
+      syncPanel();
+      updateStatus();
+      toast('已刷选 ' + state.multi.length + ' 个对象，可整体移动 / 删除');
+    }
   } else if (d.kind === 'click') {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
       /* 空白处单击 → 取消选择 */
@@ -10680,8 +10754,10 @@ window.addEventListener('pointerup', (e) => {
          闭合草图（蓝色阴影面）单击一次就直接弹拉伸菜单，不再要求 2.5 秒内的第二次点击；
          其它实体仍沿用「第二次点同一实体 → 选面」。双击重入由 dblclick 事件接管。 */
       const kd = d.root.userData.desc.kind;
-      const closedSketch = kd === 'sketch' && !!d.root.userData.desc.closed;
-      if (closedSketch) {
+      /* 草图单击即弹「拉伸」菜单：闭合草图→拉成实体，开放线段→扫掠成面（3D One 式）。
+         不再要求「第二次点击 + faceHit.face」——线段是窄面片，那个条件几乎命中不了。 */
+      const anySketch = kd === 'sketch';
+      if (anySketch) {
         clickStreakRoot = null;   // 单击即选面 → 重置，避免后续点击又被当作连击
         pickSketchFace(d.root);
       } else if (d.isSecondClick && d.faceHit.face) {
@@ -11010,7 +11086,8 @@ function updateHints() {
   } else if (state.hidden.length) {
     html = `<b>已有 ${state.hidden.length} 个对象被隐藏</b>${dots}点「显现」后它们会半透明出现，点中某一个才恢复`;
   } else if (measureActive) {
-    html = `<b>测距</b>${dots}点选起点与终点，显示两点间距离${dots}靠近顶点/格点自动吸附${dots}<kbd>Esc</kbd> 退出`;
+    const MNAME = { p2p: '点到点距离', p2face: '点到面距离', faceface: '面与面夹角', lineline: '线与线夹角' };
+    html = `<b>测量 · ${MNAME[measureMode] || '点到点距离'}</b>${dots}${MEASURE_TIP[measureMode] || ''}${dots}<kbd>Esc</kbd> 退出`;
   } else if (state.mode === 'sketch') {
     if (state.sketchStage === 'plane') {
       html = `<b>第 1 步 · 选择绘制平面</b>${dots}点击【地面网格】或某个【实体表面】作为草图平面${dots}悬停可预览${dots}<kbd>Esc</kbd> 退出`;
@@ -11847,71 +11924,194 @@ function updateP2pTip() {
    ========================================================================== */
 let measureActive = false, measureStart = null, measureEnd = null;
 let measureStartVertex = false, measureEndVertex = false;   // 是否磁吸到顶点
+let measureMode = 'p2p';   // 'p2p' 点到点 | 'p2face' 点到面 | 'faceface' 面面角 | 'lineline' 线线角
+let mPick1 = null, mPick2 = null;   // 两个拾取项 { point, normal?, dir?, vertex? }
+const MEASURE_TIP = {
+  p2p: '依次点选起点与终点显示两点距离，靠近顶点 / 格点自动吸附。',
+  p2face: '先点一个点，再点一个平面面，显示点到该平面的垂直距离。',
+  faceface: '依次点选两个平面面，显示两面夹角（0–90°）。',
+  lineline: '依次点选两条直边，显示两边夹角（0–90°）。'
+};
 
-function startMeasure(keepResult) {
+/** 拾取一条直线：取命中三角形离光标最近的一条边，返回世界坐标方向与线上最近点 */
+function pickLineInfo(e) {
+  setRay(e);
+  const hits = raycaster.intersectObjects(modelGroup.children, true);
+  for (const h of hits) {
+    const root = rootOf(h.object);
+    if (!root) continue;
+    if (!state.revealMode && isPickHidden(root)) continue;
+    if (!h.face) continue;
+    const obj = h.object;
+    const pos = obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position;
+    if (!pos) continue;
+    obj.updateMatrixWorld();
+    const wp = (i) => new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+    const va = wp(h.face.a), vb = wp(h.face.b), vc = wp(h.face.c);
+    const edges = [[va, vb], [vb, vc], [vc, va]];
+    let best = null, bd = Infinity;
+    for (const [a, b] of edges) {
+      const d = b.clone().sub(a), len2 = d.lengthSq();
+      if (len2 < 1e-9) continue;
+      const t = THREE.MathUtils.clamp(h.point.clone().sub(a).dot(d) / len2, 0, 1);
+      const foot = a.clone().addScaledVector(d, t);
+      const dist = foot.distanceToSquared(h.point);
+      if (dist < bd) { bd = dist; best = { point: foot, dir: d.normalize() }; }
+    }
+    if (best) return best;
+  }
+  /* 没命中实体网格：退化为地面上的一条水平参考线（沿 X 轴），保证总能给出结果 */
+  const gp = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(groundPlane, gp)) return { point: gp, dir: new THREE.Vector3(1, 0, 0) };
+  return null;
+}
+
+/** 按当前测量模式拾取一个项目；返回 pick 或 null */
+function measurePickAt(e) {
+  if (measureMode === 'p2p' || measureMode === 'p2face') {
+    const info = p2pPickPointInfo(e);
+    if (!info) return null;
+    return { point: info.point, vertex: !!info.vertex };
+  }
+  if (measureMode === 'faceface') {
+    const s = surfaceUnderCursor(e);
+    if (!s) return null;
+    return { point: s.point, normal: s.normal.clone().normalize() };
+  }
+  if (measureMode === 'lineline') {
+    const l = pickLineInfo(e);
+    if (!l) return null;
+    return { point: l.point, dir: l.dir.clone() };
+  }
+  return null;
+}
+
+/** 点到面：第二项必须是平面；点到点第二项是点；面/线模式第二项同类 */
+function measurePickSecond(e) {
+  if (measureMode === 'p2face') {
+    const s = surfaceUnderCursor(e);
+    if (!s) { toast('请点选一个平面面（曲面不适用）'); return null; }
+    return { point: s.point, normal: s.normal.clone().normalize() };
+  }
+  return measurePickAt(e);
+}
+
+function startMeasure(mode) {
+  if (mode && MEASURE_TIP[mode]) measureMode = mode;
   measureActive = true;
-  measureStart = null;
-  measureEnd = null;
-  measureStartVertex = false;
-  measureEndVertex = false;
-  if (!keepResult) updateMeasureOverlay();
+  measureStart = null; measureEnd = null;
+  measureStartVertex = false; measureEndVertex = false;
+  mPick1 = null; mPick2 = null;
+  if (!$('measureHint')) { /* 面板可能未展开，提示仍写到状态栏 */ }
+  const hint = $('measureHint');
+  if (hint) hint.textContent = MEASURE_TIP[measureMode];
+  updateMeasureOverlay();
   hideObjMenu();
   updateHints();
-  toast('测距：点选起点，再点选终点（Esc 退出）');
+  toast(MEASURE_TIP[measureMode] + '（Esc 退出）');
 }
 
 function cancelMeasure() {
   measureActive = false;
-  measureStart = null;
-  measureEnd = null;
-  measureStartVertex = false;
-  measureEndVertex = false;
+  measureStart = null; measureEnd = null;
+  measureStartVertex = false; measureEndVertex = false;
+  mPick1 = null; mPick2 = null;
   hideCursorDot();
   updateMeasureOverlay();
   updateHints();
 }
 
 function measureClick(e) {
-  const info = p2pPickPointInfo(e);
-  if (!info) return;
-  const p = info.point;
-  if (!measureStart) {
-    measureStart = p;
-    measureStartVertex = info.vertex;
+  const pick = mPick1 ? measurePickSecond(e) : measurePickAt(e);
+  if (!pick) return;
+  if (!mPick1) {
+    mPick1 = pick;
+    measureStart = pick.point.clone();
+    measureStartVertex = !!pick.vertex;
     measureEnd = null;
     measureEndVertex = false;
-    toast('已设起点，点选终点');
+    toast(measureMode === 'p2p' ? '已设起点，点选终点'
+        : measureMode === 'p2face' ? '已设起点，点选目标平面'
+        : '已拾取第一个对象，点选第二个');
   } else {
-    measureEnd = p;
-    measureEndVertex = info.vertex;
+    mPick2 = pick;
+    measureEnd = pick.point.clone();
+    measureEndVertex = !!pick.vertex;
     measureActive = false;
     hideCursorDot();
     updateHints();
-    toast('测距完成，可点「测距」重新测量');
+    const val = measureValue();
+    toast(val ? '测量完成：' + val + '（可点「开始测量」重测）' : '测量完成');
   }
   updateMeasureOverlay();
+}
+
+/** 计算当前测量值（返回显示文本），各模式复用 */
+function measureValue() {
+  if (!mPick1 || !mPick2) return null;
+  if (measureMode === 'p2p') {
+    return mPick1.point.distanceTo(mPick2.point).toFixed(2) + ' mm';
+  }
+  if (measureMode === 'p2face') {
+    const n = mPick2.normal;
+    const d = Math.abs(mPick1.point.clone().sub(mPick2.point).dot(n));
+    return d.toFixed(2) + ' mm';
+  }
+  if (measureMode === 'faceface') {
+    let a = mPick1.normal.angleTo(mPick2.normal) * 180 / Math.PI;
+    if (a > 90) a = 180 - a;
+    return a.toFixed(2) + '°';
+  }
+  if (measureMode === 'lineline') {
+    let a = mPick1.dir.angleTo(mPick2.dir) * 180 / Math.PI;
+    if (a > 90) a = 180 - a;
+    return a.toFixed(2) + '°';
+  }
+  return null;
 }
 
 function updateMeasureOverlay() {
   const lineEl = $('measureLine'), tag = $('measureTag'), marksEl = $('measureMarks');
   if (!lineEl || !tag) return;
-  if (!measureStart) {
+  if (!mPick1) {
     setSvgHtml(lineEl, '');
     tag.style.display = 'none';
     if (marksEl) marksEl.innerHTML = '';
     return;
   }
-  const b = measureEnd || measureStart;
-  const sa = projectToScreen(measureStart), sb = projectToScreen(b);
-  setSvgHtml(lineEl, `<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sb.x.toFixed(1)}" y2="${sb.y.toFixed(1)}"`
-    + ` stroke="#2f6fed" stroke-width="2.2" opacity=".95"/>`);
+  const p1 = mPick1.point;
+  const p2 = mPick2 ? mPick2.point : p1;
+  const sa = projectToScreen(p1), sb = projectToScreen(p2);
+  let svg = `<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sb.x.toFixed(1)}" y2="${sb.y.toFixed(1)}"`
+    + ` stroke="#2f6fed" stroke-width="2.2" opacity=".95"/>`;
   tag.style.display = 'block';
   tag.style.left = ((sa.x + sb.x) / 2).toFixed(1) + 'px';
   tag.style.top = ((sa.y + sb.y) / 2 - 18).toFixed(1) + 'px';
-  tag.textContent = measureStart.distanceTo(b).toFixed(2) + ' mm';
+  /* 面面角 / 线线角：在两端画出法向或方向短箭头，直观显示所测对象 */
+  if (mPick2 && (measureMode === 'faceface' || measureMode === 'lineline')) {
+    const vecOf = (pk) => (measureMode === 'faceface' ? pk.normal : pk.dir);
+    for (const [pk, s] of [[mPick1, sa], [mPick2, sb]]) {
+      const v = vecOf(pk);
+      const tip = projectToScreen(pk.point.clone().addScaledVector(v, 22));
+      svg += `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}"`
+        + ` stroke="#f5871f" stroke-width="2" opacity=".9"/>`;
+    }
+  }
+  /* 点到面：从点向平面作垂足虚线 */
+  if (mPick2 && measureMode === 'p2face') {
+    const n = mPick2.normal;
+    const signed = mPick1.point.clone().sub(mPick2.point).dot(n);
+    const foot = mPick1.point.clone().addScaledVector(n, -signed);
+    const sf = projectToScreen(foot);
+    svg += `<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sf.x.toFixed(1)}" y2="${sf.y.toFixed(1)}"`
+      + ` stroke="#f5871f" stroke-width="1.8" stroke-dasharray="5 4" opacity=".9"/>`;
+  }
+  setSvgHtml(lineEl, svg);
+  const val = measureValue();
+  tag.textContent = val || '';
   if (marksEl) {
     let html = `<div class="measuremark${measureStartVertex ? ' snap' : ''}" style="left:${sa.x.toFixed(1)}px;top:${sa.y.toFixed(1)}px"></div>`;
-    if (measureEnd) {
+    if (mPick2) {
       const endCls = measureActive ? 'hover' : 'end';
       html += `<div class="measuremark ${endCls}${measureEndVertex ? ' snap' : ''}" style="left:${sb.x.toFixed(1)}px;top:${sb.y.toFixed(1)}px"></div>`;
     }
@@ -12600,7 +12800,7 @@ window.Sketch3D = {
   exactExtrudeUnion, snapCenterPoint, setSvgHtml,
   startMeasure, cancelMeasure, updateMeasureOverlay,
   selectAllEntities, repeatLastOp,
-  get measureState() { return { active: measureActive, start: measureStart && measureStart.toArray(), end: measureEnd && measureEnd.toArray() }; },
+  get measureState() { return { active: measureActive, mode: measureMode, start: measureStart && measureStart.toArray(), end: measureEnd && measureEnd.toArray(), value: measureValue() }; },
   get multiCount() { return state.multi.length; },
   get sketchSession() { return { id: state.sketchSessionId, tool: state.sketchSessionTool, stage: state.sketchStage }; },
   get p2pState() { return { active: p2pActive, stage: p2pStage, tab: moveTab, start: p2pStart && p2pStart.toArray(), end: p2pEnd && p2pEnd.toArray() }; },
