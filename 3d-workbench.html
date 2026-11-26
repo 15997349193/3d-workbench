@@ -244,9 +244,63 @@
   .view-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;
     border-radius:6px;font-size:12px;color:var(--text);cursor:pointer;text-align:left}
   .view-menu button:hover{background:#f1f8fb}
+  .view-menu button.on{background:#e8f3ff;color:#1d63c9;font-weight:600}
+  .view-menu button.on svg{stroke:#1d63c9}
   .view-menu svg{width:16px;height:16px;stroke:#64748b;fill:none;stroke-width:1.6;stroke-linejoin:round;flex:none}
   .view-menu kbd{margin-left:auto;font-size:10px;color:var(--text-3);background:#f1f5f9;
     border:1px solid #dce5f0;border-radius:4px;padding:1px 5px}
+  /* 左上角任务窗：显现确认 / 正多边形参数 / 测量四选项卡共用同一固定坐标（仿 3D One） */
+  .task-pop{position:absolute;left:14px;top:14px;z-index:11;display:none;width:216px;
+    background:rgba(255,255,255,.98);border:1px solid #d7e2f0;border-radius:12px;
+    box-shadow:0 12px 34px rgba(24,38,66,.2),inset 0 1px 0 #fff;animation:pop .14s ease-out}
+  .task-pop.show{display:block}
+  .tp-head{display:flex;align-items:center;gap:7px;height:24px;padding:0 10px;flex:none;
+    font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--text-2);
+    border-bottom:1px solid var(--line-soft)}
+  .tp-grip{width:9px;height:11px;flex:none;opacity:.6;
+    background:radial-gradient(circle,currentColor 1.1px,transparent 1.3px) 0 0/5px 5px}
+  .tp-body{padding:9px 10px 4px}
+  .tp-row{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+  .tp-row label{font-size:11px;color:var(--text-2);min-width:44px;flex:none}
+  .tp-row .num{width:70px;height:28px;border:1px solid var(--line);border-radius:7px;
+    text-align:center;font-size:12px;font-variant-numeric:tabular-nums;outline:none;background:#fff;color:var(--text)}
+  .tp-row .num:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,111,237,.12)}
+  .tp-row .sel{height:28px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--text);
+    font-size:11px;padding:0 4px;outline:none;flex:1}
+  .tp-row .sel:focus{border-color:var(--accent)}
+  .tp-ro{flex:1;height:28px;line-height:28px;padding:0 8px;border:1px dashed #cdd9ea;border-radius:7px;
+    background:#f7faff;font-size:11px;color:#1d6ae5;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tp-tip{font-size:10px;line-height:1.5;color:var(--text-3);padding:2px 0 6px}
+  .tp-stepper{display:flex;align-items:center;gap:4px}
+  .tp-stepper .num{width:52px}
+  .tp-step-btns{display:flex;flex-direction:column;gap:2px;flex:none}
+  .tp-step-btns button{width:18px;height:13px;padding:0;border:1px solid var(--line);border-radius:4px;
+    background:#f7faff;color:var(--text-2);font-size:9px;line-height:11px;cursor:pointer}
+  .tp-step-btns button:hover{background:#e9f1ff;border-color:#93c5fd;color:#1d6ae5}
+  .tp-ok{display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 20px);margin:4px 10px 10px;
+    height:30px;border-radius:8px;background:#22b573;color:#fff;font-size:12px;font-weight:600;
+    box-shadow:0 3px 10px rgba(34,181,115,.3);transition:background .13s}
+  .tp-ok:hover{background:#199a61}
+  .tp-ok svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+  .tp-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px}
+  .tp-tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px solid #d7e2f0;
+    border-radius:8px;background:#f7faff;color:#64748b;cursor:pointer;transition:background .15s,border-color .15s;position:relative}
+  .tp-tab:hover{background:#e9f1ff;border-color:#93c5fd}
+  .tp-tab.on{border-color:#2f6fed;background:#eef5ff;color:#1d6ae5;font-weight:600;box-shadow:0 0 0 2px rgba(47,111,237,.12)}
+  .tp-tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .tp-tab .lb{font-size:9px;line-height:1}
+  .tp-tab:hover::after{content:attr(title);position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);
+    white-space:nowrap;background:#1e2633;color:#fff;font-size:10.5px;padding:4px 8px;border-radius:6px;z-index:20;pointer-events:none}
+  .tp-pick{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:10.5px;color:var(--text-2)}
+  .tp-pick .pv{flex:1;min-width:0;height:26px;line-height:26px;padding:0 8px;border:1px dashed #cdd9ea;
+    border-radius:6px;background:#f7faff;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tp-pick .pv.filled{border-style:solid;border-color:#93c5fd;background:#eef5ff;color:#1d6ae5;font-weight:600}
+  .tp-val{font-size:13px;font-weight:700;color:#16824a;text-align:center;padding:4px 0 2px;font-variant-numeric:tabular-nums}
+  /* 左键拖拽框选：屏幕空间虚线选择框（仿 RTS / 3D One 框选） */
+  .brush-box{position:absolute;z-index:10;display:none;pointer-events:none;
+    border:1px dashed #2f6fed;background:rgba(47,111,237,.09);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.45)}
+  .brush-box.show{display:block}
   /* 磁吸到顶点/格点：放大变黄 + 醒目的黄色呼吸外圈，明确告诉用户“已精确吸附” */
   .cursor-dot.snap{width:16px;height:16px;background:#ffcc00;border-color:#fff7cc;
     animation:cursorSnapPulse 1s ease-in-out infinite alternate}
@@ -393,7 +447,8 @@
   .firstrun b{display:block;color:var(--text-2);font-weight:600;font-size:14.5px;margin-bottom:4px}
 
   .toast{
-    position:absolute;left:50%;top:16px;transform:translate(-50%,-8px);
+    /* 下移约 1.5 行：顶部中央的绿勾（skDone, top:10px）占据原位置，提示文字下移避免与它重叠 */
+    position:absolute;left:50%;top:42px;transform:translate(-50%,-8px);
     background:#1e2633;color:#fff;font-size:12px;padding:7px 13px;border-radius:8px;
     opacity:0;transition:opacity .18s,transform .18s;pointer-events:none;z-index:9;
     box-shadow:0 6px 18px rgba(23,32,48,.22);max-width:70%;
@@ -941,18 +996,6 @@
           <svg viewBox="0 0 24 24"><path d="M5 3l6.6 16.2 2.3-6.4 6.4-2.3z"/></svg><span>选面拉伸</span></button>
       </div>
 
-      <!-- 测量：四个选项卡 -->
-      <div class="fly-panel" data-panel="measure">
-        <div class="fly-head">测量</div>
-        <div class="measure-tabs">
-          <button class="measure-tab on" data-mmeasure="p2p" title="点到点距离">点到点</button>
-          <button class="measure-tab" data-mmeasure="p2face" title="点到面距离">点到面</button>
-          <button class="measure-tab" data-mmeasure="faceface" title="面与面夹角">面面角</button>
-          <button class="measure-tab" data-mmeasure="lineline" title="线与线夹角">线线角</button>
-        </div>
-        <button class="fly-btn" data-measure="1">开始测量（依次点选两个对象）</button>
-        <div class="fly-hint" id="measureHint">依次点选起点与终点显示两点距离，靠近顶点 / 格点自动吸附。</div>
-      </div>
     </div>
   </nav>
 
@@ -1001,14 +1044,30 @@
     <div class="dim-tag measure-tag" id="measureTag" style="display:none"></div>
     <div id="measureMarks" aria-hidden="true"></div>
 
+    <!-- 左键拖拽框选的虚线提示框 -->
+    <div class="brush-box" id="brushBox" aria-hidden="true"></div>
+
     <!-- 草图绘制/测距：跟随鼠标的实心圆点（吸附到顶点/格点时放大变黄） -->
     <div class="cursor-dot" id="cursorDot" aria-hidden="true"></div>
+
+    <!-- 左上角任务窗（仿 3D One）：显现确认 / 正多边形参数 / 测量四选项卡共用同一固定坐标 -->
+    <div class="task-pop" id="taskPop" aria-hidden="true">
+      <div class="tp-head" id="tpHead"><span class="tp-grip"></span><span id="tpTitle">操作</span></div>
+      <div class="tp-body" id="tpBody"></div>
+      <button class="tp-ok" id="tpOk" title="确认完成，返回选择状态">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+      </button>
+    </div>
 
     <!-- 右键轻点弹出的视图菜单（右键拖动仍是旋转视图） -->
     <div class="view-menu" id="viewMenu" aria-hidden="true">
       <button type="button" id="vmGrid" title="快捷键 G">
         <svg viewBox="0 0 24 24"><path d="M3.5 3.5h17v17h-17zM3.5 9.2h17M3.5 14.8h17M9.2 3.5v17M14.8 3.5v17"/></svg>
         <span id="vmGridText">隐藏网格</span><kbd>G</kbd>
+      </button>
+      <button type="button" id="vmSpin" title="快捷键 A；旋转中 ← → 切方向，↑ ↓ 调速">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+        <span id="vmSpinText">自动旋转</span><kbd>A</kbd>
       </button>
     </div>
 
@@ -1031,7 +1090,7 @@
     <!-- 草图绘制选项：正多边形边数 -->
     <div class="sk-opt" id="skOpt">
       <span>边数</span>
-      <input id="polyN" type="number" min="3" max="12" step="1" value="6">
+      <input id="polyN" type="number" min="3" max="6" step="1" value="6">
       <span>边</span>
     </div>
 
@@ -1045,6 +1104,15 @@
         </svg>
         拉伸
         <span class="k">E</span>
+      </button>
+      <button class="fm-btn" data-fm="revolve" title="将封闭轮廓绕一条轮廓边旋转生成回转体">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 12a8 4 0 0 1 16 0"/>
+          <path d="M20 12v3"/>
+          <path d="M4 12l3-2.2M4 12l3 2.2M20 12l-3-2.2M20 12l-3 2.2"/>
+          <path d="M5 18h14" opacity=".5"/>
+        </svg>
+        旋转
       </button>
     </div>
 
@@ -5517,6 +5585,8 @@ const state = {
   hidden: [],          // 被「隐藏」的对象（仍留在场景，仅 visible=false）
   revealMode: false,   // 显现拾取模式：点隐藏对象让它重新显示
   polyN: 6,            // 正多边形边数
+  polyRot: 0,          // 正多边形旋转角度（度），首顶点方向
+  polyCenter: null,    // 正多边形中心点（绘制平面局部坐标），由用户点击确定、实时刷新
   ex: { open: false, h: 10, h1: 10, h2: 10, type: 'one', dir: 1, op: 'new', dirVec: null, picking: false },  // 拉伸面板状态（type=一边/两边/对称；h1/h2 为两侧高度；dirVec=拾取方向）
   sketchStage: 'plane',   // 草图两段式：'plane' 选绘制平面 | 'draw' 开始绘制
   sketchPlane: null,      // 已锁定的绘制平面（见 lockSketchPlane）
@@ -5773,7 +5843,10 @@ const overlayGroup = new THREE.Group();
 const faceGroup = new THREE.Group();
 const ghostGroup = new THREE.Group();
 const draftGroup = new THREE.Group();
-overlayGroup.add(faceGroup, ghostGroup, draftGroup);
+const measureVisualGroup = new THREE.Group();   // 测量专用：贴合网格 / 半透明面 / 描线
+const boolPreviewGroup = new THREE.Group();     // 布尔窗：运算结果的半透明 + 虚线预览
+const revPreviewGroup = new THREE.Group();       // 旋转窗：回转结果的半透明 + 虚线预览
+overlayGroup.add(faceGroup, ghostGroup, draftGroup, measureVisualGroup, boolPreviewGroup, revPreviewGroup);
 scene.add(modelGroup, overlayGroup);
 
 /* 地面射线检测用的数学平面（z = 0，Z 朝上约定） */
@@ -5865,14 +5938,63 @@ function makeEdgeLines(coords, desc) {
   return edges;
 }
 
-/** 轮廓边坐标：按二面角阈值提取硬边/轮廓，共面的 CSG 剖分三角二面角≈0 会被自动过滤，
-    因此布尔复合体（solid）也能得到干净的外轮廓，不会残留放射状碎线。 */
+/**
+ * 布尔复合体的干净轮廓：先按面法线把共面三角片归为一簇，只保留
+ * ①面的真实外边界 ②两簇之间的硬边；共面剖分对角线一律不画。
+ * EdgesGeometry 只看相邻三角的二面角，CSG 在共面处会有微小浮点偏差，
+ * 细长三角的二面角很容易被误判成硬边，这就是移动时放射状碎线的来源。
+ */
+function coplanarEdgeCoords(geo, angleDeg = 24) {
+  const pos = geo && geo.attributes && geo.attributes.position;
+  if (!pos) return [];
+  const idx = geo.index;
+  const count = idx ? idx.count : pos.count;
+  const at = (k) => new THREE.Vector3().fromBufferAttribute(pos, idx ? idx.getX(k) : k);
+  const keyOf = (p) => Math.round(p.x * 1000) + ',' + Math.round(p.y * 1000) + ',' + Math.round(p.z * 1000);
+  const edgeMap = new Map();
+  const cosLimit = Math.cos(angleDeg * Math.PI / 180);
+  for (let t = 0; t + 2 < count; t += 3) {
+    const a = at(t), b = at(t + 1), c = at(t + 2);
+    const n = b.clone().sub(a).cross(c.clone().sub(a));
+    if (n.lengthSq() < 1e-12) continue;
+    n.normalize();
+    const tri = [a, b, c];
+    for (let e = 0; e < 3; e++) {
+      const p = tri[e], q = tri[(e + 1) % 3];
+      if (p.distanceToSquared(q) < 1e-8) continue;
+      const kp = keyOf(p), kq = keyOf(q);
+      if (kp === kq) continue;
+      const k = kp < kq ? kp + '|' + kq : kq + '|' + kp;
+      if (!edgeMap.has(k)) edgeMap.set(k, []);
+      edgeMap.get(k).push({ n, p, q });
+    }
+  }
+  const out = [];
+  edgeMap.forEach((list) => {
+    let hard = list.length === 1;
+    if (!hard) {
+      for (let i = 0; i < list.length && !hard; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          if (list[i].n.dot(list[j].n) < cosLimit) { hard = true; break; }
+        }
+      }
+    }
+    if (!hard) return;                       // 同一平面簇内部的剖分边：丢掉
+    const { p, q } = list[0];
+    if (p.distanceToSquared(q) < 4e-4) return;  // 极短碎边也丢掉
+    out.push(p.x, p.y, p.z, q.x, q.y, q.z);
+  });
+  return out;
+}
+
+/** 轮廓边坐标：规则体走 EdgesGeometry；布尔复合体走共面簇硬边，杜绝三角碎线。 */
 function edgeCoordsFor(desc, geo) {
   if (desc.kind === 'extrude') {
     const rec = roundExtrudeEdgeCoords(desc);
     if (rec) return rec;
   }
   if (!geo || !geo.attributes || !geo.attributes.position) return [];
+  if (desc.kind === 'solid') return coplanarEdgeCoords(geo, 24);
   return Array.from(new THREE.EdgesGeometry(geo, 24).attributes.position.array);
 }
 
@@ -6240,17 +6362,21 @@ function toneOf(desc) {
 
 /** 实体材质（3D One 式浅色塑料：柔和哑光 + 极弱清漆 + 环境反射，明亮通透） */
 function bodyMaterial(desc) {
+  const isSolid = desc && desc.kind === 'solid';
   return new THREE.MeshPhysicalMaterial({
     color: toneOf(desc).fill,
     roughness: 0.34,
     metalness: 0.015,
     clearcoat: 0.10,
     clearcoatRoughness: 0.55,
-    transparent: true,
-    opacity: 0.97,
+    /* 布尔复合体改为完全不透明：0.97 的半透明会让相邻面的深度排序与背面剔除
+       把极细的 CSG 接缝放大成明显的白缝。双面渲染则保证万一还有微小开口，
+       看到的是实体内壁而不是背景白。 */
+    transparent: !isSolid,
+    opacity: isSolid ? 1 : 0.97,
     depthWrite: true,
     envMapIntensity: 0.34,
-    side: desc && desc.kind === 'sheet' ? THREE.DoubleSide : THREE.FrontSide
+    side: (isSolid || (desc && desc.kind === 'sheet')) ? THREE.DoubleSide : THREE.FrontSide
   });
 }
 /** 放置后未点「确定」的预览色：3D One 式透明浅绿，可透见下方网格 */
@@ -6264,7 +6390,12 @@ function applyBodyAppearance(obj) {
   const pending = d.dimPending === true;
   const tone = toneOf(d);
   obj.material.color.setHex(pending ? PENDING_FILL : tone.fill);
-  obj.material.opacity = pending ? 0.5 : 0.97;
+  const wantTransparent = pending || d.kind !== 'solid';
+  if (obj.material.transparent !== wantTransparent) {
+    obj.material.transparent = wantTransparent;
+    obj.material.needsUpdate = true;
+  }
+  obj.material.opacity = pending ? 0.5 : (d.kind === 'solid' ? 1 : 0.97);
   obj.material.depthWrite = !pending;
   const e = obj.children.find((c) => c.userData.isEdge);
   if (e) {
@@ -6349,16 +6480,26 @@ function sketchNodes(pts, n, radius = 1.5) {
   pts.forEach((p) => pos.push(p.x, p.y, p.z));
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  const m = new THREE.PointsMaterial({
-    color: SKETCH_NODE_C,
-    size: Math.max(6, radius * 6), sizeAttenuation: false,
+  const base = Math.max(8, radius * 6);
+  const grp = new THREE.Group();
+  /* 描边环：白色、稍大，固定屏幕像素。始终白色，不随三态染色。 */
+  const ring = new THREE.Points(g, new THREE.PointsMaterial({
+    color: 0xffffff, size: base + 3.5, sizeAttenuation: false,
     map: sketchNodeTexture(), transparent: true, alphaTest: 0.5,
     depthWrite: false, depthTest: false
-  });
-  const points = new THREE.Points(g, m);
-  points.renderOrder = 13;
-  points.userData.isNode = true;
-  return points;
+  }));
+  ring.renderOrder = 13;
+  ring.userData.isNodeRing = true;
+  /* 实心芯：与草图线同色，稍小，露出外圈白描边。跟随三态 / 显现幽灵态染色。 */
+  const core = new THREE.Points(g, new THREE.PointsMaterial({
+    color: SKETCH_C, size: base, sizeAttenuation: false,
+    map: sketchNodeTexture(), transparent: true, alphaTest: 0.5,
+    depthWrite: false, depthTest: false
+  }));
+  core.renderOrder = 14;
+  core.userData.isNode = true;
+  grp.add(ring, core);
+  return grp;
 }
 
 function makeSketchParts(desc, lift = 0.5) {
@@ -6549,6 +6690,7 @@ function restoreScene(json) {
   select(null);
   state.hidden = [];
   state.revealMode = false;
+  hideTaskPop();
   const rb = $('btnReveal'); if (rb) rb.classList.remove('on');
   [...modelGroup.children].forEach((o) => { modelGroup.remove(o); disposeObject(o); });
   JSON.parse(json).forEach((d) => { d.dimPending = false; buildObject(d); });
@@ -6581,6 +6723,15 @@ function rememberOp(kind, desc) {
 }
 function repeatLastOp() {
   if (!lastOp) return toast('没有可重复的操作');
+  /* 上一步是布尔（并/交/差）：重新弹出同一运算的左上角任务窗，让用户重选基体与合并体。
+     不能直接重做——布尔会消耗合并体，场景已变；弹窗才是 3D One 的重复语义。 */
+  if (lastOp.kind === 'bool') {
+    const op = lastOp.desc && lastOp.desc.op;
+    if (!BOOL_NAMES[op]) return toast('没有可重复的布尔运算');
+    openBoolPop(op);
+    toast('已重新打开上一步的' + BOOL_NAMES[op] + '窗口：点选基体与合并体后对勾确认');
+    return;
+  }
   /* 上一步是草图：等价于再点一次工具栏里的原绘图命令，重新选平面画一条新的，
      不再复制出一条与原来平行/重叠的草图。 */
   if (lastOp.kind === 'sketch') {
@@ -6620,6 +6771,593 @@ function redo() {
   toast('已还原');
 }
 
+/* ============================================================
+   左上角任务窗（仿 3D One）：显现确认 / 正多边形参数 / 测量选项卡共用同一固定坐标
+   ============================================================ */
+let taskPopKind = null;   // null | 'reveal' | 'poly' | 'measure' | 'bool'
+function showTaskPop(kind, title, bodyHtml, onOk) {
+  taskPopKind = kind;
+  const pop = $('taskPop');
+  if (!pop) return;
+  $('tpTitle').textContent = title;
+  $('tpBody').innerHTML = bodyHtml;
+  const ok = $('tpOk');
+  ok.onclick = onOk || (() => hideTaskPop());
+  pop.classList.add('show');
+  pop.setAttribute('aria-hidden', 'false');
+}
+function hideTaskPop() {
+  /* 布尔窗被任何路径关闭时都要清掉结果预览与选中高亮，避免留下幽灵虚线框 */
+  if (taskPopKind === 'bool') {
+    clearBoolPreview();
+    if (boolPick.a) setHighlight(boolPick.a, false);
+    boolPick.bs.forEach((o) => setHighlight(o, false, true));
+    boolPick = { op: null, a: null, bs: [] };
+  }
+  if (taskPopKind === 'revolve') clearRevPreview();
+  taskPopKind = null;
+  const pop = $('taskPop');
+  if (pop) { pop.classList.remove('show'); pop.setAttribute('aria-hidden', 'true'); }
+}
+
+let revealStartCount = 0;   // 进入显现会话时的隐藏对象数，用于算「已恢复几个」
+function numCn(n) {
+  const d = ['零','一','二','三','四','五','六','七','八','九','十'];
+  if (n <= 10) return d[n];
+  if (n < 20) return '十' + (n === 10 ? '' : d[n - 10]);
+  return String(n);
+}
+/** 本次显现会话已恢复的隐藏实体数 */
+function revealedCount() { return Math.max(0, revealStartCount - state.hidden.length); }
+function revealLabel() {
+  const n = revealedCount();
+  return n <= 0 ? '未选中实体' : `选中${numCn(n)}实体`;
+}
+/** 显现窗正文：实时显示已恢复（选中）的实体数量 */
+function revealPopBody() {
+  return `<div class="tp-row"><label>实体</label><div class="tp-ro" id="revealCount">${revealLabel()}</div></div>`
+       + `<div class="tp-tip">所有隐藏对象已半透明显示，点选要恢复的实体。点下方对勾确认并退出。</div>`;
+}
+/** 显现窗计数随恢复刷新 */
+function refreshRevealPop() {
+  if (taskPopKind !== 'reveal') return;
+  const el = $('revealCount');
+  if (el) el.textContent = revealLabel();
+}
+
+/* ---- 布尔运算任务窗：基体（1个）+ 合并体（并集可多个 / 交差仅1个） ----
+   三个运算共用左上角同一个窗；用户在视图点选 → 对勾确认执行一次运算 → 回到选择状态。 */
+const BOOL_NAMES = { add: '并集', sub: '差集', int: '交集' };
+let boolPick = { op: null, a: null, bs: [] };   // a=基体, bs=合并体列表
+
+function isBoolEntity(o) {
+  const k = o && o.userData && o.userData.desc && o.userData.desc.kind;
+  return !!k && k !== 'sketch' && k !== 'sheet';
+}
+function boolCanAddMore() {
+  return boolPick.op === 'add' || boolPick.bs.length === 0;
+}
+/** 布尔窗里已点选的基体 / 合并体：悬停逻辑必须把它们当「已选中」，移开后不能刷回普通色 */
+function isBoolChosen(o) {
+  return !!o && (boolPick.a === o || boolPick.bs.indexOf(o) >= 0);
+}
+function boolPopBody() {
+  const a = boolPick.a;
+  const bs = boolPick.bs;
+  const mergeTxt = bs.length ? bs.map((o) => entityName(o)).join('、') : '点击视图选取';
+  const tip = boolPick.op === 'add'
+    ? '先点基体，再点一个或多个合并体；对勾确认后全部并入基体。'
+    : '先点基体，再点一个合并体；对勾确认后只保留公共部分（交集）或从基体挖除（差集）。';
+  return `<div class="tp-row"><label>基体</label><div class="tp-ro" id="boolBaseTxt">${a ? entityName(a) : '点击视图选取'}</div></div>`
+       + `<div class="tp-row"><label>合并体</label><div class="tp-ro" id="boolMergeTxt">${mergeTxt}</div></div>`
+       + `<div class="tp-tip">${tip}</div>`;
+}
+function entityName(o) {
+  const d = o && o.userData && o.userData.desc;
+  if (!d) return '实体';
+  return ({ box: '长方体', cylinder: '圆柱', sphere: '球', cone: '圆锥', torus: '圆环',
+    ellipsoid: '椭球', pyramid: '棱锥', frustum: '圆台', horn: '螺旋体', plate: '板',
+    extrude: '拉伸体', sheet: '面', solid: '复合体' })[d.kind] || '实体';
+}
+function refreshBoolPop() {
+  if (taskPopKind !== 'bool') return;
+  const a = $('boolBaseTxt'), b = $('boolMergeTxt');
+  if (a) a.textContent = boolPick.a ? entityName(boolPick.a) : '点击视图选取';
+  if (b) {
+    b.textContent = boolPick.bs.length
+      ? boolPick.bs.map(entityName).join('、') : '点击视图选取';
+  }
+}
+/** 清掉结果预览（半透明填充 + 虚线轮廓），不动真实实体 */
+function clearBoolPreview() {
+  while (boolPreviewGroup.children.length) {
+    const o = boolPreviewGroup.children.pop();
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  }
+}
+/**
+ * 选完基体与合并体后先算一遍结果，用半透明体 + 虚线轮廓提示用户。
+ * 只在覆盖层画预览，不改动场景实体；确认时再正式执行 booleanWith。
+ */
+function refreshBoolPreview() {
+  clearBoolPreview();
+  const { op, a, bs } = boolPick;
+  if (!a || !bs.length) return;
+  try {
+    let cur = a, geo = null;
+    for (let i = 0; i < bs.length; i++) {
+      geo = booleanWith(cur, bs[i].userData.desc, op);
+      if (i < bs.length - 1) {
+        /* 并集多个合并体：把上一步结果临时装成对象，继续与下一个运算 */
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(geo.p, 3));
+        if (geo.n && geo.n.length === geo.p.length) {
+          g.setAttribute('normal', new THREE.Float32BufferAttribute(geo.n, 3));
+        }
+        if (geo.i && geo.i.length) g.setIndex(geo.i);
+        const tmp = new THREE.Mesh(g, a.material);
+        tmp.position.copy(a.position);
+        tmp.userData = { desc: { kind: 'solid', uid: (cur.userData.desc || {}).uid,
+          pos: [...a.position.toArray()], tone: (cur.userData.desc || {}).tone || 0, geo } };
+        tmp.updateMatrixWorld(true);
+        cur = tmp;
+      }
+    }
+    if (!geo || geo.p.length < 9) throw new Error('运算结果为空');
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(geo.p, 3));
+    const nn = (geo.n && geo.n.length === geo.p.length)
+      ? geo.n : new Array(geo.p.length).fill(0);
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nn, 3));
+    if (geo.i && geo.i.length) g.setIndex(geo.i);
+    const fill = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      color: 0x59d7ff, transparent: true, opacity: 0.22, depthWrite: false,
+      side: THREE.DoubleSide
+    }));
+    fill.position.copy(a.position);
+    fill.renderOrder = 6;
+    boolPreviewGroup.add(fill);
+    /* 只描硬边：coplanarEdgeCoords 会丢掉共面剖分对角线，虚线框干净 */
+    const ec = coplanarEdgeCoords(g, 24);
+    if (ec.length >= 6) {
+      const eg = new THREE.BufferGeometry();
+      eg.setAttribute('position', new THREE.Float32BufferAttribute(ec, 3));
+      const dash = new THREE.LineSegments(eg, new THREE.LineDashedMaterial({
+        color: 0x8ceaff, dashSize: 2.6, gapSize: 1.8,
+        transparent: true, opacity: 0.95, depthTest: false
+      }));
+      dash.computeLineDistances();
+      dash.position.copy(a.position);
+      dash.renderOrder = 7;
+      boolPreviewGroup.add(dash);
+    }
+  } catch (err) {
+    clearBoolPreview();
+  }
+}
+function clearBoolPicking() {
+  clearBoolPreview();
+  if (boolPick.a) setHighlight(boolPick.a, false);
+  boolPick.bs.forEach((o) => setHighlight(o, false, true));
+  boolPick = { op: null, a: null, bs: [] };
+}
+function openBoolPop(op) {
+  if (!CSG || !csgEvaluator) return toast('布尔运算库未加载（需联网）');
+  clearBoolPicking();
+  boolPick.op = op;
+  state.mode = 'object';
+  state.tool = 'select';
+  syncToolUI();
+  select(null);
+  showTaskPop('bool', BOOL_NAMES[op] + '运算', boolPopBody(), () => commitBoolPick());
+  toast(BOOL_NAMES[op] + '：先在视图点基体，再点合并体，最后点对勾确认');
+}
+/** 布尔窗开启时点击视图：第一下基体，其后合并体（并集可多，交/差只取一个） */
+function boolPickClick(e) {
+  const h = pick(e);
+  if (!h || !h.root || !isBoolEntity(h.root)) { toast('请点选实体（草图与面不能做布尔）'); return; }
+  const o = h.root;
+  if (!boolPick.a) {
+    boolPick.a = o;
+    setHighlight(o, true);
+  } else if (o === boolPick.a) {
+    toast('已选为基体，请点另一个实体作为合并体'); return;
+  } else if (boolPick.bs.indexOf(o) >= 0) {
+    boolPick.bs = boolPick.bs.filter((x) => x !== o);
+    setHighlight(o, false, true);
+  } else if (boolCanAddMore()) {
+    boolPick.bs.push(o);
+    setHighlight(o, true, true);
+  } else {
+    toast('交集 / 差集只能选一个合并体'); return;
+  }
+  /* 已选对象保持深黄选中态：即使鼠标停留其上，也不让它退回悬停色 */
+  setEntityHover(null);
+  hoverEntity = null;
+  if (boolPick.a) setHighlight(boolPick.a, true);
+  boolPick.bs.forEach((x) => setHighlight(x, true, true));
+  refreshBoolPop();
+  refreshBoolPreview();
+}
+/** 对勾确认：基体依次与每个合并体做布尔，一次性入撤销栈；结束回到选择状态 */
+function commitBoolPick() {
+  const { op, a, bs } = boolPick;
+  if (!a || !bs.length) { toast('请先点选基体与合并体，再点对勾确认'); return; }
+  beginEdit();
+  try {
+    let cur = a;
+    for (const other of bs) {
+      const geo = booleanWith(cur, other.userData.desc, op);
+      const cd = cur.userData.desc;
+      cur.userData.desc = {
+        kind: 'solid', uid: cd.uid, pos: [...cd.pos], tone: cd.tone || 0,
+        hostUid: cd.hostUid, geo
+      };
+      if (other !== cur) { modelGroup.remove(other); disposeObject(other); }
+      updateObject(cur);
+    }
+    clearBoolPicking();
+    hideTaskPop();
+    state.face = null;
+    clearGroup(faceGroup);
+    select(cur);
+    /* 记住本次布尔，中键滚轮重复时重新弹出同一运算的任务窗（而非误报上步画草图） */
+    rememberOp('bool', { op });
+    toast(`${BOOL_NAMES[op]}完成：已合并 ${bs.length} 个实体`);
+  } catch (err) {
+    restoreScene(editBase);
+    clearBoolPicking();
+    hideTaskPop();
+    commitEdit();
+    return toast('运算失败：' + (err.message || err));
+  }
+  commitEdit();
+  updateFirstRun();
+  updateStatus();
+}
+function cancelBoolPick() {
+  clearBoolPicking();
+  if (taskPopKind === 'bool') hideTaskPop();
+  toast('已取消布尔运算');
+}
+
+/* ---- 旋转任务窗：只读轮廓 / 只读旋转轴（视图点选实时生成）+ 类型 + 角度 ---- */
+const REV_NAMES = { one: '一边', two: '两边', sym: '对称' };
+function revContourText() {
+  return revPick.loop ? `已选轮廓（${revPick.loop.length} 个顶点）` : '点击视图选取封闭轮廓';
+}
+function revAxisText() {
+  if (revPick.axisEdge == null || !revPick.loop) return '点击视图选取一条轮廓边';
+  const a = revPick.loop[revPick.axisEdge];
+  const b = revPick.loop[(revPick.axisEdge + 1) % revPick.loop.length];
+  return `第 ${revPick.axisEdge + 1} 条边 · ${a.x.toFixed(1)},${a.y.toFixed(1)},${a.z.toFixed(1)}`;
+}
+function revolvePopBody() {
+  return `<div class="tp-row"><label>轮廓</label><div class="tp-ro" id="revContourTxt">${revContourText()}</div></div>`
+       + `<div class="tp-row"><label>旋转轴</label><div class="tp-ro" id="revAxisTxt">${revAxisText()}</div></div>`
+       + `<div class="tp-row"><label>类型</label><select class="sel" id="revType">`
+       + `<option value="one"${revPick.type === 'one' ? ' selected' : ''}>一边</option>`
+       + `<option value="two"${revPick.type === 'two' ? ' selected' : ''}>两边</option>`
+       + `<option value="sym"${revPick.type === 'sym' ? ' selected' : ''}>对称</option></select></div>`
+       + `<div class="tp-row"><label>角度</label><input class="num" id="revAngle" type="number" step="1" value="${revPick.angle}"> <span style="font-size:11px;color:var(--text-3)">°</span></div>`
+       + `<div class="tp-tip">先点「轮廓」框后在视图点一个封闭面，再点「旋转轴」框后点该面的一条边；`
+       + `角度只取整数（可为负）。虚线框即生成结果，满意点对勾确认。</div>`;
+}
+function refreshRevolvePop() {
+  if (taskPopKind !== 'revolve') return;
+  const c = $('revContourTxt'), a = $('revAxisTxt');
+  if (c) c.textContent = revContourText();
+  if (a) a.textContent = revAxisText();
+}
+function clearRevPreview() {
+  if (!revPreviewGroup) return;
+  while (revPreviewGroup.children.length) {
+    const o = revPreviewGroup.children.pop();
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  }
+}
+/** 轮廓 + 轴 + 类型 + 角度齐备后，用虚线透明框实时预览回转结果 */
+function refreshRevPreview() {
+  clearRevPreview();
+  if (!revPreviewGroup || !revPick.loop || revPick.axisEdge == null) return;
+  let geo;
+  try {
+    geo = revolveDesc(revPick.loop, revPick.normal, revPick.axisEdge, revPick.type, revPick.angle);
+  } catch (e) { geo = null; }
+  if (!geo || !geo.p || geo.p.length < 9) return;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(geo.p, 3));
+  if (geo.n && geo.n.length === geo.p.length)
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(geo.n, 3));
+  if (geo.i && geo.i.length) g.setIndex(geo.i);
+  const fill = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color: 0x59d7ff, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide
+  }));
+  fill.renderOrder = 6;
+  revPreviewGroup.add(fill);
+  const ec = coplanarEdgeCoords(g, 24);
+  if (ec.length >= 6) {
+    const eg = new THREE.BufferGeometry();
+    eg.setAttribute('position', new THREE.Float32BufferAttribute(ec, 3));
+    const dash = new THREE.LineSegments(eg, new THREE.LineDashedMaterial({
+      color: 0x8ceaff, dashSize: 2.6, gapSize: 1.8,
+      transparent: true, opacity: 0.95, depthTest: false
+    }));
+    dash.computeLineDistances();
+    dash.renderOrder = 7;
+    revPreviewGroup.add(dash);
+  }
+}
+/** 旋转窗开启时点视图：按当前拾取阶段取封闭轮廓 / 轮廓边 */
+function revPickClick(e) {
+  if (revPick.picking === 'contour') {
+    const sh = pick(e);
+    if (!sh || !sh.root) return toast('请点击一个封闭草图面');
+    const region = closedSketchRegionFor(sh.root);
+    if (!region) return toast('请点击一个已闭合的草图平面');
+    revPick.loop = region.loop.map((p) => p.clone());
+    revPick.normal = region.normal.clone();
+    revPick.axisEdge = null;
+    revPick.picking = 'axis';
+    refreshRevolvePop();
+    clearRevPreview();
+    toast('已取轮廓，请在视图点选一条轮廓边作为旋转轴');
+    return;
+  }
+  if (revPick.picking === 'axis') {
+    if (!revPick.loop) { toast('请先选取封闭轮廓'); return; }
+    const edge = nearestLoopEdge(e, revPick.loop);
+    if (edge == null) return toast('请点击轮廓上的一条边');
+    revPick.axisEdge = edge;
+    revPick.picking = null;
+    refreshRevolvePop();
+    refreshRevPreview();
+    toast('已选旋转轴，可改类型/角度，虚线框为预览');
+  }
+}
+/** 屏幕上离光标最近的一条轮廓边索引 */
+function nearestLoopEdge(e, loop) {
+  setRay(e);
+  const r = viewport.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  let best = null, bd = 26 * 26;   // 26px 命中半径
+  for (let i = 0; i < loop.length; i++) {
+    const a = projectToScreen(loop[i]), b = projectToScreen(loop[(i + 1) % loop.length]);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((sx - a.x) * dx + (sy - a.y) * dy) / l2)) : 0;
+    const qx = a.x + t * dx - sx, qy = a.y + t * dy - sy;
+    const d2 = qx * qx + qy * qy;
+    if (d2 < bd) { bd = d2; best = i; }
+  }
+  return best;
+}
+function openRevolvePop(loopWorld, normalWorld) {
+  clearRevPreview();
+  revPick = {
+    loop: loopWorld ? loopWorld.map((p) => p.clone()) : null,
+    normal: normalWorld ? normalWorld.clone() : null,
+    axisEdge: null, type: 'one', angle: 360,
+    picking: loopWorld ? 'axis' : 'contour'
+  };
+  showTaskPop('revolve', '旋转', revolvePopBody(), () => commitRevolve());
+  bindRevolvePop();
+  if (revPick.loop) toast('请在视图点选一条轮廓边作为旋转轴（虚线框实时预览）');
+  else toast('请在视图点选一个封闭草图面作为旋转轮廓');
+}
+function bindRevolvePop() {
+  const c = $('revContourTxt'), a = $('revAxisTxt'), t = $('revType'), ag = $('revAngle');
+  if (c) c.onclick = () => { revPick.picking = 'contour'; toast('请在视图点选一个封闭草图面'); };
+  if (a) a.onclick = () => { revPick.picking = 'axis'; toast('请在视图点选轮廓上的一条边'); };
+  if (t) t.onchange = () => { revPick.type = t.value; refreshRevPreview(); };
+  if (ag) ag.oninput = () => {
+    const v = parsePolyInt(ag.value, null);
+    if (v !== null) { revPick.angle = v; refreshRevPreview(); }
+  };
+  if (ag) ag.onblur = () => { ag.value = String(revPick.angle); };
+}
+/** 对勾确认：按预览的同一参数生成回转体，写入场景并回到选择态 */
+function commitRevolve() {
+  if (!revPick.loop || revPick.axisEdge == null) {
+    toast('请先选好轮廓与旋转轴，再点对勾确认'); return;
+  }
+  let geo;
+  try {
+    geo = revolveDesc(revPick.loop, revPick.normal, revPick.axisEdge, revPick.type, revPick.angle);
+  } catch (e) { geo = null; }
+  if (!geo || !geo.p || geo.p.length < 9) return toast('旋转结果为空，请检查轮廓与轴');
+  beginEdit();
+  try {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(geo.p, 3));
+    if (geo.n && geo.n.length === geo.p.length)
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(geo.n, 3));
+    if (geo.i && geo.i.length) g.setIndex(geo.i);
+    const tone = (state.selected && state.selected.userData.desc && state.selected.userData.desc.tone) || 0;
+    const src = state.selected && state.selected.userData.desc;
+    const desc = {
+      kind: 'solid', uid: (src && src.uid) || Date.now(), tone,
+      pos: [0, 0, 0], geo
+    };
+    const obj = new THREE.Mesh(g, bodyMaterial(desc));
+    obj.userData = { desc };
+    obj.position.set(0, 0, 0);
+    obj.updateMatrixWorld(true);
+    applyBodyAppearance(obj);
+    modelGroup.add(obj);
+    /* 旋转体用的是轮廓顶点，草图本体不再需要：移除参与轮廓的草图对象 */
+    const grp = state.selected ? sketchGroupOf(state.selected) : [];
+    grp.forEach((o) => { if (o.parent) { modelGroup.remove(o); disposeObject(o); } });
+    clearRevPreview();
+    hideTaskPop();
+    state.face = null;
+    clearGroup(faceGroup);
+    select(obj);
+    rememberOp('revolve', { type: revPick.type, angle: revPick.angle });
+    toast(`${REV_NAMES[revPick.type]}旋转完成：已生成回转体`);
+  } catch (err) {
+    restoreScene(editBase);
+    clearRevPreview();
+    hideTaskPop();
+    commitEdit();
+    return toast('旋转失败：' + (err.message || err));
+  }
+  commitEdit();
+  updateFirstRun();
+  updateStatus();
+}
+function cancelRevolve() {
+  clearRevPreview();
+  if (taskPopKind === 'revolve') hideTaskPop();
+  toast('已取消旋转');
+}
+
+/* ---- 正多边形参数窗：边数 + 旋转角度 + 只读中心点（用户在视图点击确定） ---- */
+function polyCenterText() {
+  const c = state.polyCenter;
+  return c ? `X ${round1(c[0])}, Y ${round1(c[1])} mm` : '在视图中点击确定中心点';
+}
+let lastShapeEvent = null;   // 最近一次形状拖拽事件，参数变化时用它即时重算预览
+function polyPopBody() {
+  return `<div class="tp-row"><label>边数</label><div class="tp-stepper">`
+       + `<input class="num" id="polyNEdit" type="number" min="3" max="6" step="1" value="${state.polyN}">`
+       + `<span class="tp-step-btns"><button type="button" data-pstep="1" title="增加一条边">▲</button><button type="button" data-pstep="-1" title="减少一条边">▼</button></span></div></div>`
+       + `<div class="tp-row"><label>旋转角</label><input class="num" id="polyRotEdit" type="number" step="1" value="${state.polyRot}"> <span style="font-size:11px;color:var(--text-3)">°</span></div>`
+       + `<div class="tp-row"><label>中心点</label><div class="tp-ro" id="polyCenterTxt">${polyCenterText()}</div></div>`
+       + `<div class="tp-tip">边数 3–6；旋转角只取整数（可为负）。中心点由鼠标在视图中点击确定；外接圆半径直接拖动画出。</div>`;
+}
+/** 参数变化 → 正在拖出的正多边形立即按新参数重算 */
+function refreshPolyPreview() {
+  if (state.draft && state.draft.type === 'sketch-poly' && lastShapeEvent) updateShapeSketch(lastShapeEvent);
+}
+/** 边数只取 3–6 的整数；旋转角只取整数，可为负。空串/仅负号是输入中间态，先不改写。 */
+function parsePolyInt(raw, fallback) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!/^-?\d+$/.test(s)) return null;
+  const v = parseInt(s, 10);
+  return Number.isFinite(v) ? v : fallback;
+}
+function applyPolyParamInput() {
+  const nEl = $('polyNEdit'), rEl = $('polyRotEdit');
+  if (nEl) {
+    const v = parsePolyInt(nEl.value, state.polyN);
+    if (v != null) state.polyN = Math.max(3, Math.min(6, v));
+  }
+  if (rEl) {
+    /* 允许用户输入 "-5"：负号已录入但数字未录入时保持现状，不重置为 0 */
+    const v = parsePolyInt(rEl.value, null);
+    if (v != null) state.polyRot = v;
+  }
+  const skN = $('polyN'); if (skN) skN.value = state.polyN;
+  refreshPolyPreview();
+}
+/** 失焦 / 对勾确认时把非法输入规整为合法值 */
+function normalizePolyInputs() {
+  const nEl = $('polyNEdit'), rEl = $('polyRotEdit');
+  if (nEl) nEl.value = state.polyN;
+  if (rEl) rEl.value = state.polyRot;
+}
+function openPolyPop() {
+  showTaskPop('poly', '正多边形', polyPopBody(), () => {
+    commitPolyParams();
+    hideTaskPop();
+    toast(`正多边形：${state.polyN} 边，旋转 ${state.polyRot}°，参数已确认`);
+  });
+  const nEl = $('polyNEdit'), rEl = $('polyRotEdit');
+  if (nEl) {
+    nEl.addEventListener('input', applyPolyParamInput);
+    nEl.addEventListener('blur', normalizePolyInputs);
+  }
+  if (rEl) {
+    rEl.addEventListener('input', applyPolyParamInput);
+    rEl.addEventListener('blur', normalizePolyInputs);
+  }
+  document.querySelectorAll('#tpBody [data-pstep]').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const dir = parseInt(b.dataset.pstep, 10);
+      state.polyN = Math.max(3, Math.min(6, state.polyN + dir));
+      if (nEl) nEl.value = state.polyN;
+      applyPolyParamInput();
+    };
+  });
+}
+/** 提交参数窗中的值（确认时） */
+function commitPolyParams() {
+  applyPolyParamInput();
+  normalizePolyInputs();
+}
+/** 用户在视图确定中心点时实时刷新只读框 */
+function refreshPolyCenter(centerLocal) {
+  state.polyCenter = centerLocal ? centerLocal.slice() : null;
+  if (taskPopKind !== 'poly') return;
+  const el = $('polyCenterTxt');
+  if (el) el.textContent = polyCenterText();
+}
+
+/* ---- 测量窗：4 个图标选项卡 + 两个拾取结果框（点击视图实时填充） ---- */
+const MEASURE_ICONS = {
+  p2p: '<svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M6.5 16.5l11-9"/></svg>',
+  p2face: '<svg viewBox="0 0 24 24"><path d="M3 18h18v-6L12 4 3 12z"/><circle cx="12" cy="9" r="1.4"/><path d="M12 10.5v6"/></svg>',
+  faceface: '<svg viewBox="0 0 24 24"><path d="M3 16h11l6-8"/><path d="M3 16l6-8h8"/><path d="M9 8a4 4 0 0 1 5 8"/></svg>',
+  lineline: '<svg viewBox="0 0 24 24"><path d="M3 18L14 7"/><path d="M10 20L21 9"/><path d="M14 7a3 3 0 0 1 7 2"/></svg>'
+};
+function measureNames() {
+  return { p2p: '点到点', p2face: '点到面', faceface: '面面角', lineline: '线线角' };
+}
+/** 拾取结果框当前文字（实时反映 mPick1/mPick2） */
+function pickText(pk) {
+  if (!pk) return '点击视图选取';
+  if (pk.vertex) return '顶点 · ' + fmtV(pk.point);
+  if (pk.normal) return '平面 · ' + fmtV(pk.point);
+  if (pk.dir) return '直线 · ' + fmtV(pk.point);
+  return '点 · ' + fmtV(pk.point);
+}
+function fmtV(p) { return `(${round1(p.x)}, ${round1(p.y)}, ${round1(p.z)})`; }
+function measurePopBody() {
+  const N = measureNames();
+  let tabs = '<div class="tp-tabs">';
+  Object.keys(N).forEach((k) => {
+    tabs += `<button class="tp-tab${k === measureMode ? ' on' : ''}" data-mtab="${k}" title="${MEASURE_TIP[k]}">${MEASURE_ICONS[k]}<span class="lb">${N[k]}</span></button>`;
+  });
+  tabs += '</div>';
+  const secondLabel = measureMode === 'p2face' ? '目标面' : measureMode === 'faceface' ? '第二个面' : measureMode === 'lineline' ? '第二条线' : '终点';
+  const firstLabel = measureMode === 'faceface' ? '第一个面' : measureMode === 'lineline' ? '第一条线' : '起点';
+  tabs += `<div class="tp-pick"><label style="min-width:44px">${firstLabel}</label><div class="pv${mPick1 ? ' filled' : ''}" id="mp1">${pickText(mPick1)}</div></div>`;
+  tabs += `<div class="tp-pick"><label style="min-width:44px">${secondLabel}</label><div class="pv${mPick2 ? ' filled' : ''}" id="mp2">${pickText(mPick2)}</div></div>`;
+  tabs += `<div class="tp-val" id="mValue">${measureValue() || '等待拾取…'}</div>`;
+  return tabs;
+}
+/** 实时刷新测量窗的两个拾取框与结果值 */
+function refreshMeasurePop() {
+  if (taskPopKind !== 'measure') return;
+  const e1 = $('mp1'), e2 = $('mp2'), ev = $('mValue');
+  if (e1) { e1.textContent = pickText(mPick1); e1.classList.toggle('filled', !!mPick1); }
+  if (e2) { e2.textContent = pickText(mPick2); e2.classList.toggle('filled', !!mPick2); }
+  if (ev) ev.textContent = measureValue() || '等待拾取…';
+}
+function openMeasurePop(mode) {
+  startMeasure(mode);
+  showTaskPop('measure', '测量', measurePopBody(), () => {
+    cancelMeasure();
+    hideTaskPop();
+    toast('测量已结束');
+  });
+  openMeasurePopBindTabs();
+}
+function openMeasurePopBindTabs() {
+  document.querySelectorAll('#tpBody [data-mtab]').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      startMeasure(b.dataset.mtab);
+      $('tpBody').innerHTML = measurePopBody();
+      openMeasurePopBindTabs();
+    };
+  });
+}
+
 /** 隐藏选中对象：从场景视图移除（仍在数据里），并清掉选中态 */
 function hideSelected() {
   let targets = state.multi.length > 1 ? state.multi.slice() : (state.selected ? [state.selected] : []);
@@ -6639,18 +7377,29 @@ function hideSelected() {
 }
 
 /** 进入/退出显现模式：所有隐藏对象先以半透明幽灵出现，点中某一个才真正显现 */
-function toggleRevealMode() {
-  if (!state.revealMode && !state.hidden.length) return toast('当前没有隐藏对象');
-  state.revealMode = !state.revealMode;
+/** 退出显现模式：未恢复的隐藏对象重新藏起，关任务窗，回到普通选择状态 */
+function exitRevealMode(showToast) {
+  if (!state.revealMode) return;
+  state.revealMode = false;
   const btn = $('btnReveal');
-  if (btn) btn.classList.toggle('on', state.revealMode);
-  if (state.revealMode) {
-    state.hidden.forEach((o) => { o.visible = true; paintRevealGhost(o); });
-    toast('显现模式：所有隐藏对象已半透明显示，点中某一个才真正显现它（再次点「显现」退出）');
-  } else {
-    state.hidden.forEach((o) => { o.visible = false; paintEntity(o, 'normal'); });
-    toast('已退出显现模式，未点选的隐藏对象重新隐藏');
-  }
+  if (btn) btn.classList.remove('on');
+  state.hidden.forEach((o) => { o.visible = false; paintEntity(o, 'normal'); });
+  hideTaskPop();
+  if (showToast !== false) toast('已确认显现结果，回到选择状态');
+  updateHints();
+}
+
+function toggleRevealMode() {
+  /* 已处于显现模式：点「显现」按钮或对勾都视为确认退出 */
+  if (state.revealMode) { exitRevealMode(); return; }
+  if (!state.hidden.length) return toast('当前没有隐藏对象');
+  state.revealMode = true;
+  revealStartCount = state.hidden.length;
+  const btn = $('btnReveal');
+  if (btn) btn.classList.add('on');
+  state.hidden.forEach((o) => { o.visible = true; paintRevealGhost(o); });
+  showTaskPop('reveal', '显现实体', revealPopBody(), () => exitRevealMode());
+  toast('显现模式：点选要恢复的实体，点左上角对勾确认退出');
   updateHints();
 }
 
@@ -6662,11 +7411,8 @@ function revealObject(obj) {
   obj.visible = true;
   if (obj.userData.desc) delete obj.userData.desc.hidden;
   paintEntity(obj, 'normal');   // 先脱掉幽灵外观；随后 select() 会刷成选中态
-  if (!state.hidden.length) {
-    state.revealMode = false;
-    const btn = $('btnReveal');
-    if (btn) btn.classList.remove('on');
-  }
+  /* 不再自动退出：即便全部恢复，也由左上角任务窗的对勾统一确认退出 */
+  refreshRevealPop();
   updateStatus();
   updateHints();
   return true;
@@ -6899,11 +7645,11 @@ function pick(e) {
     if (!state.revealMode && isPickHidden(root)) continue;
     const isSketch = root.userData.desc && root.userData.desc.kind === 'sketch';
     if (isSketch && !h.object.userData.isFill) {
-      if (!solidSketch) solidSketch = { hit: h, root };   // 草图线/顶点：最高优先
+      if (!solidSketch) solidSketch = { hit: h, root, isFill: false };   // 草图线/顶点：最高优先
     } else if (isSketch && h.object.userData.isFill) {
-      if (!sketchFill) sketchFill = { hit: h, root };     // 草图填充面：次优先
+      if (!sketchFill) sketchFill = { hit: h, root, isFill: true };      // 草图填充面：次优先
     } else if (!solidEntity) {
-      solidEntity = { hit: h, root };                      // 实体：兜底
+      solidEntity = { hit: h, root };                                   // 实体：兜底
     }
   }
   return solidSketch || sketchFill || solidEntity;
@@ -6958,7 +7704,8 @@ function paintRevealGhost(obj) {
       if (!c.material || !c.material.color) return;
       c.material.transparent = true;
       if (c.material.depthWrite !== undefined) c.material.depthWrite = false;
-      if (c.userData.isNode) { c.material.color.setHex(REVEAL_GHOST_EDGE); c.material.opacity = 0.6; }
+      if (c.userData.isNodeRing) { c.material.color.setHex(0xffffff); c.material.opacity = 0.45; }
+      else if (c.userData.isNode) { c.material.color.setHex(REVEAL_GHOST_EDGE); c.material.opacity = 0.6; }
       else if (c.userData.isFill) { c.material.color.setHex(REVEAL_GHOST_FILL); c.material.opacity = 0.12; }
       else { c.material.color.setHex(REVEAL_GHOST_EDGE); c.material.opacity = 0.35; }
     });
@@ -6983,7 +7730,8 @@ function paintEntity(obj, look) {
     else if (!obj.isMesh) {
       obj.traverse((c) => {
         if (!c.material || !c.material.color) return;
-        c.material.color.setHex(c.userData.isNode ? SKETCH_NODE_C : c.userData.isFill ? SKETCH_FILL_C : SKETCH_C);
+        if (c.userData.isNodeRing) { c.material.color.setHex(0xffffff); return; }  // 端点白描边恒白
+        c.material.color.setHex(c.userData.isNode ? SKETCH_C : c.userData.isFill ? SKETCH_FILL_C : SKETCH_C);
         if (c.userData.isFill) c.material.opacity = 0.36;
       });
     }
@@ -7001,6 +7749,7 @@ function paintEntity(obj, look) {
   } else {
     obj.traverse((ch) => {
       if (!ch.material || !ch.material.color) return;
+      if (ch.userData.isNodeRing) { ch.material.color.setHex(0xffffff); return; }  // 端点白描边恒白
       if (ch.userData.isNode) { ch.material.color.setHex(c('edge')); return; }
       if (ch.userData.isFill) {
         ch.material.color.setHex(c('fill')); ch.material.opacity = L.depth ? 0.45 : 0.3;
@@ -7105,6 +7854,94 @@ function sketchGroupOf(obj) {
   return group.length ? group : [obj];
 }
 
+/** 草图点的世界坐标（与 makeSketchParts 同一套局部基） */
+function sketchPointWorld(desc, xy) {
+  const { u, v } = sketchBasis(desc);
+  const o = new THREE.Vector3().fromArray(desc.pos || [0, 0, 0]);
+  return o.clone().addScaledVector(u, xy[0]).addScaledVector(v, xy[1]);
+}
+function sketchPtKey(p) {
+  return Math.round(p.x * 20) + ',' + Math.round(p.y * 20) + ',' + Math.round(p.z * 20);
+}
+/**
+ * 自动识别「草图已经围成一个闭合平面」。
+ * · 单个闭合草图（矩形/圆/椭圆/正多边形/闭合折线）：直接返回它自身轮廓。
+ * · 多段线：把同一次草图会话、同一平面上的线段端点连成图；只有包含被点对象、
+ *   且每个端点度数恰好为 2 的连通环才算闭合，自动排出顺序，无需用户额外确认。
+ */
+function closedSketchRegionFor(root) {
+  const d = root && root.userData && root.userData.desc;
+  if (!d || d.kind !== 'sketch') return null;
+  const basis = sketchBasis(d);
+  const normal = basis.n.clone();
+  if (d.closed && d.points.length >= 3) {
+    const loop = d.points.map((p) => sketchPointWorld(d, p));
+    const center = new THREE.Vector3();
+    loop.forEach((p) => center.add(p));
+    center.multiplyScalar(1 / loop.length);
+    return { loop, normal, center, roots: [root] };
+  }
+  const group = sketchGroupOf(root);
+  if (group.length < 3) return null;
+  const segs = [], adj = new Map(), pts = new Map();
+  group.forEach((o) => {
+    const od = o.userData && o.userData.desc;
+    if (!od || od.kind !== 'sketch' || od.closed || (od.points || []).length < 2) return;
+    if (sketchBasis(od).n.dot(normal) < 0.999) return;   // 不同平面的线不能围成同一个面
+    const wp = od.points.map((p) => sketchPointWorld(od, p));
+    for (let i = 0; i < wp.length - 1; i++) {
+      const a = wp[i], b = wp[i + 1];
+      if (a.distanceToSquared(b) < 1e-6) continue;
+      const ka = sketchPtKey(a), kb = sketchPtKey(b);
+      if (ka === kb) continue;
+      pts.set(ka, a); pts.set(kb, b);
+      const idx = segs.length;
+      segs.push({ obj: o, ka, kb });
+      if (!adj.has(ka)) adj.set(ka, []);
+      if (!adj.has(kb)) adj.set(kb, []);
+      adj.get(ka).push(idx); adj.get(kb).push(idx);
+    }
+  });
+  if (segs.length < 3) return null;
+  /* 从被点对象所在的线段出发做连通遍历 */
+  const queue = segs.map((s, i) => (s.obj === root ? i : -1)).filter((i) => i >= 0);
+  const seenSeg = new Set(), seenNode = new Set();
+  while (queue.length) {
+    const i = queue.pop();
+    if (seenSeg.has(i)) continue;
+    seenSeg.add(i);
+    [segs[i].ka, segs[i].kb].forEach((k) => {
+      seenNode.add(k);
+      (adj.get(k) || []).forEach((j) => { if (!seenSeg.has(j)) queue.push(j); });
+    });
+  }
+  if (seenSeg.size < 3) return null;
+  for (const k of seenNode) if ((adj.get(k) || []).length !== 2) return null;   // 有端点/分叉 → 未闭合
+  /* 沿环走出有序轮廓 */
+  const first = segs[Array.from(seenSeg)[0]];
+  const start = first.ka;
+  const loop = [pts.get(start).clone()];
+  let cur = start, prevSeg = -1, guard = 0;
+  while (guard++ <= seenSeg.size) {
+    let nextSeg = -1;
+    for (const j of adj.get(cur) || []) {
+      if (j !== prevSeg && seenSeg.has(j)) { nextSeg = j; break; }
+    }
+    if (nextSeg < 0) return null;
+    const s = segs[nextSeg];
+    const next = s.ka === cur ? s.kb : s.ka;
+    loop.push(pts.get(next).clone());
+    prevSeg = nextSeg;
+    cur = next;
+    if (cur === start) break;
+  }
+  if (cur !== start || loop.length < 4) return null;
+  const center = new THREE.Vector3();
+  loop.forEach((p) => center.add(p));
+  center.multiplyScalar(1 / loop.length);
+  return { loop, normal, center, roots: Array.from(seenSeg).map((i) => segs[i].obj) };
+}
+
 function select(obj) {
   clearMulti();
   setEntityHover(null);
@@ -7137,36 +7974,81 @@ function select(obj) {
   showObjMenu();   // 选中实体（未选面）→ 浮出「移动/缩放/置平」菜单
 }
 
-/** 左键从空白处拖动刷选：光标扫过的对象依次成组选中（3D One 式刷选）。
-    第一次刷到时先清掉旧的选中/选面/浮层；草图会话成组；A/B 只取前两个真实实体。 */
-function brushPick(e) {
-  const d = drag;
-  if (!d || !d.picked) return;
-  const hit = pick(e);
-  if (!hit || !hit.root) return;
-  const root = hit.root;
-  if (!root.userData || !root.userData.desc) return;
-  if (state.selected === root || state.selectedB === root || state.multi.indexOf(root) >= 0) return;
-
-  if (!d.picked.size) select(null);   // 首次命中：清干净旧选择，以本次刷选为准
-
-  d.picked.add(root);
-  sketchGroupOf(root).forEach((o) => {
-    if (o === state.selected || o === state.selectedB || state.multi.indexOf(o) >= 0) return;
-    state.multi.push(o);
-    setHighlight(o, true);
-  });
-
-  /* A=第一个实体、B=第二个实体；草图/面只高亮，不参与布尔 */
-  const solids = state.multi.filter((o) => {
+/* ---------- 左键拖拽框选：屏幕虚线框 + 相交即选中 ---------- */
+function showBrushBox(rect) {
+  const el = $('brushBox');
+  if (!el) return;
+  el.style.left = rect.left.toFixed(1) + 'px';
+  el.style.top = rect.top.toFixed(1) + 'px';
+  el.style.width = Math.max(0, rect.right - rect.left).toFixed(1) + 'px';
+  el.style.height = Math.max(0, rect.bottom - rect.top).toFixed(1) + 'px';
+  el.classList.add('show');
+}
+function hideBrushBox() {
+  const el = $('brushBox');
+  if (el) el.classList.remove('show');
+}
+/** 对象在视口里的屏幕包围盒（相对 viewport 左上角） */
+function objectScreenRect(obj) {
+  if (!obj || !obj.visible) return null;
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return null;
+  const r = viewport.getBoundingClientRect();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    const v = new THREE.Vector3(
+      i & 1 ? box.max.x : box.min.x,
+      i & 2 ? box.max.y : box.min.y,
+      i & 4 ? box.max.z : box.min.z
+    ).project(camera);
+    if (v.z < -1 || v.z > 1) continue;
+    const x = (v.x * 0.5 + 0.5) * r.width;
+    const y = (-v.y * 0.5 + 0.5) * r.height;
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  return Number.isFinite(minX) ? { left: minX, top: minY, right: maxX, bottom: maxY } : null;
+}
+function rectsIntersect(a, b) {
+  return !!(a && b && a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top);
+}
+/** 把框选结果一次性写进选择状态；草图按会话成组，A/B 只取前两个真实实体 */
+function applyBrushSelection(objs) {
+  clearMulti();
+  state.multi = objs.slice();
+  const solids = objs.filter((o) => {
     const k = o.userData && o.userData.desc && o.userData.desc.kind;
     return k && k !== 'sketch' && k !== 'sheet';
   });
-  state.selected = solids[0] || state.multi[0] || null;
+  state.selected = solids[0] || objs[0] || null;
   state.selectedB = solids[1] || null;
-  if (state.selectedB) setHighlight(state.selectedB, true, true);
+  state.face = null; state.faceHit = null; state.placeFace = null;
+  clearGroup(faceGroup); hideFaceMenu(); hideObjMenu();
+  objs.forEach((o) => setHighlight(o, true, o === state.selectedB));
   updateBoolButtons();
+  syncPanel();
   updateStatus();
+}
+/** 拖拽过程中实时框选：只要对象的屏幕包围盒与虚线框相交就选中 */
+function brushPick(e) {
+  const d = drag;
+  if (!d || d.kind !== 'brush') return;
+  const r = viewport.getBoundingClientRect();
+  const rect = {
+    left: Math.min(d.x0, e.clientX) - r.left,
+    top: Math.min(d.y0, e.clientY) - r.top,
+    right: Math.max(d.x0, e.clientX) - r.left,
+    bottom: Math.max(d.y0, e.clientY) - r.top
+  };
+  showBrushBox(rect);
+  const objs = [];
+  modelGroup.children.forEach((o) => {
+    if (!o.userData || !o.userData.desc || isPickHidden(o)) return;
+    if (!rectsIntersect(rect, objectScreenRect(o))) return;
+    sketchGroupOf(o).forEach((g) => { if (objs.indexOf(g) < 0) objs.push(g); });
+  });
+  d.hitAny = objs.length > 0;
+  applyBrushSelection(objs);
 }
 
 /** 点选一个面：识别整面 → 橙色高亮 + 浮出「拉伸」菜单 */
@@ -7609,20 +8491,29 @@ function polygonGeometry(loopWorld, normal, offset = 0) {
 }
 
 /** 整面高亮：铺满所有共面三角 + 描出所有边界环（沿法向抬一点防闪烁） */
-function buildFaceHighlight(loopWorld, normal, loopsWorld, fillCoords) {
+function buildFaceHighlight(loopWorld, normal, loopsWorld, fillCoords, sketchBlue) {
   clearGroup(faceGroup);
   const off = FACE_OFF;
+  /* 闭合草图面弹拉伸菜单时用蓝色系（浅蓝填充 + 蓝描边）：
+     草图本体已由 syncEntityFacePaint 退回蓝色，若这里仍用橙色 FACE_C 描边，
+     就会盖在草图轮廓上看起来"轮廓一直是黄色"，用户无法分辨哪个面将被拉伸。
+     实体选面仍走默认橙色，保持两种场景的视觉区分。 */
+  const fillMaterial = () => sketchBlue
+    ? new THREE.MeshBasicMaterial({ color: SKETCH_FILL_C, transparent: true, opacity: 0.34,
+        side: THREE.DoubleSide, depthWrite: false })
+    : faceFillMat();
+  const strokeColor = sketchBlue ? SKETCH_C : FACE_C;
   // 1) 面填充：优先用所有共面三角整片铺满（CSG 拆成多片时也能选中整个面）
   if (fillCoords && fillCoords.length >= 9) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(fillCoords, 3));
     g.computeVertexNormals();
-    const fill = new THREE.Mesh(g, faceFillMat());
+    const fill = new THREE.Mesh(g, fillMaterial());
     fill.position.addScaledVector(normal, off);
     fill.renderOrder = 3;
     faceGroup.add(fill);
   } else {
-    const fill = new THREE.Mesh(polygonGeometry(loopWorld, normal, off), faceFillMat());
+    const fill = new THREE.Mesh(polygonGeometry(loopWorld, normal, off), fillMaterial());
     fill.renderOrder = 3;
     faceGroup.add(fill);
   }
@@ -7634,7 +8525,7 @@ function buildFaceHighlight(loopWorld, normal, loopsWorld, fillCoords) {
     lp.push(lp[0].clone());
     const line = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(lp),
-      new THREE.LineBasicMaterial({ color: FACE_C })
+      new THREE.LineBasicMaterial({ color: strokeColor })
     );
     line.renderOrder = 4;
     faceGroup.add(line);
@@ -7758,7 +8649,7 @@ function addSketchPoint(worldP) {
  * 由「起点 + 当前点」算出形状的轮廓点集
  * 矩形：对角两点；圆：圆心+半径；椭圆：中心+长短轴；正多边形：中心+外接圆
  */
-function shapePoints(type, sx, sz, cx, cz, sides) {
+function shapePoints(type, sx, sz, cx, cz, sides, rotDeg) {
   const dx = cx - sx, dz = cz - sz;
   const out = [];
 
@@ -7794,7 +8685,9 @@ function shapePoints(type, sx, sz, cx, cz, sides) {
   if (type === 'sketch-poly') {
     const r = Math.max(2, Math.round(Math.hypot(dx, dz) / SNAP) * SNAP);
     const k = Math.max(3, Math.min(12, sides || 6));
-    const a0 = Math.atan2(dz, dx);          // 让一个顶点朝向鼠标
+    /* 旋转角度是相对拖拽方向的偏移：0° 时首顶点朝向鼠标拖拽落点（原行为），
+       设定角度后整体绕中心旋转该角度。 */
+    const a0 = Math.atan2(dz, dx) + ((rotDeg != null && !isNaN(rotDeg)) ? rotDeg * Math.PI / 180 : 0);
     for (let i = 0; i < k; i++) {
       const a = a0 + (i / k) * Math.PI * 2;
       out.push([round1(sx + Math.cos(a) * r), round1(sz + Math.sin(a) * r)]);
@@ -7812,6 +8705,7 @@ function startShapeSketch(e) {
   const [x, y] = worldToPlane2D(p);
   /* 弱磁吸：仅靠近格点/顶点/已有端点才吸，其余保留小数落点 */
   state.draft = { type: state.tool, points: [], start: magnetSnap2D(x, y) };
+  if (state.tool === 'sketch-poly') refreshPolyCenter(state.draft.start);
   renderDraft();
 }
 
@@ -7819,13 +8713,15 @@ function startShapeSketch(e) {
 function updateShapeSketch(e) {
   const d = state.draft;
   if (!d || !d.start) return;
+  lastShapeEvent = e;   // 参数窗改动时复用同一光标位置实时重算
   const p = planePoint(e);
   if (!p) return;
   const [x, y] = worldToPlane2D(p);
   const [sx, sy] = magnetSnap2D(x, y);
-  const pts = shapePoints(d.type, d.start[0], d.start[1], sx, sy, state.polyN);
+  const pts = shapePoints(d.type, d.start[0], d.start[1], sx, sy, state.polyN, state.polyRot || 0);
   d.points = pts;
   renderDraft();
+  updateSegOverlay();   // 拖拽中实时刷新尺寸标签（长宽 / 半径 / 长短轴 / 外接圆半径）
 }
 
 /** 拖拽类形状：松开 → 生成闭合草图 */
@@ -7879,7 +8775,7 @@ function commitSketch(points, tip, closed = true, stayInLine = false) {
   select(obj);
   commitEdit();
   if (!closed) segObj = obj;   // 线段：显示长度标签，可输入精确值
-  else if (state.tool === 'sketch-rect') shapeObj = obj;   // 矩形：显示宽高标签，可编辑
+  else if (['sketch-rect','sketch-circle','sketch-ellipse','sketch-poly'].includes(state.tool)) shapeObj = obj;  // 拖拽类形状：显示尺寸标签，可编辑
   updateFirstRun();
   updateStatus();
   toast(tip || (closed
@@ -8029,42 +8925,58 @@ function updateSegOverlay() {
       ? planeLocalWorld(sp, state.segHoverLocal[0], state.segHoverLocal[1])
       : a.clone();
   }
-  /* 矩形：长、宽分别显示，各自可点击编辑 */
+  /* 拖拽类形状（矩形/圆/椭圆/正多边形）：尺寸数字实时显示，各自可点击编辑 */
   const shapeWTag = $('shapeWTag'), shapeHTag = $('shapeHTag');
-  let shapePts = null, shapePlane = null;
+  let shapePts = null, shapePlane = null, shapeKind = null;
   if (!a && shapeObj && shapeObj.userData.desc && shapeObj.userData.desc.kind === 'sketch') {
     const d = shapeObj.userData.desc;
-    shapePts = d.points; shapePlane = d.plane;
-  } else if (!a && state.mode === 'sketch' && state.draft && state.draft.type === 'sketch-rect'
-             && state.draft.points.length >= 3 && state.sketchPlane) {
-    shapePts = state.draft.points; shapePlane = state.sketchPlane;
+    shapePts = d.points; shapePlane = d.plane; shapeKind = d.sketchTool;
+  } else if (!a && state.mode === 'sketch' && state.draft && state.draft.type
+             && state.draft.type.startsWith('sketch-') && state.draft.points.length >= 3 && state.sketchPlane) {
+    shapePts = state.draft.points; shapePlane = state.sketchPlane; shapeKind = state.draft.type;
   } else if (!a && state.selected && state.selected.userData.desc
              && state.selected.userData.desc.kind === 'sketch'
-             && state.selected.userData.desc.sketchTool === 'sketch-rect') {
-    /* 兜底：切工具 / 撤销 / 重开文件后 shapeObj 可能为空，只要选中的是矩形草图就恢复标签 */
+             && ['sketch-rect','sketch-circle','sketch-ellipse','sketch-poly'].includes(state.selected.userData.desc.sketchTool)) {
     shapeObj = state.selected;
     const d = shapeObj.userData.desc;
-    shapePts = d.points; shapePlane = d.plane;
+    shapePts = d.points; shapePlane = d.plane; shapeKind = d.sketchTool;
   }
   if (shapePts && shapePlane && shapePts.length >= 3 && !shapeEditing) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     shapePts.forEach(([x, y]) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); });
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     const w = maxX - minX, h = maxY - minY;
-    /* 长标签在下边外侧、宽标签在右边外侧，留出足够间距不与图形边框/填充相交 */
-    const sw = projectToScreen(planeLocalWorld(shapePlane, (minX + maxX) / 2, minY));
-    const sh = projectToScreen(planeLocalWorld(shapePlane, maxX, (minY + maxY) / 2));
-    if (shapeWTag && shapeHTag) {
-      shapeWTag.style.display = 'block';
-      shapeWTag.style.left = sw.x.toFixed(1) + 'px';
-      shapeWTag.style.top = (sw.y + 30).toFixed(1) + 'px';
-      shapeWTag.innerHTML = w.toFixed(2) + '<span class="u"> mm</span>';
-      shapeWTag._dim = 'w'; shapeWTag._wh = [w, h]; shapeWTag._plane = shapePlane;
-      shapeHTag.style.display = 'block';
-      shapeHTag.style.left = (sh.x + 34).toFixed(1) + 'px';
-      shapeHTag.style.top = sh.y.toFixed(1) + 'px';
-      shapeHTag.innerHTML = h.toFixed(2) + '<span class="u"> mm</span>';
-      shapeHTag._dim = 'h'; shapeHTag._wh = [w, h]; shapeHTag._plane = shapePlane;
+    /* 每种形状给出两个可编辑尺寸项：矩形=长/宽，圆=直径/半径（只用一个），椭圆=长轴/短轴，正多边形=外接圆半径 */
+    let dims = [];
+    if (shapeKind === 'sketch-circle') {
+      const r = Math.max(w, h) / 2;
+      dims = [{ key: 'r', label: 'R', value: r, pt: [cx, maxY], off: [0, 26] }];
+    } else if (shapeKind === 'sketch-ellipse') {
+      dims = [
+        { key: 'w', label: '长轴', value: w, pt: [cx, minY], off: [0, 26] },
+        { key: 'h', label: '短轴', value: h, pt: [maxX, cy], off: [34, 0] }
+      ];
+    } else if (shapeKind === 'sketch-poly') {
+      const r = Math.hypot(shapePts[0][0] - cx, shapePts[0][1] - cy);
+      dims = [{ key: 'r', label: 'R', value: r, pt: [cx, maxY], off: [0, 26] }];
+    } else { // 矩形默认
+      dims = [
+        { key: 'w', label: '长', value: w, pt: [cx, minY], off: [0, 30] },
+        { key: 'h', label: '宽', value: h, pt: [maxX, cy], off: [34, 0] }
+      ];
     }
+    const showTag = (tag, d) => {
+      if (!tag || !d) { if (tag) tag.style.display = 'none'; return; }
+      const sp = projectToScreen(planeLocalWorld(shapePlane, d.pt[0], d.pt[1]));
+      tag.style.display = 'block';
+      tag.style.left = (sp.x + d.off[0]).toFixed(1) + 'px';
+      tag.style.top = (sp.y + d.off[1]).toFixed(1) + 'px';
+      tag.innerHTML = d.label + ' ' + d.value.toFixed(2) + '<span class="u"> mm</span>';
+      tag._dim = d.key; tag._shapeKind = shapeKind; tag._curValue = d.value;
+      tag._shapeInfo = { pts: shapePts, plane: shapePlane, cx, cy, w, h, minX, maxX, minY, maxY };
+    };
+    showTag(shapeWTag, dims[0]);
+    showTag(shapeHTag, dims[1]);
     segLenTag.style.display = 'none';
     segConfirm.style.display = 'none';
     segLayer.classList.add('show');
@@ -8172,25 +9084,22 @@ function confirmPendingShape() {
 function beginShapeDimEdit(dim) {
   const tag = $(dim === 'w' ? 'shapeWTag' : 'shapeHTag');
   if (!tag || shapeEditing) return;
-  /* 找到当前矩形的点数组：优先已提交对象，其次绘制中的 draft */
+  const info = tag._shapeInfo || {};
+  const kind = tag._shapeKind || 'sketch-rect';
+  /* 找到当前形状的点数组：优先已提交对象，其次绘制中的 draft */
   let ptsRef = null, objToUpdate = null;
   if (shapeObj && shapeObj.userData.desc && shapeObj.userData.desc.kind === 'sketch') {
-    ptsRef = shapeObj.userData.desc.points;
-    objToUpdate = shapeObj;
-  } else if (state.mode === 'sketch' && state.draft && state.draft.type === 'sketch-rect'
-             && state.draft.points.length >= 3) {
+    ptsRef = shapeObj.userData.desc.points; objToUpdate = shapeObj;
+  } else if (state.mode === 'sketch' && state.draft && state.draft.points.length >= 3) {
     ptsRef = state.draft.points;
   } else if (state.selected && state.selected.userData.desc
-             && state.selected.userData.desc.kind === 'sketch'
-             && state.selected.userData.desc.sketchTool === 'sketch-rect') {
-    ptsRef = state.selected.userData.desc.points;
-    objToUpdate = state.selected;
-    shapeObj = state.selected;
+             && state.selected.userData.desc.kind === 'sketch') {
+    ptsRef = state.selected.userData.desc.points; objToUpdate = state.selected; shapeObj = state.selected;
   }
   if (!ptsRef) return;
   shapeEditing = true;
-  const [w, h] = tag._wh || [10, 10];
-  tag.innerHTML = `<input type="number" step="0.01" min="0.01" value="${round2(dim === 'w' ? w : h)}" style="width:64px">`;
+  const curVal = tag._curValue != null ? tag._curValue : (info[dim] || 10);
+  tag.innerHTML = `<input type="number" step="0.01" min="0.01" value="${round2(curVal)}" style="width:64px">`;
   const input = tag.querySelector('input');
   input.focus(); input.select();
   const finish = (commit) => {
@@ -8198,21 +9107,33 @@ function beginShapeDimEdit(dim) {
     const v = commit ? parseFloat(input.value) : NaN;
     shapeEditing = false;
     if (isFinite(v) && v > 0) {
-      let minX = Infinity, minY = Infinity;
-      ptsRef.forEach(([x, y]) => { minX = Math.min(minX, x); minY = Math.min(minY, y); });
-      const nw = dim === 'w' ? v : w;
-      const nh = dim === 'h' ? v : h;
-      const next = [
-        [round2(minX), round2(minY)], [round2(minX + nw), round2(minY)],
-        [round2(minX + nw), round2(minY + nh)], [round2(minX), round2(minY + nh)]
-      ];
-      for (let i = 0; i < next.length; i++) ptsRef[i] = next[i];
-      if (objToUpdate) {
-        beginEdit(); updateObject(objToUpdate); commitEdit(); syncPanel();
-      } else if (state.draft) {
-        renderDraft();   // draft：重画橡皮筋与顶点，实时反馈新尺寸
+      const cx = info.cx != null ? info.cx : 0, cy = info.cy != null ? info.cy : 0;
+      let next = null;
+      if (kind === 'sketch-rect') {
+        const w = info.w || 10, h = info.h || 10;
+        const nw = dim === 'w' ? v : w, nh = dim === 'h' ? v : h;
+        const x0 = cx - w / 2, y0 = cy - h / 2;
+        next = [[round2(x0), round2(y0)], [round2(x0 + nw), round2(y0)],
+                [round2(x0 + nw), round2(y0 + nh)], [round2(x0), round2(y0 + nh)]];
+      } else if (kind === 'sketch-circle' || kind === 'sketch-poly') {
+        next = shapePoints(kind, cx, cy, cx + v, cy, state.polyN, state.polyRot || 0);
+      } else if (kind === 'sketch-ellipse') {
+        const rx = (info.w || 10) / 2, rz = (info.h || 10) / 2;
+        const nrx = dim === 'w' ? v / 2 : rx, nrz = dim === 'h' ? v / 2 : rz;
+        const seg = 160;
+        next = [];
+        for (let i = 0; i < seg; i++) {
+          const a = (i / seg) * Math.PI * 2;
+          next.push([round1(cx + Math.cos(a) * nrx), round1(cy + Math.sin(a) * nrz)]);
+        }
       }
-      toast('矩形尺寸已改为 ' + round2(nw) + ' × ' + round2(nh) + ' mm');
+      if (next) {
+        ptsRef.length = 0;
+        next.forEach((p) => ptsRef.push(p));
+        if (objToUpdate) { beginEdit(); updateObject(objToUpdate); commitEdit(); syncPanel(); }
+        else if (state.draft) renderDraft();
+        toast('尺寸已改为 ' + round2(v) + ' mm');
+      }
     }
     shapePendingConfirm = true;   // 第一次回车确定尺寸，第二次回车确认图形并继续
     updateSegOverlay();
@@ -8528,6 +9449,133 @@ function extrudeSpan() {
   return null;
 }
 
+/* ===================== 旋转体（回转）=====================
+ * 封闭轮廓绕自身一条边旋转。轮廓边落在轴上，旋转曲面自然闭合；
+ * 非整周时在起止角度补端面。法线按「位置 + 法线」焊接，
+ * 让共面内部边被 coplanarEdgeCoords 抵消，虚线框只描真实硬边。
+ */
+let revPick = { loop: null, normal: null, axisEdge: null, type: 'one', angle: 360, picking: null };
+
+/** 旋转体生成：返回 {p,i,n}（世界坐标，pos 用 [0,0,0]） */
+function revolveDesc(loopWorld, normalWorld, axisEdge, type, angle) {
+  const loop = (loopWorld || []).map((p) => p.clone ? p.clone() : new THREE.Vector3().fromArray(p));
+  const n = loop.length;
+  if (n < 3 || axisEdge == null || axisEdge < 0 || axisEdge >= n) return null;
+  const i = axisEdge, j = (i + 1) % n;
+  const A = loop[i], B = loop[j];
+  const eY = B.clone().sub(A);
+  if (eY.lengthSq() < 1e-8) return null;
+  eY.normalize();
+  /* 面内垂直于轴的单位向量，指向轮廓内部 */
+  const nn = (normalWorld && normalWorld.clone ? normalWorld.clone() : new THREE.Vector3(0, 0, 1)).normalize();
+  let eX = new THREE.Vector3().crossVectors(nn, eY);
+  if (eX.lengthSq() < 1e-8) eX = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 0, 1), eY);
+  if (eX.lengthSq() < 1e-8) return null;
+  eX.normalize();
+  const mid = A.clone().add(B).multiplyScalar(0.5);
+  const cen = new THREE.Vector3();
+  loop.forEach((p) => cen.add(p));
+  cen.multiplyScalar(1 / n);
+  if (cen.sub(mid).dot(eX) < 0) eX.negate();
+  const lx = new THREE.Vector3().crossVectors(eY, eX).normalize();  // 切向基（phi 增大方向）
+
+  /* 生成母线：从 A 沿非轴边绕到 B */
+  const prof = [];
+  let k = i;
+  for (let t = 0; t < n; t++) {
+    prof.push(loop[k]);
+    if (k === j) break;
+    k = (k - 1 + n) % n;
+  }
+  if (prof.length < 2) return null;
+  const pt2 = prof.map((p) => {
+    const d = p.clone().sub(A);
+    return new THREE.Vector2(d.dot(eX), d.dot(eY));
+  });
+  const rad = (Math.abs(angle) || 0) * Math.PI / 180;
+  if (rad < 1e-6) return null;
+  let phiStart = 0, phiLen = 0;
+  if (type === 'two') { phiStart = -rad; phiLen = 2 * rad; }
+  else if (type === 'sym') { phiStart = -rad / 2; phiLen = rad; }
+  /* 一边：负角与正角扫出同一块扇形（轮廓只落在轴一侧），只是起始角不同；
+     用负角直接做 phiLength 会让 LatheGeometry 退化，等价地转成正向扫掠。 */
+  else { phiStart = angle < 0 ? -rad : 0; phiLen = rad; }
+  const seg = Math.max(4, Math.min(144, Math.ceil(Math.abs(phiLen) / (Math.PI / 36))));
+  const lathe = new THREE.LatheGeometry(pt2, seg, phiStart, phiLen);
+
+  /* 局部 → 世界：localX→lx, localY→eY, localZ→eX，原点 A */
+  const mtx = new THREE.Matrix4().makeBasis(lx, eY, eX);
+  mtx.setPosition(A);
+  lathe.applyMatrix4(mtx);
+
+  const tris = [];
+  const lp = lathe.getAttribute('position'), ln = lathe.getAttribute('normal'), li = lathe.getIndex();
+  const lc = li ? li.count : lp.count;
+  const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+  for (let t = 0; t < lc; t += 3) {
+    const ids = [0, 1, 2].map((q) => li ? li.getX(t + q) : t + q);
+    [va, vb, vc].forEach((v, q) => v.fromBufferAttribute(lp, ids[q]));
+    const ns = ln ? ids.map((id) => new THREE.Vector3().fromBufferAttribute(ln, id)) : null;
+    tris.push({ pts: [va.clone(), vb.clone(), vc.clone()], ns });
+  }
+  lathe.dispose();
+
+  /* 非整周：补起止端面（轮廓多边形按 (r,h) 三角化） */
+  const full = Math.abs(Math.abs(phiLen) - Math.PI * 2) < 1e-4;
+  if (!full) {
+    const contour2 = loop.map((p) => {
+      const d = p.clone().sub(A);
+      return new THREE.Vector2(d.dot(eX), d.dot(eY));
+    });
+    let faces = [];
+    try { faces = THREE.ShapeUtils.triangulateShape(contour2, []); } catch (e) { faces = []; }
+    const place = (phi, q2) => {
+      const rv = eX.clone().multiplyScalar(Math.cos(phi)).addScaledVector(lx, Math.sin(phi));
+      return A.clone().addScaledVector(eY, q2.y).addScaledVector(rv, q2.x);
+    };
+    for (const [phi, sgn] of [[phiStart, -1], [phiStart + phiLen, 1]]) {
+      const outward = lx.clone().multiplyScalar(Math.cos(phi)).addScaledVector(eX, -Math.sin(phi)).multiplyScalar(sgn).normalize();
+      for (const f of faces) {
+        const q = f.map((id) => contour2[id]);
+        let a3 = place(phi, q[0]), b3 = place(phi, q[1]), c3 = place(phi, q[2]);
+        const fn = b3.clone().sub(a3).cross(c3.clone().sub(a3)).normalize();
+        if (fn.dot(outward) < 0) { const tmp = b3; b3 = c3; c3 = tmp; }
+        tris.push({ pts: [a3, b3, c3] });
+      }
+    }
+  }
+  if (!tris.length) return null;
+  return packRevSoup(tris);
+}
+
+/** 把三角汤按「位置键 + 法线键」焊接成可序列化顶点表 */
+function packRevSoup(tris) {
+  const Q = 10000;
+  const p = [], n = [], index = [], vmap = new Map();
+  const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+  const qn = (v) => Math.round(v * Q) / Q;
+  for (const t of tris) {
+    const [a, b, c] = t.pts;
+    const fn = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+    const ns = t.ns || [fn, fn, fn];
+    for (let q = 0; q < 3; q++) {
+      const v = t.pts[q], nv = ns[q] || fn;
+      const pk = qn(v.x) + ',' + qn(v.y) + ',' + qn(v.z);
+      const nk = qn(nv.x) + ',' + qn(nv.y) + ',' + qn(nv.z);
+      const key = pk + '@' + nk;
+      let dst = vmap.get(key);
+      if (dst === undefined) {
+        dst = p.length / 3;
+        vmap.set(key, dst);
+        p.push(v.x, v.y, v.z);
+        n.push(nv.x, nv.y, nv.z);
+      }
+      index.push(dst);
+    }
+  }
+  return { p, i: index, n };
+}
+
 /** 拉伸体预览（半透明蓝色） */
 function previewExtrudeGhost(desc) {
   clearGroup(ghostGroup);
@@ -8721,15 +9769,29 @@ function dominantAxis(v) {
  *   3) 场景没有可用实体 → 返回 null（调用方一步到位退化为「新建实体」）
  */
 function findSketchBooleanHost(sketchObj, sDesc) {
+  /* 隐藏实体不能当母体：工程里草图画在实体表面后该实体被隐藏（desc.hidden=true），
+     hostUid 仍指向它。若照旧用 hostUid，布尔结果会写回看不见的实体，用户误以为"运算结果不对"。
+     因此候选里排除隐藏对象；hostUid 命中隐藏对象时也忽略，退回就近选可见实体。 */
+  const isVisibleEntity = (o) => o.userData.desc && !o.userData.desc.hidden && o.visible !== false;
   const candidates = modelGroup.children.filter((o) =>
-    o !== sketchObj && o.userData.desc &&
+    o !== sketchObj && isVisibleEntity(o) &&
     o.userData.desc.kind !== 'sketch' && o.userData.desc.kind !== 'sheet');
   if (!candidates.length) return null;
   if (sDesc.hostUid != null) {
-    const host = candidates.find((o) => o.userData.desc.uid === sDesc.hostUid);
+    const host = candidates.find((o) => o.userData.desc.uid === sDesc.hostUid && isVisibleEntity(o));
     if (host) return host;
   }
-  const p = new THREE.Vector3().fromArray(sDesc.pos || [0, 0, 0]);
+  /* 母体按「草图实际所在位置」判定，不能用 sDesc.pos（那只是绘制平面的原点，
+     地面草图恒为 [0,0,0]）。多个实体时用草图顶点质心找最近的一个，
+     否则画在远处的草图会错选到原点附近的实体，交集看起来就像「只剩那个实体」。 */
+  let p;
+  if (Array.isArray(sDesc.points) && sDesc.points.length) {
+    p = new THREE.Vector3();
+    sDesc.points.forEach((xy) => p.add(sketchPointWorld(sDesc, xy)));
+    p.multiplyScalar(1 / sDesc.points.length);
+  } else {
+    p = new THREE.Vector3().fromArray(sDesc.pos || [0, 0, 0]);
+  }
   const c = new THREE.Vector3();
   let best = null, bd = Infinity;
   candidates.forEach((o) => {
@@ -8738,6 +9800,396 @@ function findSketchBooleanHost(sketchObj, sDesc) {
     if (d < bd) { bd = d; best = o; }
   });
   return best;
+}
+
+/* ===================== 共面面片合并（并集视觉修复） =====================
+ * CSG 并集会把同一平面拆成多片三角，而选面用 0.03mm 容差聚类共面三角：
+ * 拉伸焊接偏移造成的 0.02–0.06mm 近共面片会被判成不同面，看起来像「没合并成整面」。
+ * 这里把 COPLANAR_TOL 内的近共面三角焊接顶点、抵消内部缝、重新三角化成一个整面。
+ * 关键：顶点法线全程按位置键查回原值，圆柱 / 球等曲面的平滑着色不会被拍平成面法线。
+ */
+const COPLANAR_TOL = 0.10;   // mm：实测 0.05 起收敛，0.10 有余量且不会误合并相近独立面
+
+function soupOf(geo) {
+  const pos = geo.getAttribute('position');
+  const nor = geo.getAttribute('normal');
+  const idx = geo.getIndex();
+  const n = idx ? idx.count : pos.count;
+  const canon = new Map();
+  const tris = [];
+  for (let i = 0; i < n; i += 3) {
+    const ids = [0, 1, 2].map(k => idx ? idx.getX(i + k) : i + k);
+    const pts = ids.map(v => new THREE.Vector3().fromBufferAttribute(pos, v));
+    const ns = ids.map(v => nor
+      ? new THREE.Vector3().fromBufferAttribute(nor, v) : new THREE.Vector3(0, 0, 1));
+    const keys = pts.map(p => [p.x, p.y, p.z].map(x => Math.round(x * 10000)).join(','));
+    keys.forEach((k, j) => { if (!canon.has(k)) canon.set(k, pts[j].clone()); });
+    tris.push({ ks: keys, pts, ns });
+  }
+  return { tris, canon };
+}
+function geoOfTris(tris) {
+  const p = [], nn = [];
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nr = new THREE.Vector3();
+  for (const t of tris) {
+    e1.subVectors(t.pts[1], t.pts[0]); e2.subVectors(t.pts[2], t.pts[0]);
+    nr.crossVectors(e1, e2);
+    if (nr.lengthSq() < 1e-18) continue;
+    for (let i = 0; i < 3; i++) {
+      p.push(t.pts[i].x, t.pts[i].y, t.pts[i].z);
+      nn.push(t.ns[i].x, t.ns[i].y, t.ns[i].z);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nn, 3));
+  return g;
+}
+function frameOf(normal) {
+  const n = normal.clone().normalize();
+  const ref = Math.abs(n.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+  const u = new THREE.Vector3().crossVectors(n, ref).normalize();
+  const v = new THREE.Vector3().crossVectors(n, u).normalize();
+  return { u, v };
+}
+function canonicalPlane(n0, d0) {
+  const n = n0.clone().normalize();
+  let d = d0;
+  const neg = n.z < -1e-7 ||
+    (Math.abs(n.z) < 1e-7 && n.y < -1e-7) ||
+    (Math.abs(n.z) < 1e-7 && Math.abs(n.y) < 1e-7 && n.x < 0);
+  if (neg) { n.negate(); d = -d; }
+  return { n, d };
+}
+function repairCoplanar(geo, distTol) {
+  const soup = soupOf(geo);
+  const groups = [];
+  const COS = 0.9995;
+  for (const t of soup.tris) {
+    const e1 = new THREE.Vector3().subVectors(t.pts[1], t.pts[0]);
+    const e2 = new THREE.Vector3().subVectors(t.pts[2], t.pts[0]);
+    const raw = new THREE.Vector3().crossVectors(e1, e2);
+    if (raw.lengthSq() < 1e-18) continue;
+    const pl = canonicalPlane(raw, raw.clone().normalize().dot(t.pts[0]));
+    let g = groups.find(x => x.n.dot(pl.n) > COS && Math.abs(x.d - pl.d) <= distTol);
+    if (!g) { g = { n: pl.n, d: pl.d, tris: [] }; groups.push(g); }
+    const rev = raw.normalize().dot(g.n) < 0;
+    g.tris.push({ ks: t.ks, ns: t.ns, rev });
+  }
+
+  const out = [];
+  let seams = 0, patches = 0, loopsBroken = 0;
+  for (const g of groups) {
+    const { u, v } = frameOf(g.n);
+    const pt2 = new Map();
+    const welded = new Map();
+    const weldKey = (q) => {
+      for (const [k, p] of welded) {
+        if (Math.abs(p.x - q.x) < distTol && Math.abs(p.y - q.y) < distTol) return k;
+      }
+      const k = 'p' + welded.size;
+      welded.set(k, q.clone());
+      return k;
+    };
+    const k2 = new Map();
+    for (const t of g.tris) {
+      const ks = t.rev ? [t.ks[0], t.ks[2], t.ks[1]] : t.ks;
+      for (const k of ks) {
+        if (k2.has(k)) continue;
+        const p = soup.canon.get(k);
+        const q = new THREE.Vector2(p.dot(u), p.dot(v));
+        const wk = weldKey(q);
+        k2.set(k, wk);
+        if (!pt2.has(wk)) pt2.set(wk, welded.get(wk));
+      }
+    }
+    /* 原顶点法线表：重新三角化后按位置键查回，曲面平滑着色不退化 */
+    const normalOf = new Map();
+    for (const t of g.tris) {
+      const ks = t.rev ? [t.ks[0], t.ks[2], t.ks[1]] : t.ks;
+      const ns = t.rev ? [t.ns[0], t.ns[2], t.ns[1]] : t.ns;
+      for (let q = 0; q < 3; q++) {
+        const wk = k2.get(ks[q]);
+        if (wk && !normalOf.has(wk)) normalOf.set(wk, ns[q]);
+      }
+    }
+    const dir = new Map();
+    for (const t of g.tris) {
+      const ks = (t.rev ? [t.ks[0], t.ks[2], t.ks[1]] : t.ks).map(k => k2.get(k));
+      for (let e = 0; e < 3; e++) {
+        const a = ks[e], b = ks[(e + 1) % 3];
+        if (a === b) continue;
+        const key = a + '>' + b;
+        dir.set(key, (dir.get(key) || 0) + 1);
+      }
+    }
+    const boundary = [], seen = new Set();
+    dir.forEach((c, key) => {
+      if (seen.has(key)) return;
+      const [a, b] = key.split('>');
+      const rk = b + '>' + a;
+      const cr = dir.get(rk) || 0;
+      seen.add(key); seen.add(rk);
+      seams += Math.min(c, cr);
+      const net = c - cr;
+      if (net > 0) for (let i = 0; i < net; i++) boundary.push([a, b]);
+      else if (net < 0) for (let i = 0; i < -net; i++) boundary.push([b, a]);
+    });
+    const outgoing = new Map();
+    for (const [a, b] of boundary) {
+      if (!outgoing.has(a)) outgoing.set(a, []);
+      outgoing.get(a).push(b);
+    }
+    const used = new Set(), loops = [];
+    for (const [a, bs] of outgoing) {
+      for (let i = 0; i < bs.length; i++) {
+        const start = a + '>' + bs[i];
+        if (used.has(start)) continue;
+        const loop = [a]; used.add(start);
+        let cur = a, nxt = bs[i], guard = 0;
+        while (nxt !== a && guard++ < 10000) {
+          loop.push(nxt);
+          const opts = outgoing.get(nxt) || [];
+          let pick = -1;
+          for (let j = 0; j < opts.length; j++) {
+            const id = nxt + '>' + opts[j];
+            if (!used.has(id)) { pick = j; break; }
+          }
+          if (pick < 0) break;
+          const nn = opts[pick];
+          used.add(nxt + '>' + nn);
+          cur = nxt; nxt = nn;
+        }
+        if (nxt === a) loops.push(loop);
+        else loopsBroken++;
+      }
+    }
+    if (!loops.length) continue;
+    const areaOf = (l) => {
+      let s = 0;
+      for (let i = 0; i < l.length; i++) {
+        const p = pt2.get(l[i]), q = pt2.get(l[(i + 1) % l.length]);
+        s += p.x * q.y - q.x * p.y;
+      }
+      return s / 2;
+    };
+    const signed = loops.map(l => ({ l, a: areaOf(l) })).filter(x => Math.abs(x.a) > 1e-8);
+    const outers = signed.filter(x => x.a > 0).sort((a, b) => b.a - a.a);
+    const holes = signed.filter(x => x.a < 0).sort((a, b) => a.a - b.a);
+    const inPoly = (p, poly) => {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const a = poly[i], b = poly[j];
+        if ((a.y > p.y) !== (b.y > p.y) &&
+            p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+      }
+      return inside;
+    };
+    for (const o of outers) {
+      patches++;
+      const contour = o.l.map(k => pt2.get(k));
+      const holeSel = holes.filter(h => inPoly(pt2.get(h.l[0]), contour));
+      const hs = holeSel.map(h => h.l.map(k => pt2.get(k)));
+      let faces = [];
+      try { faces = THREE.ShapeUtils.triangulateShape(contour, hs); }
+      catch (e) { continue; }
+      const all = contour.concat(...hs);
+      /* wk 与三角化输入一一对应，查回原顶点法线 */
+      const wkAligned = o.l.concat(...holeSel.map(h => h.l));
+      for (const f of faces) {
+        const tri = f.map(i => all[i]);
+        /* 2D 投影点还原回 3D 平面（不能把 Vector2 直接送出去，否则 z 为 NaN） */
+        const p3 = tri.map(q => new THREE.Vector3()
+          .addScaledVector(u, q.x).addScaledVector(v, q.y).addScaledVector(g.n, g.d));
+        const tn = f.map(i => normalOf.get(wkAligned[i]) || g.n);
+        out.push({ pts: p3, ns: tn });
+      }
+    }
+  }
+  return { geo: geoOfTris(out), groups: groups.length, seams, patches, loopsBroken };
+}
+/** 把打包顶点表送进共面修复，再按「位置 + 法线」建共享索引后返回顶点表 */
+function repairCoplanarPacked(packed, distTol = COPLANAR_TOL) {
+  if (!packed || !packed.p || packed.p.length < 9) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(packed.p, 3));
+  if (packed.n && packed.n.length === packed.p.length)
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(packed.n, 3));
+  if (packed.i && packed.i.length) g.setIndex(packed.i);
+  let fixed;
+  try { fixed = repairCoplanar(g, distTol); } catch (e) { g.dispose(); return null; }
+  g.dispose();
+  const gf = fixed.geo;
+  const pos = gf.getAttribute('position'), nor = gf.getAttribute('normal');
+  if (!pos || pos.count < 3) { gf.dispose(); return null; }
+  const p = [], n = [], index = [], vmap = new Map();
+  const q = (v) => Math.round(v * 10000);
+  for (let v = 0; v < pos.count; v++) {
+    const key = q(pos.getX(v)) + ',' + q(pos.getY(v)) + ',' + q(pos.getZ(v)) + '@' +
+      q(nor.getX(v)) + ',' + q(nor.getY(v)) + ',' + q(nor.getZ(v));
+    let d = vmap.get(key);
+    if (d === undefined) {
+      d = p.length / 3;
+      vmap.set(key, d);
+      p.push(pos.getX(v), pos.getY(v), pos.getZ(v));
+      n.push(nor.getX(v), nor.getY(v), nor.getZ(v));
+    }
+    index.push(d);
+  }
+  gf.dispose();
+  if (p.length < 9) return null;
+  return { p, i: index, n };
+}
+
+/**
+ * CSG 结果打包 + T 型接点消除。
+ *
+ * three-bvh-csg 在共面处两侧面的三角剖分相位不同：一侧是一条长边，另一侧是两条短边，
+ * 长边中点没有对应顶点 —— 这就是 T 型接点。光栅化时两侧各画各的三角形，接缝处会
+ * 露出背景色的细缝，旋转到某些角度就连成截图里的「破碎面」。本函数：
+ *   1) 按位置键焊接顶点（0.0001mm 精度，保住共面关系）；
+ *   2) 对每条边，检查是否有别的顶点落在这条边的内部，有则把该三角沿此点切开，
+ *      让两侧三角剖分完全一致；新顶点法线由所在边的两端法线插值得到；
+ *   3) 最终按「位置键 + 法线」建索引：同一位置不同朝向的面仍然各自持有自己的法线，
+ *      硬边不会被拉偏（保留此前删除 unifyBooleanNormals 的修复结论）。
+ *
+ * @param kept    过滤后的三角数组 [{ia,ib,ic,area}]
+ * @param posAttr CSG 结果 position 属性（世界坐标）
+ * @param nAttr   CSG 结果 normal 属性（可空）
+ * @param vi      index 取值函数
+ * @param ox/oy/oz objA 的世界平移，用于把结果转回 objA 局部坐标
+ */
+function packBooleanResult(kept, posAttr, nAttr, vi, ox, oy, oz) {
+  const Q = 10000;
+  const keyOf = (src) =>
+    Math.round((posAttr.getX(src) - ox) * Q) + ',' +
+    Math.round((posAttr.getY(src) - oy) * Q) + ',' +
+    Math.round((posAttr.getZ(src) - oz) * Q);
+  const posOfKey = (k) => {
+    const a = k.split(',').map(Number);
+    return [a[0] / Q, a[1] / Q, a[2] / Q];
+  };
+  const normOf = (src) => nAttr
+    ? [nAttr.getX(src), nAttr.getY(src), nAttr.getZ(src)]
+    : [0, 0, 1];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0]
+  ];
+  const len = (a) => Math.hypot(a[0], a[1], a[2]);
+  const lerpN = (a, b, s) => [
+    a[0] + (b[0] - a[0]) * s,
+    a[1] + (b[1] - a[1]) * s,
+    a[2] + (b[2] - a[2]) * s
+  ];
+
+  /* 全局位置表：键 = 量化后的局部坐标；只存位置，法线始终跟着三角走 */
+  const posMap = new Map();
+  for (const t of kept) {
+    for (const s of [t.ia, t.ib, t.ic]) {
+      const k = keyOf(s);
+      if (!posMap.has(k)) posMap.set(k, posOfKey(k));
+    }
+  }
+  /* 只把「只出现一次的边的端点」当成候选接点。真正的 T 型接点一定来自这种边；
+     若拿全部顶点去试，圆/曲面附近的大量相邻顶点会被容差误判，切出成百上千个碎三角。 */
+  const edgeCount = new Map();
+  const markEdges = (ks) => {
+    for (let e = 0; e < 3; e++) {
+      const a = ks[e], b = ks[(e + 1) % 3];
+      if (a === b) continue;
+      const k = a < b ? a + '|' + b : b + '|' + a;
+      edgeCount.set(k, (edgeCount.get(k) || 0) + 1);
+    }
+  };
+  for (const t of kept) {
+    markEdges([keyOf(t.ia), keyOf(t.ib), keyOf(t.ic)]);
+  }
+  const junctionKeys = new Set();
+  edgeCount.forEach((cnt, k) => {
+    if (cnt !== 1) return;
+    const [a, b] = k.split('|');
+    junctionKeys.add(a);
+    junctionKeys.add(b);
+  });
+  const COLLINEAR_EPS = 2e-4;    // 0.0002mm：量化精度的 2 倍，只吸收量化误差
+
+  const outTris = [];
+  for (const t of kept) {
+    /* work 三角：ks = 位置键，ns = 该三角在这三个顶点上的法线（互不串用） */
+    let work = [{
+      ks: [keyOf(t.ia), keyOf(t.ib), keyOf(t.ic)],
+      ns: [normOf(t.ia), normOf(t.ib), normOf(t.ic)]
+    }];
+    for (let pass = 0; pass < 8; pass++) {
+      const next = [];
+      let changed = false;
+      for (const tri of work) {
+        let split = false;
+        for (let e = 0; e < 3 && !split; e++) {
+          const j = (e + 1) % 3, k = (e + 2) % 3;
+          const A = tri.ks[e], B = tri.ks[j], C = tri.ks[k];
+          const pa = posMap.get(A), pb = posMap.get(B);
+          const ab = sub(pb, pa), l2 = dot(ab, ab);
+          if (l2 < 1e-10) continue;
+          const mids = [];
+          for (const key of junctionKeys) {
+            if (key === A || key === B || key === C) continue;
+            const pv = sub(posMap.get(key), pa);
+            if (len(cross(ab, pv)) > COLLINEAR_EPS) continue;
+            const s = dot(pv, ab) / l2;
+            if (s > 0.02 && s < 0.98) mids.push({ key, s });
+          }
+          if (!mids.length || mids.length > 64) continue;   // 异常多的接点视为数值噪声，不切
+          mids.sort((x, y) => x.s - y.s);
+          /* 新顶点：位置键已有，法线 = 本三角该边两端法线的插值 */
+          const chainK = [A], chainN = [tri.ns[e]];
+          for (const m of mids) {
+            chainK.push(m.key);
+            chainN.push(lerpN(tri.ns[e], tri.ns[j], m.s));
+          }
+          chainK.push(B);
+          chainN.push(tri.ns[j]);
+          for (let q = 0; q < chainK.length - 1; q++) {
+            next.push({
+              ks: [chainK[q], chainK[q + 1], C],
+              ns: [chainN[q], chainN[q + 1], tri.ns[k]]
+            });
+          }
+          changed = true;
+          split = true;
+        }
+        if (!split) next.push(tri);
+      }
+      work = next;
+      if (!changed) break;
+    }
+    for (const tri of work) outTris.push(tri);
+  }
+
+  /* 按「位置键 + 该三角的法线」建索引：硬边两侧法线不同 → 不共享，绝不拉偏 */
+  const p = [], n = [], index = [];
+  const vmap = new Map();
+  const qn = (v) => Math.round(v * 10000) / 10000;
+  for (const tri of outTris) {
+    for (let v = 0; v < 3; v++) {
+      const k = tri.ks[v], nv = tri.ns[v];
+      const nk = qn(nv[0]) + ',' + qn(nv[1]) + ',' + qn(nv[2]);
+      const id = k + '@' + nk;
+      let dst = vmap.get(id);
+      if (dst === undefined) {
+        dst = p.length / 3;
+        vmap.set(id, dst);
+        p.push(posMap.get(k)[0], posMap.get(k)[1], posMap.get(k)[2]);
+        n.push(nv[0], nv[1], nv[2]);
+      }
+      index.push(dst);
+    }
+  }
+  return { p, i: index, n };
 }
 
 /**
@@ -8794,41 +10246,18 @@ function booleanWith(objA, descB, op) {
   const minArea = Math.max(0.05, totalArea * 0.000005);
   const kept = tris.filter((t) => t.area >= minArea);
 
-  /* 世界坐标 → objA 局部坐标（本工具的实体只有平移）。法线保留 CSG 的平滑值。 */
+  /* 世界坐标 → objA 局部坐标（本工具的实体只有平移）。
+     packBooleanResult 先按位置焊接并消除 T 型接点，再按「位置+法线」建索引：
+     硬边两侧法线各自独立，绝不做按位置的法线归并（会重演 56° 法线拉偏）。 */
   const ox = objA.position.x, oy = objA.position.y, oz = objA.position.z;
-  const p = [], n = [], index = [];
-  const vertMap = new Map();
-  for (const t of kept) {
-    for (const src of [t.ia, t.ib, t.ic]) {
-      let dst = vertMap.get(src);
-      if (dst === undefined) {
-        dst = p.length / 3;
-        vertMap.set(src, dst);
-        p.push(
-          Math.round((posAttr.getX(src) - ox) * 100) / 100,
-          Math.round((posAttr.getY(src) - oy) * 100) / 100,
-          Math.round((posAttr.getZ(src) - oz) * 100) / 100
-        );
-        if (nAttr) {
-          n.push(
-            Math.round(nAttr.getX(src) * 10000) / 10000,
-            Math.round(nAttr.getY(src) * 10000) / 10000,
-            Math.round(nAttr.getZ(src) * 10000) / 10000
-          );
-        }
-      }
-      index.push(dst);
-    }
-  }
-  if (p.length < 9) throw new Error('运算结果为空');
-  const i = index;
+  const geo = packBooleanResult(kept, posAttr, nAttr, vi, ox, oy, oz);
+  if (geo.p.length < 9) throw new Error('运算结果为空');
+  /* 共面修复：把 0.10mm 内的近共面碎片焊成整面。选面用 0.03mm 容差聚类，
+     焊接后顶点落在同一平面，点选时自然整片选中；法线按原值查回，曲面不受影响。 */
+  const repaired = repairCoplanarPacked(geo, COPLANAR_TOL);
   geoA.dispose();
   geoB.dispose();
-  /* 法线直接用 CSG 的原始值：打包时已按顶点索引去重，同一顶点被多个三角共享的关系完整保留，
-     CSG 已为硬边两侧分配好各自的法线。绝不能再按「空间位置」归并——交集边缘同一位置属于
-     多个不同朝向的面，位置归并会把硬边法线拉偏（实测最大偏差达 56°），渲染出来就是破碎三角片。
-     故这里直接返回 CSG 原始法线，不再做任何位置归并。 */
-  return { p, i, n };
+  return repaired || geo;
 }
 
 /**
@@ -8858,6 +10287,7 @@ function entityBoolean(op) {
     clearGroup(faceGroup);
     updateObject(a);
     select(a);
+    rememberOp('bool', { op });   // 中键滚轮重复时重新弹出同一运算的任务窗
     toast(op === 'add' ? '并集完成：A∪B 已合并为一个实体'
         : op === 'sub' ? '差集完成：已从 A 中减去 B'
         : '交集完成：仅保留 A 与 B 的重叠部分');
@@ -8965,6 +10395,21 @@ function applyExtrude() {
     const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir, useOp !== 'new', state.ex.dirVec, extrudeSpan());
     if (!bDesc) return toast('轮廓无效，无法拉伸');
 
+    /* 交集 sanity 提示：拉伸体若把母体整个包住，交集本来就等于母体本身（数学上正确，
+       但常被误认为"运算没生效"）。提前用包围盒判出来，明确告诉用户原因。 */
+    if (useOp === 'int' && host) {
+      const bg = worldGeometryOf(bDesc);
+      const bbS = new THREE.Box3().setFromBufferAttribute(bg.attributes.position);
+      bg.dispose();
+      const bbH = new THREE.Box3().setFromObject(host);
+      const tol = 0.05;
+      const covers = ['x', 'y', 'z'].every((a) =>
+        bbS.min[a] <= bbH.min[a] + tol && bbS.max[a] >= bbH.max[a] - tol);
+      if (covers) {
+        toast('草图拉伸体已把所选实体完全包住，交集结果就是这个实体本身（可缩小草图或减少拉伸高度）');
+      }
+    }
+
     beginEdit();
     try {
       if (useOp === 'new') {
@@ -8989,9 +10434,12 @@ function applyExtrude() {
         clearGroup(faceGroup);
         hideFaceMenu();
         select(host);
-        toast(useOp === 'add' ? '已把草图拉伸体合并进母体（加运算）'
+        rememberOp('bool', { op: useOp });   // 中键滚轮重复时重新弹出同一运算的任务窗
+        /* 地面草图没有 hostUid，母体是自动就近选的；提示出来便于用户核对是否选对 */
+        const hostHint = desc0.hostUid == null ? '（母体自动选了离草图最近的实体）' : '';
+        toast((useOp === 'add' ? '已把草图拉伸体合并进母体（加运算）'
             : useOp === 'sub' ? '已用草图拉伸体从母体切除（减运算）'
-            : '已只保留与草图拉伸体重叠的部分（交运算）');
+            : '已只保留与草图拉伸体重叠的部分（交运算）') + hostHint);
       }
     } catch (err) {
       restoreScene(editBase);         // 整体回滚（母体几何 + 草图都在快照里）
@@ -9583,7 +11031,12 @@ function refreshExtrudePreview() {
 /* ---------- 浮层事件绑定 ---------- */
 faceMenuEl.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-fm]');
-  if (btn && btn.dataset.fm === 'extrude') openExtrudePanel();
+  if (!btn) return;
+  if (btn.dataset.fm === 'extrude') openExtrudePanel();
+  else if (btn.dataset.fm === 'revolve') {
+    const r = state.face && state.face.loop ? state.face : null;
+    openRevolvePop(r ? r.loop : null, r ? r.normal : null);
+  }
 });
 
 /* ---------- 对象菜单事件：移动 ---------- */
@@ -10023,8 +11476,8 @@ function syncToolUI() {
   const toolActive = (state.mode === 'sketch' && state.tool !== 'select') || isPrimitive(state.tool);
   viewport.classList.toggle('cross', toolActive);
   if (!toolActive) renderer.domElement.style.cursor = 'default';
-  /* 正多边形边数设置只在多边形工具下露出 */
-  $('skOpt').classList.toggle('show', state.mode === 'sketch' && state.tool === 'sketch-poly');
+  /* 正多边形参数统一在左上角任务窗设置，底部旧边数条不再显示 */
+  $('skOpt').classList.remove('show');
   updateHints();
 }
 
@@ -10145,9 +11598,12 @@ function setTool(t) {
       'sketch-ellipse': '椭圆：从中心拖出长短轴',
       'sketch-poly': '正多边形：从中心拖出外接圆（右下角可改边数）'
     }[t];
+    if (t === 'sketch-poly' && state.sketchStage === 'draw') openPolyPop();
+    else if (taskPopKind === 'poly') hideTaskPop();
     if (tip && state.sketchStage === 'draw') toast(tip);
     return;
   }
+  if (taskPopKind === 'poly') hideTaskPop();
   endSketchSession();
   state.tool = t;
   state.mode = 'object';
@@ -10178,6 +11634,45 @@ function toggleGrid() {
                      : '地面网格与原点已隐藏（格点吸附仍可用）');
 }
 
+/* ---- 自动旋转：右键菜单 / A 键开关；旋转中 ← → 切方向、↑ ↓ 调速 ---- */
+const autoSpin = {
+  on: false,
+  dir: 1,                       // 1 顺时针，-1 逆时针（绕 Z 轴）
+  level: 2,                     // 速度档位索引
+  speeds: [0.25, 0.5, 1, 2, 4]  // 倍率；1 档约 16°/秒
+};
+function toggleAutoRotate() {
+  autoSpin.on = !autoSpin.on;
+  const label = $('vmSpinText');
+  if (label) label.textContent = autoSpin.on ? '停止自动旋转' : '自动旋转';
+  const btn = $('vmSpin');
+  if (btn) btn.classList.toggle('on', autoSpin.on);
+  toast(autoSpin.on
+    ? '自动旋转已开启（← → 切方向，↑ ↓ 调速，A / 右键菜单停止）'
+    : '自动旋转已停止（A / 右键菜单可再开启）');
+}
+function stepAutoSpin(dt) {
+  if (!autoSpin.on) return;
+  const t = controls.target;
+  const p = camera.position.clone().sub(t);
+  const ang = 0.00028 * autoSpin.speeds[autoSpin.level] * autoSpin.dir * Math.max(0, Math.min(dt, 64));
+  const c = Math.cos(ang), s = Math.sin(ang);
+  camera.position.set(t.x + p.x * c - p.y * s, t.y + p.x * s + p.y * c, t.z + p.z);
+}
+function setSpinDir(dir) {
+  autoSpin.dir = dir;
+  toast('自动旋转方向：' + (dir > 0 ? '顺时针' : '逆时针'));
+}
+function nudgeSpinSpeed(step) {
+  const next = Math.max(0, Math.min(autoSpin.speeds.length - 1, autoSpin.level + step));
+  if (next === autoSpin.level) {
+    toast(step > 0 ? '已是最快旋转速度' : '已是最慢旋转速度');
+    return;
+  }
+  autoSpin.level = next;
+  toast('自动旋转速度：' + autoSpin.speeds[autoSpin.level] + '×');
+}
+
 const viewMenuEl = $('viewMenu');
 function hideViewMenu() {
   if (viewMenuEl) viewMenuEl.classList.remove('show');
@@ -10185,13 +11680,19 @@ function hideViewMenu() {
 function showViewMenu(clientX, clientY) {
   if (!viewMenuEl) return;
   const r = viewport.getBoundingClientRect();
-  viewMenuEl.style.left = Math.max(6, Math.min(clientX - r.left, r.width - 168)) + 'px';
-  viewMenuEl.style.top = Math.max(6, Math.min(clientY - r.top, r.height - 52)) + 'px';
-  viewMenuEl.classList.add('show');
+  viewMenuEl.classList.add('show');   // 先显示才能量到真实高度（菜单项数会变）
+  const mw = viewMenuEl.offsetWidth || 158, mh = viewMenuEl.offsetHeight || 52;
+  viewMenuEl.style.left = Math.max(6, Math.min(clientX - r.left, r.width - mw - 6)) + 'px';
+  viewMenuEl.style.top = Math.max(6, Math.min(clientY - r.top, r.height - mh - 6)) + 'px';
 }
 if ($('vmGrid')) $('vmGrid').addEventListener('click', (e) => {
   e.stopPropagation();
   toggleGrid();
+  hideViewMenu();
+});
+if ($('vmSpin')) $('vmSpin').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleAutoRotate();
   hideViewMenu();
 });
 
@@ -10209,26 +11710,25 @@ $('toolbar').addEventListener('click', (e) => {
   const cat = e.target.closest('.cat');
   if (cat) {
     document.querySelectorAll('.cat').forEach((c) => c.classList.toggle('on', c === cat));
+    /* 测量不再有左侧二级面板：点击分类直接弹出左上角测量窗（仿 3D One） */
+    if (cat.dataset.cat === 'measure') {
+      document.querySelectorAll('.fly-panel').forEach((p) => p.classList.remove('on'));
+      openMeasurePop(measureMode);
+      return;
+    }
     document.querySelectorAll('.fly-panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === cat.dataset.cat));
     return;
   }
   const btn = e.target.closest('button');
   if (!btn) return;
   if (btn.dataset.tool) setTool(btn.dataset.tool);
-  else if (btn.dataset.bool) entityBoolean(btn.dataset.bool);
+  else if (btn.dataset.bool) openBoolPop(btn.dataset.bool);
   else if (btn.dataset.act === 'undo') undo();
   else if (btn.dataset.act === 'redo') redo();
   else if (btn.dataset.act === 'delete') deleteSelected();
   else if (btn.dataset.act === 'shade') toggleShade();
   else if (btn.dataset.act === 'hide') hideSelected();
   else if (btn.dataset.act === 'reveal') toggleRevealMode();
-  else if (btn.dataset.mmeasure) {
-    /* 测量选项卡：切换模式并以该模式开始测量 */
-    document.querySelectorAll('.measure-tab').forEach((t) => t.classList.toggle('on', t === btn));
-    measureMode = btn.dataset.mmeasure;
-    startMeasure(measureMode);
-  }
-  else if (btn.dataset.measure) { if (measureActive) cancelMeasure(); else startMeasure(measureMode); }
 });
 
 $('modeSwitch').addEventListener('click', (e) => {
@@ -10274,8 +11774,9 @@ window.addEventListener('pointerup', (e) => {
 /* 正多边形边数 */
 $('polyN').addEventListener('change', () => {
   const v = parseInt($('polyN').value, 10);
-  state.polyN = Math.max(3, Math.min(12, isFinite(v) ? v : 6));
+  state.polyN = Math.max(3, Math.min(6, isFinite(v) ? v : 6));
   $('polyN').value = state.polyN;
+  const edit = $('polyNEdit'); if (edit) edit.value = state.polyN;
 });
 
 window.addEventListener('keydown', (e) => {
@@ -10302,6 +11803,8 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape') {
+    if (taskPopKind === 'bool') { cancelBoolPick(); return; }
+    if (taskPopKind === 'revolve') { cancelRevolve(); return; }
     if (viewMenuEl && viewMenuEl.classList.contains('show')) { hideViewMenu(); return; }
     if (state.ex.picking) {
       state.ex.picking = false;
@@ -10316,7 +11819,7 @@ window.addEventListener('keydown', (e) => {
       backToPickPlane();          // 从绘制状态退回「选平面」
       return;
     }
-    if (measureActive) { cancelMeasure(); toast('已退出测距'); return; }
+    if (measureActive) { cancelMeasure(); if (taskPopKind === 'measure') hideTaskPop(); toast('已退出测距'); return; }
     if (p2pActive) { cancelP2p(); updateP2pTip(); toast('已取消点到点'); return; }
     if (moveActive) { hideObjMenu(); toast('已退出移动模式'); return; }
     if (objMenuEl.classList.contains('show')) { hideObjMenu(); return; }
@@ -10359,6 +11862,16 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  /* 自动旋转中：← → 切方向，↑ ↓ 调速（与右键菜单的开关共用同一套状态） */
+  if (autoSpin.on && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+      || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    if (e.key === 'ArrowLeft') setSpinDir(-1);
+    else if (e.key === 'ArrowRight') setSpinDir(1);
+    else if (e.key === 'ArrowUp') nudgeSpinSpeed(1);
+    else nudgeSpinSpeed(-1);
+    return;
+  }
   const k = e.key.toLowerCase();
   if (k === 'v') setTool('select');
   if (k === 'b') setTool('box');
@@ -10370,6 +11883,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'l') setTool('sketch-ellipse');
   if (k === 'p') setTool('sketch-poly');
   if (k === 'g') toggleGrid();          // 网格隐藏/显现（替代左侧按钮）
+  if (k === 'a') toggleAutoRotate();    // 自动旋转开/关（同右键菜单）
   if (k === 'e' && state.face && !state.ex.open) openExtrudePanel();
 });
 
@@ -10404,7 +11918,22 @@ viewport.addEventListener('pointerdown', (e) => {
     if (e.button !== 1 && e.button !== 2) e.preventDefault();
     return;
   }
-  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .mv-rot-hit, .mv-center-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
+  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .task-pop, .view-menu, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .mv-rot-hit, .mv-center-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
+
+  /* 布尔任务窗开启时：视图点击 = 选基体/合并体，不走选中/拖动 */
+  if (taskPopKind === 'bool') {
+    e.preventDefault();
+    e.stopPropagation();
+    boolPickClick(e);
+    return;
+  }
+  /* 旋转任务窗开启时：视图点击 = 拾取封闭轮廓 / 旋转轴 */
+  if (taskPopKind === 'revolve') {
+    e.preventDefault();
+    e.stopPropagation();
+    revPickClick(e);
+    return;
+  }
 
   /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
   if (inViewCube(e)) {
@@ -10459,9 +11988,9 @@ viewport.addEventListener('pointerdown', (e) => {
     const hit = pick(e);
     if (!hit) {
       clickStreakRoot = null;                                 // 点空白 → 打断连续点击序列
-      /* 左键从空白处拖动 = 刷选：光标扫过的对象依次选中（3D One 式）。
+      /* 左键从空白处拖动 = 框选：虚线框内的对象一次性选中（3D One 式）。
          左键已不参与视图旋转，故空白处拖动安全；单击空白（无位移）仍在 pointerup 里取消选择。 */
-      drag = { kind: 'brush', x: e.clientX, y: e.clientY, moved: false, picked: new Set() };
+      drag = { kind: 'brush', x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false, hitAny: false };
       return;
     }
     /* 显现模式：隐藏对象已临时可见，点中它 → 恢复显现，不走选中/拖动 */
@@ -10611,6 +12140,13 @@ window.addEventListener('pointermove', (e) => {
     const info = p2pPickPointInfo(e);
     if (info) { measureEnd = info.point; measureEndVertex = info.vertex; updateMeasureOverlay(); }
   }
+  /* 面相关测量的悬停预览：网格始终贴合光标下的目标面，拾取后由 updateMeasureVisuals 接管 */
+  if (measureActive && !drag && !mPick2
+      && (measureMode === 'faceface' || (measureMode === 'p2face' && mPick1))) {
+    clearGroup(measureVisualGroup);
+    const s = measureFacePick(e);
+    if (s && s.face) addMeasureFaceGrid(s.face, MEASURE_COLORS.b);
+  }
   /* 点到点：已设起点后，鼠标移动实时画预览虚线 */
   if (p2pActive && p2pStage === 1 && !drag) {
     const info = p2pPickPointInfo(e);
@@ -10706,20 +12242,22 @@ window.addEventListener('pointerup', (e) => {
   if (!drag) return;
   const d = drag;
   drag = null;
+  if (d.kind === 'brush') hideBrushBox();   // 松手：虚线框立即消失，选中结果保留
 
   if (d.kind === 'vcube') {
     controls.enabled = true;    // 松手恢复主视图控制
     /* 点击（无位移）= 跳转到该面的标准视角；拖动过 = 保持在当前角度（不回弹） */
     if (!d.moved) viewCubeClick(e);
   } else if (d.kind === 'brush') {
-    /* 刷选松手：扫到过对象就保留多选；没扫到任何对象且几乎没移动 → 视为点空白，取消选择 */
-    if (!d.picked.size && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
+    /* 框选松手：框到对象就保留多选；没框到任何对象（单击空白 / 空框拖拽）→ 取消选择。
+       注意：旧代码用已删除的 d.picked.size，TaskError 会让这里整段不执行。 */
+    if (!d.hitAny) {
       clickStreakRoot = null;
       select(null);
-    } else if (d.picked.size) {
+    } else if (d.moved) {
       syncPanel();
       updateStatus();
-      toast('已刷选 ' + state.multi.length + ' 个对象，可整体移动 / 删除');
+      toast('已框选 ' + state.multi.length + ' 个对象，可整体移动 / 删除');
     }
   } else if (d.kind === 'click') {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
@@ -10754,12 +12292,15 @@ window.addEventListener('pointerup', (e) => {
          闭合草图（蓝色阴影面）单击一次就直接弹拉伸菜单，不再要求 2.5 秒内的第二次点击；
          其它实体仍沿用「第二次点同一实体 → 选面」。双击重入由 dblclick 事件接管。 */
       const kd = d.root.userData.desc.kind;
-      /* 草图单击即弹「拉伸」菜单：闭合草图→拉成实体，开放线段→扫掠成面（3D One 式）。
-         不再要求「第二次点击 + faceHit.face」——线段是窄面片，那个条件几乎命中不了。 */
+      /* 草图：只有「已围成闭合平面」才弹拉伸菜单；开放线条永远是普通选中。
+         同一次会话的多段线若首尾相接会自动识别为闭合区域，无需额外点击。 */
       const anySketch = kd === 'sketch';
       if (anySketch) {
-        clickStreakRoot = null;   // 单击即选面 → 重置，避免后续点击又被当作连击
-        pickSketchFace(d.root);
+        const region = closedSketchRegionFor(d.root);
+        if (region) {
+          clickStreakRoot = null;
+          pickSketchFace(d.root, region);
+        }
       } else if (d.isSecondClick && d.faceHit.face) {
         clickStreakRoot = null;   // 已进入选面 → 重置，避免第三次点击又选面
         pickFace(d.root, d.faceHit);
@@ -10838,6 +12379,7 @@ function lockSketchPlane(face, hostUid) {
     };
     state.sketchStage = 'draw';
     updateHints();
+    if (state.tool === 'sketch-poly') openPolyPop();
     toast('已选择地面为绘制平面：开始绘制（Esc 重新选平面）');
     return;
   }
@@ -10864,6 +12406,7 @@ function lockSketchPlane(face, hostUid) {
   faceGroup.add(line);
 
   updateHints();
+  if (state.tool === 'sketch-poly') openPolyPop();
   toast('已选择实体表面为绘制平面：草图会画在这个高度上（Esc 重新选平面）');
 }
 
@@ -10935,48 +12478,22 @@ function renderPlaneHover(hit) {
   draftGroup.add(border);
 }
 
-/** 单击闭合草图（蓝色平面）→ 视口浮出「拉伸」菜单（与实体选面一致） */
-function pickSketchFace(root) {
-  const desc = root.userData.desc;
-
-  /* 开放线段：同样弹出拉伸菜单，拉伸的含义是「扫掠成带状面」 */
-  if (!desc.closed) {
-    if (desc.points.length < 2) { toast('线段至少要 2 个点才能拉伸'); return; }
-    const { u, v, n } = sketchBasis(desc);
-    const o = new THREE.Vector3().fromArray(desc.pos || [0, 0, 0]);
-    const worldPts = desc.points.map(([x, y]) => new THREE.Vector3()
-      .addScaledVector(u, x).addScaledVector(v, y).add(o));
-    const center = new THREE.Vector3();
-    worldPts.forEach((p) => center.add(p));
-    center.multiplyScalar(1 / worldPts.length);
-    state.face = {
-      normal: n.clone(), point: center.clone(), center: center.clone(),
-      loop: worldPts, isLine: true
-    };
-    clearGroup(faceGroup);
-    const hl = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(worldPts),
-      new THREE.LineBasicMaterial({ color: FACE_C })
-    );
-    hl.renderOrder = 4;
-    faceGroup.add(hl);
-    hideObjMenu();
-    syncFaceHint();
-    showFaceMenu();
-    return;
-  }
-
-  if (desc.points.length < 3) { toast('轮廓点不足，无法拉伸'); return; }
-  const { u, v, n } = sketchBasis(desc);
-  const o = new THREE.Vector3().fromArray(desc.pos);
-  const loop = desc.points.map(([x, y]) => new THREE.Vector3()
-    .addScaledVector(u, x).addScaledVector(v, y).add(o));
-  const center = new THREE.Vector3();
-  loop.forEach((p) => center.add(p));
-  center.multiplyScalar(1 / loop.length);
-  const normal = n.clone();
-  state.face = { normal, point: center.clone(), loop, center: center.clone() };
-  buildFaceHighlight(loop, normal);
+/**
+ * 单击「已经闭合的草图平面」→ 视口浮出拉伸菜单。
+ * 开放线条只做普通选中：不再弹拉伸菜单，也不再扫掠成带状面。
+ * 闭合轮廓可来自单个闭合草图，也可由同一次会话的多段线自动拼成（closedSketchRegionFor）。
+ */
+function pickSketchFace(root, region) {
+  const r = region || closedSketchRegionFor(root);
+  if (!r) return;
+  state.face = { normal: r.normal.clone(), point: r.center.clone(), loop: r.loop.map((p) => p.clone()), center: r.center.clone() };
+  /* 闭合草图面 → 蓝色系高亮，明确提示"这一面将被拉伸"；
+     实体选面仍走橙色，两者不会混淆。同时把草图本体从选中黄退回普通蓝。 */
+  buildFaceHighlight(r.loop, r.normal, null, null, true);
+  const grp = sketchGroupOf(root);
+  grp.forEach((o) => paintEntity(o, 'normal'));
+  facePaintKey = '';   // 让渲染循环按 state.face 重新判定，避免又被刷回选中黄
+  hoverEntity = null;
   hideObjMenu();
   syncFaceHint();
   showFaceMenu();
@@ -11031,10 +12548,10 @@ function setEntityHover(obj) {
   hoverEntity = next;
   hoverGroup = next ? sketchGroupOf(next) : [];
   prevGroup.forEach((o) => {
-    if (o !== state.selected && o !== state.selectedB && !hoverGroup.includes(o)) paintEntity(o, 'normal');
+    if (o !== state.selected && o !== state.selectedB && !isBoolChosen(o) && !hoverGroup.includes(o)) paintEntity(o, 'normal');
   });
   hoverGroup.forEach((o) => {
-    if (o !== state.selected && o !== state.selectedB) paintEntity(o, 'hover');
+    if (o !== state.selected && o !== state.selectedB && !isBoolChosen(o)) paintEntity(o, 'hover');
   });
 }
 
@@ -11082,7 +12599,7 @@ function updateHints() {
   let html = '';
 
   if (state.revealMode) {
-    html = `<b>显现模式</b>${dots}所有隐藏对象已半透明显示${dots}点中某一个才真正显现它${dots}再次点「显现」按钮退出`;
+    html = `<b>显现模式</b>${dots}所有隐藏对象已半透明显示${dots}点选要恢复的实体${dots}点左上角对勾确认退出`;
   } else if (state.hidden.length) {
     html = `<b>已有 ${state.hidden.length} 个对象被隐藏</b>${dots}点「显现」后它们会半透明出现，点中某一个才恢复`;
   } else if (measureActive) {
@@ -11956,13 +13473,16 @@ function pickLineInfo(e) {
       const t = THREE.MathUtils.clamp(h.point.clone().sub(a).dot(d) / len2, 0, 1);
       const foot = a.clone().addScaledVector(d, t);
       const dist = foot.distanceToSquared(h.point);
-      if (dist < bd) { bd = dist; best = { point: foot, dir: d.normalize() }; }
+      if (dist < bd) { bd = dist; best = { point: foot, dir: d.clone().normalize(), a: a.clone(), b: b.clone() }; }
     }
     if (best) return best;
   }
   /* 没命中实体网格：退化为地面上的一条水平参考线（沿 X 轴），保证总能给出结果 */
   const gp = new THREE.Vector3();
-  if (raycaster.ray.intersectPlane(groundPlane, gp)) return { point: gp, dir: new THREE.Vector3(1, 0, 0) };
+  if (raycaster.ray.intersectPlane(groundPlane, gp)) {
+    const dir = new THREE.Vector3(1, 0, 0);
+    return { point: gp.clone(), dir, a: gp.clone().addScaledVector(dir, -80), b: gp.clone().addScaledVector(dir, 80) };
+  }
   return null;
 }
 
@@ -11974,24 +13494,51 @@ function measurePickAt(e) {
     return { point: info.point, vertex: !!info.vertex };
   }
   if (measureMode === 'faceface') {
-    const s = surfaceUnderCursor(e);
-    if (!s) return null;
-    return { point: s.point, normal: s.normal.clone().normalize() };
+    const sh = pick(e);
+    if (!sh || !sh.hit || !sh.hit.face) return null;
+    const b = faceBoundary(sh.root, sh.hit);
+    if (!b) return null;
+    return { point: sh.hit.point.clone(), normal: b.normal.clone().normalize(), face: b, obj: sh.root };
   }
   if (measureMode === 'lineline') {
     const l = pickLineInfo(e);
     if (!l) return null;
-    return { point: l.point, dir: l.dir.clone() };
+    return { point: l.point.clone(), dir: l.dir.clone(), a: l.a && l.a.clone(), b: l.b && l.b.clone() };
   }
   return null;
+}
+
+/** 拾取一个平面面（带完整边界），用于点到面 / 面面角的贴合网格提示 */
+function measureFacePick(e) {
+  const sh = pick(e);
+  if (sh && sh.hit && sh.hit.face) {
+    const b = faceBoundary(sh.root, sh.hit);
+    if (b) return { point: sh.hit.point.clone(), normal: b.normal.clone().normalize(), face: b, obj: sh.root };
+  }
+  /* 没命中实体面：退化为网格平面（地面），与草图绘制选平面用同一套无限平面。
+     给它一块有限边界，好让贴合网格铺满并稳定显示。 */
+  setRay(e);
+  const gp = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(groundPlane, gp)) return null;
+  const nn = groundPlane.normal.clone().normalize();
+  const { u, v } = planeBasis(nn);
+  const R = 160;
+  const loop = [
+    gp.clone().addScaledVector(u, -R).addScaledVector(v, -R),
+    gp.clone().addScaledVector(u, R).addScaledVector(v, -R),
+    gp.clone().addScaledVector(u, R).addScaledVector(v, R),
+    gp.clone().addScaledVector(u, -R).addScaledVector(v, R)
+  ];
+  const face = { loop, normal: nn, center: gp.clone(), point: gp.clone() };
+  return { point: gp.clone(), normal: nn.clone(), face, obj: null, ground: true };
 }
 
 /** 点到面：第二项必须是平面；点到点第二项是点；面/线模式第二项同类 */
 function measurePickSecond(e) {
   if (measureMode === 'p2face') {
-    const s = surfaceUnderCursor(e);
+    const s = measureFacePick(e);
     if (!s) { toast('请点选一个平面面（曲面不适用）'); return null; }
-    return { point: s.point, normal: s.normal.clone().normalize() };
+    return s;
   }
   return measurePickAt(e);
 }
@@ -12002,9 +13549,7 @@ function startMeasure(mode) {
   measureStart = null; measureEnd = null;
   measureStartVertex = false; measureEndVertex = false;
   mPick1 = null; mPick2 = null;
-  if (!$('measureHint')) { /* 面板可能未展开，提示仍写到状态栏 */ }
-  const hint = $('measureHint');
-  if (hint) hint.textContent = MEASURE_TIP[measureMode];
+  clearGroup(measureVisualGroup);
   updateMeasureOverlay();
   hideObjMenu();
   updateHints();
@@ -12017,6 +13562,7 @@ function cancelMeasure() {
   measureStartVertex = false; measureEndVertex = false;
   mPick1 = null; mPick2 = null;
   hideCursorDot();
+  clearGroup(measureVisualGroup);
   updateMeasureOverlay();
   updateHints();
 }
@@ -12037,12 +13583,12 @@ function measureClick(e) {
     mPick2 = pick;
     measureEnd = pick.point.clone();
     measureEndVertex = !!pick.vertex;
-    measureActive = false;
-    hideCursorDot();
+    /* 不再自动退出测量：窗保持打开，点窗内对勾才确认结束（仿 3D One） */
     updateHints();
     const val = measureValue();
-    toast(val ? '测量完成：' + val + '（可点「开始测量」重测）' : '测量完成');
+    toast(val ? '测量完成：' + val + '（可继续点选或点对勾结束）' : '测量完成');
   }
+  refreshMeasurePop();
   updateMeasureOverlay();
 }
 
@@ -12070,45 +13616,207 @@ function measureValue() {
   return null;
 }
 
+/* ---------- 测量可视化：贴合网格 / 半透明双面 / 线描边 / 角度圆弧 ---------- */
+const MEASURE_COLORS = { a: 0x2f6fed, b: 0xf5871f };
+
+/** 在指定面上铺一层贴合的细网格（沿法向仅抬 0.05mm，不与面分离） */
+function addMeasureFaceGrid(face, color) {
+  if (!face || !face.loop || face.loop.length < 3) return;
+  const { u, v, n } = planeBasis(face.normal);
+  const c = face.center || face.point;
+  let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+  face.loop.forEach((p) => {
+    const d = p.clone().sub(c);
+    const a = d.dot(u), b = d.dot(v);
+    if (a < minU) minU = a; if (a > maxU) maxU = a;
+    if (b < minV) minV = b; if (b > maxV) maxV = b;
+  });
+  if (!Number.isFinite(minU) || maxU - minU < 0.1 || maxV - minV < 0.1) return;
+  const span = Math.max(maxU - minU, maxV - minV);
+  const step = Math.max(5, Math.round(span / 12 / 5) * 5);
+  const off = 0.05;
+  const at = (a, b) => c.clone().addScaledVector(u, a).addScaledVector(v, b).addScaledVector(n, off);
+  const segs = [];
+  for (let k = Math.ceil(minU / step) * step; k <= maxU + 1e-6; k += step) {
+    segs.push(at(k, minV), at(k, maxV));
+  }
+  for (let k = Math.ceil(minV / step) * step; k <= maxV + 1e-6; k += step) {
+    segs.push(at(minU, k), at(maxU, k));
+  }
+  /* 虚线透明网格：depthTest 关闭，稳定贴合、不会与面 z-fighting 而若隐若现 */
+  const gGeo = new THREE.BufferGeometry().setFromPoints(segs);
+  const grid = new THREE.LineSegments(gGeo, new THREE.LineDashedMaterial({
+    color, transparent: true, opacity: 0.9, depthWrite: false, depthTest: false,
+    dashSize: 3, gapSize: 2.2
+  }));
+  grid.computeLineDistances();
+  grid.renderOrder = 18;
+  measureVisualGroup.add(grid);
+  const ring = face.loop.map((p) => p.clone().addScaledVector(n, off));
+  ring.push(ring[0].clone());
+  const rGeo = new THREE.BufferGeometry().setFromPoints(ring);
+  const border = new THREE.LineSegments(rGeo, new THREE.LineDashedMaterial({
+    color, transparent: true, opacity: 1, depthWrite: false, depthTest: false,
+    dashSize: 4, gapSize: 2.5
+  }));
+  border.computeLineDistances();
+  border.renderOrder = 19;
+  measureVisualGroup.add(border);
+}
+
+/** 测量模式下的 3D 辅助图形：面模式网格/半透明面，线模式描出两条线 */
+function updateMeasureVisuals() {
+  clearGroup(measureVisualGroup);
+  if (!measureActive) return;
+  if (measureMode === 'p2face') {
+    if (mPick2 && mPick2.face) addMeasureFaceGrid(mPick2.face, MEASURE_COLORS.b);
+    else if (mPick1 && mPick1.face) addMeasureFaceGrid(mPick1.face, MEASURE_COLORS.a);
+    return;
+  }
+  if (measureMode === 'faceface') {
+    [mPick1, mPick2].forEach((pk, i) => {
+      if (!pk || !pk.face) return;
+      const color = i === 0 ? MEASURE_COLORS.a : MEASURE_COLORS.b;
+      addMeasureFaceGrid(pk.face, color);
+      const mesh = new THREE.Mesh(
+        polygonGeometry(pk.face.loop, pk.normal, 0.07 + i * 0.01),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, depthTest: false })
+      );
+      mesh.renderOrder = 17;
+      measureVisualGroup.add(mesh);
+    });
+    return;
+  }
+  if (measureMode === 'lineline') {
+    [mPick1, mPick2].forEach((pk, i) => {
+      if (!pk) return;
+      const a = pk.a || pk.point.clone().addScaledVector(pk.dir, -80);
+      const b = pk.b || pk.point.clone().addScaledVector(pk.dir, 80);
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([a, b]),
+        new THREE.LineBasicMaterial({ color: i === 0 ? MEASURE_COLORS.a : MEASURE_COLORS.b, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false })
+      );
+      line.renderOrder = 20;
+      measureVisualGroup.add(line);
+    });
+  }
+}
+
+/** 两条 3D 直线的最近点中点（相交时即交点，异面时取公垂线中点） */
+function twoLineVertex(a, da, b, db) {
+  const r = a.clone().sub(b);
+  const A = da.dot(da), B = da.dot(db), C = db.dot(db), D = da.dot(r), E = db.dot(r);
+  const den = A * C - B * B;
+  const s = Math.abs(den) > 1e-8 ? (B * E - C * D) / den : 0;
+  const t = Math.abs(den) > 1e-8 ? (A * E - B * D) / den : 0;
+  return a.clone().addScaledVector(da, s).add(b.clone().addScaledVector(db, t)).multiplyScalar(0.5);
+}
+/** 两平面交线：方向 = n1×n2，点取离两拾取点中点最近的一点 */
+function twoPlaneEdge(p1, n1, p2, n2, hint) {
+  const dir = new THREE.Vector3().crossVectors(n1, n2);
+  if (dir.lengthSq() < 1e-10) return { point: hint.clone(), dir: new THREE.Vector3(0, 0, 1) };
+  dir.normalize();
+  const d1 = -n1.dot(p1), d2 = -n2.dot(p2);
+  const den = 1 - Math.pow(n1.dot(n2), 2);
+  let point;
+  if (Math.abs(den) < 1e-8) point = p1.clone();
+  else point = n1.clone().multiplyScalar((d1 - d2 * n1.dot(n2)) / den)
+    .addScaledVector(n2, (d2 - d1 * n1.dot(n2)) / den);
+  point.addScaledVector(dir, hint.clone().sub(point).dot(dir));
+  return { point, dir };
+}
+
+/** 屏幕空间角弧：从屏幕中心 v 出发的两条射线之间画小弧，并把数值放到弧外侧 */
+function screenArc(svgParts, vertex, dirA, dirB, value) {
+  const c = projectToScreen(vertex);
+  const sa = projectToScreen(vertex.clone().addScaledVector(dirA, 18));
+  const sb = projectToScreen(vertex.clone().addScaledVector(dirB, 18));
+  let a1 = Math.atan2(sa.y - c.y, sa.x - c.x);
+  let a2 = Math.atan2(sb.y - c.y, sb.x - c.x);
+  let diff = ((a2 - a1 + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  const end = a1 + diff;
+  const r = 24;
+  const p1 = { x: c.x + Math.cos(a1) * r, y: c.y + Math.sin(a1) * r };
+  const p2 = { x: c.x + Math.cos(end) * r, y: c.y + Math.sin(end) * r };
+  svgParts.push(`<path d="M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} A ${r} ${r} 0 0 ${diff > 0 ? 1 : 0} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}"`
+    + ` fill="none" stroke="#f5871f" stroke-width="2.4"/>`);
+  const mid = a1 + diff / 2;
+  return { x: c.x + Math.cos(mid) * (r + 16), y: c.y + Math.sin(mid) * (r + 16), text: value };
+}
+
 function updateMeasureOverlay() {
   const lineEl = $('measureLine'), tag = $('measureTag'), marksEl = $('measureMarks');
   if (!lineEl || !tag) return;
+  updateMeasureVisuals();
   if (!mPick1) {
     setSvgHtml(lineEl, '');
     tag.style.display = 'none';
+    tag.textContent = '';
     if (marksEl) marksEl.innerHTML = '';
     return;
   }
+  const val = measureValue();
   const p1 = mPick1.point;
   const p2 = mPick2 ? mPick2.point : p1;
   const sa = projectToScreen(p1), sb = projectToScreen(p2);
-  let svg = `<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sb.x.toFixed(1)}" y2="${sb.y.toFixed(1)}"`
-    + ` stroke="#2f6fed" stroke-width="2.2" opacity=".95"/>`;
-  tag.style.display = 'block';
-  tag.style.left = ((sa.x + sb.x) / 2).toFixed(1) + 'px';
-  tag.style.top = ((sa.y + sb.y) / 2 - 18).toFixed(1) + 'px';
-  /* 面面角 / 线线角：在两端画出法向或方向短箭头，直观显示所测对象 */
-  if (mPick2 && (measureMode === 'faceface' || measureMode === 'lineline')) {
-    const vecOf = (pk) => (measureMode === 'faceface' ? pk.normal : pk.dir);
-    for (const [pk, s] of [[mPick1, sa], [mPick2, sb]]) {
-      const v = vecOf(pk);
-      const tip = projectToScreen(pk.point.clone().addScaledVector(v, 22));
-      svg += `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}"`
-        + ` stroke="#f5871f" stroke-width="2" opacity=".9"/>`;
+  const svg = [];
+  const isAngle = !!(mPick2 && (measureMode === 'faceface' || measureMode === 'lineline'));
+  const isP2FaceDone = !!(mPick2 && measureMode === 'p2face');
+  let label = null;
+  let footScreen = null;
+  if (isP2FaceDone) {
+    /* 点到面：只画起点→垂足的橙色虚线，不画起点→面上拾取点的蓝色连线（多余） */
+  } else if (!isAngle) {
+    svg.push(`<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sb.x.toFixed(1)}" y2="${sb.y.toFixed(1)}"`
+      + ` stroke="#2f6fed" stroke-width="2.2" opacity=".95"/>`);
+  } else {
+    let vertex, dirA, dirB;
+    if (measureMode === 'lineline') {
+      vertex = twoLineVertex(mPick1.point, mPick1.dir, mPick2.point, mPick2.dir);
+      dirA = mPick1.dir; dirB = mPick2.dir;
+    } else {
+      const hint = mPick1.point.clone().add(mPick2.point).multiplyScalar(0.5);
+      const edge = twoPlaneEdge(mPick1.point, mPick1.normal, mPick2.point, mPick2.normal, hint);
+      vertex = edge.point;
+      const rayOf = (pk) => {
+        const c = pk.face && pk.face.center ? pk.face.center : pk.point;
+        const t = c.clone().sub(vertex);
+        t.addScaledVector(pk.normal, -t.dot(pk.normal));
+        if (t.lengthSq() < 1e-8) t.set(0, 0, 1).addScaledVector(pk.normal, -pk.normal.z);
+        return t.normalize();
+      };
+      dirA = rayOf(mPick1); dirB = rayOf(mPick2);
     }
+    label = screenArc(svg, vertex, dirA, dirB, val || '');
   }
-  /* 点到面：从点向平面作垂足虚线 */
+  /* 点到面：从点向平面作垂足虚线；点到点只保留两点连线与距离标签 */
   if (mPick2 && measureMode === 'p2face') {
     const n = mPick2.normal;
     const signed = mPick1.point.clone().sub(mPick2.point).dot(n);
     const foot = mPick1.point.clone().addScaledVector(n, -signed);
     const sf = projectToScreen(foot);
-    svg += `<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sf.x.toFixed(1)}" y2="${sf.y.toFixed(1)}"`
-      + ` stroke="#f5871f" stroke-width="1.8" stroke-dasharray="5 4" opacity=".9"/>`;
+    footScreen = sf;
+    svg.push(`<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sf.x.toFixed(1)}" y2="${sf.y.toFixed(1)}"`
+      + ` stroke="#f5871f" stroke-width="1.8" stroke-dasharray="5 4" opacity=".9"/>`);
   }
-  setSvgHtml(lineEl, svg);
-  const val = measureValue();
-  tag.textContent = val || '';
+  setSvgHtml(lineEl, svg.join(''));
+  /* 只有真正算出结果才显示数值标签，避免只拾取第一点时留下一个空白白框 */
+  if (label) {
+    tag.style.display = 'block';
+    tag.style.left = label.x.toFixed(1) + 'px';
+    tag.style.top = label.y.toFixed(1) + 'px';
+    tag.textContent = label.text;
+  } else if (val) {
+    const lx = footScreen ? (sa.x + footScreen.x) / 2 : (sa.x + sb.x) / 2;
+    const ly = footScreen ? (sa.y + footScreen.y) / 2 - 18 : (sa.y + sb.y) / 2 - 18;
+    tag.style.display = 'block';
+    tag.style.left = lx.toFixed(1) + 'px';
+    tag.style.top = ly.toFixed(1) + 'px';
+    tag.textContent = val;
+  } else {
+    tag.style.display = 'none';
+    tag.textContent = '';
+  }
   if (marksEl) {
     let html = `<div class="measuremark${measureStartVertex ? ' snap' : ''}" style="left:${sa.x.toFixed(1)}px;top:${sa.y.toFixed(1)}px"></div>`;
     if (mPick2) {
@@ -12731,6 +14439,7 @@ renderer.setAnimationLoop(() => {
   const _dt = Math.min(64, _now - _lastFrameT);   // 限制单帧步长，避免切后台回来跳变
   _lastFrameT = _now;
   if (viewAnim) stepViewAnim();
+  stepAutoSpin(_dt);            // 自动旋转：方向/速度由 ← → ↑ ↓ 控制
   stabilizeCameraUp();          // 顶/底视角用 Y 作 up，避免网格歪斜
   refreshGridStep();            // 顶面视图网格 ×1.5（吸附步距联动）
   stepGridZoom();               // 网格步距平滑过渡
@@ -12773,11 +14482,15 @@ window.Sketch3D = {
   get gridStep() { return grid.material.uniforms.uStep.value; },
   get snapStep() { return SNAP; },
   lockSketchPlane, backToPickPlane,
-  beginSketchSession, endSketchSession, reenterSketchSession, sketchGroupOf,
+  beginSketchSession, endSketchSession, reenterSketchSession, sketchGroupOf, closedSketchRegionFor,
   openExtrudePanel, closeExtrudePanel, setTool, setMode,
   entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
+  openBoolPop, boolPickClick, commitBoolPick, cancelBoolPick,
+  revolveDesc, packRevSoup, openRevolvePop, revPickClick, refreshRevPreview, commitRevolve, cancelRevolve,
+  measureFacePick, addMeasureFaceGrid,
   animateView, viewCubeRect,
   primitiveDesc, makeGeometry, hornGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
+  coplanarEdgeCoords, edgeCoordsFor,
   alignLoopsToFaceEdges,
   confirmDim, autoConfirmDim, applyBodyAppearance,
   serializeScene, restoreScene, undo, redo,
@@ -12798,9 +14511,14 @@ window.Sketch3D = {
   magnetSnapMoveDelta, entityWorldVertsXY,
   /* 精确面延伸 / 中心磁吸（探针） */
   exactExtrudeUnion, snapCenterPoint, setSvgHtml,
-  startMeasure, cancelMeasure, updateMeasureOverlay,
-  selectAllEntities, repeatLastOp,
+  startMeasure, cancelMeasure, updateMeasureOverlay, measureVisualGroup,
+  addMeasureFaceGrid, updateMeasureVisuals, measureFacePick, twoLineVertex, twoPlaneEdge, screenArc,
+  selectAllEntities, repeatLastOp, brushPick, showBrushBox, hideBrushBox, objectScreenRect,
   get measureState() { return { active: measureActive, mode: measureMode, start: measureStart && measureStart.toArray(), end: measureEnd && measureEnd.toArray(), value: measureValue() }; },
+  /* 左上角任务窗探针（供验证） */
+  revealObject, exitRevealMode, revealedCount, showTaskPop, hideTaskPop, openPolyPop, openMeasurePop, refreshMeasurePop, beginShapeDimEdit,
+  applyPolyParamInput, refreshPolyPreview,
+  get taskPopKind() { return taskPopKind; },
   get multiCount() { return state.multi.length; },
   get sketchSession() { return { id: state.sketchSessionId, tool: state.sketchSessionTool, stage: state.sketchStage }; },
   get p2pState() { return { active: p2pActive, stage: p2pStage, tab: moveTab, start: p2pStart && p2pStart.toArray(), end: p2pEnd && p2pEnd.toArray() }; },
