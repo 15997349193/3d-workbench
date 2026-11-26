@@ -64,6 +64,7 @@
      02 · 三栏布局骨架：顶栏 / 左工具栏 / 中视口 / 右属性面板
      ========================================================= */
   .app{
+    position:relative;
     height:100vh;
     display:grid;
     grid-template-columns:236px 1fr 302px;
@@ -166,6 +167,9 @@
   .fly-panel.on{display:flex}
   .fly-head{font-size:11px;font-weight:700;color:var(--text);letter-spacing:.03em;padding:3px 8px 8px;border-bottom:1px solid var(--line-soft);margin-bottom:4px}
   .fly-hint{font-size:10.5px;line-height:1.6;color:var(--text-3);padding:8px 8px 10px}
+  .fly-btn{margin:4px 6px;padding:9px;border-radius:9px;border:1px solid #d7e2f0;background:#f7faff;
+    color:#1d4ed8;font-size:11.5px;font-weight:700;cursor:pointer}
+  .fly-btn:hover{background:#e9f1ff;border-color:#93c5fd}
 
   .tool{
     position:relative;width:100%;display:flex;flex-direction:row;align-items:center;gap:10px;
@@ -203,6 +207,9 @@
   .tool[data-act="undo"]{--tc:#64748b}
   .tool[data-act="delete"]{--tc:#ef4444}
   .tool[data-act="shade"]{--tc:#0ea5e9}
+  .tool[data-act="hide"]{--tc:#64748b}
+  .tool[data-act="reveal"]{--tc:#0ea5e9}
+  .tool[data-act="reveal"].on{--tc:#0ea5e9}
   /* 实体布尔运算区（A / Shift+B） */
   .tool.booltool{--tc:#6366f1}
   .tool.booltool:not(.ready){opacity:.45}
@@ -223,8 +230,30 @@
     background:radial-gradient(80% 60% at 50% 8%,rgba(120,160,225,.07),transparent 60%),
                radial-gradient(70% 50% at 50% 100%,rgba(150,175,215,.10),transparent 60%);
   }
-  #viewport.cross,#viewport.cross canvas{cursor:crosshair}
+  /* 草图/测距不再用十字光标：普通箭头 + 跟随鼠标的实心圆点（见 .cursor-dot） */
+  #viewport.cross,#viewport.cross canvas{cursor:default}
   #viewport canvas{display:block}
+  /* 磁吸落点提示：普通态蓝色实心点，吸附到顶点/格点时放大变黄 */
+  .cursor-dot{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:6;
+    width:11px;height:11px;border-radius:50%;background:#2f6fed;border:2px solid #fff;display:none;
+    box-shadow:0 0 0 2px rgba(47,111,237,.5),0 2px 8px rgba(28,42,70,.3)}
+  /* 右键轻点视图菜单：只放显示相关开关，右键拖动照常旋转 */
+  .view-menu{position:absolute;z-index:12;display:none;min-width:158px;padding:5px;
+    background:#fff;border:1px solid #dce5f0;border-radius:9px;box-shadow:0 8px 24px rgba(28,42,70,.18)}
+  .view-menu.show{display:block}
+  .view-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;
+    border-radius:6px;font-size:12px;color:var(--text);cursor:pointer;text-align:left}
+  .view-menu button:hover{background:#f1f8fb}
+  .view-menu svg{width:16px;height:16px;stroke:#64748b;fill:none;stroke-width:1.6;stroke-linejoin:round;flex:none}
+  .view-menu kbd{margin-left:auto;font-size:10px;color:var(--text-3);background:#f1f5f9;
+    border:1px solid #dce5f0;border-radius:4px;padding:1px 5px}
+  /* 磁吸到顶点/格点：放大变黄 + 醒目的黄色呼吸外圈，明确告诉用户“已精确吸附” */
+  .cursor-dot.snap{width:16px;height:16px;background:#ffcc00;border-color:#fff7cc;
+    animation:cursorSnapPulse 1s ease-in-out infinite alternate}
+  @keyframes cursorSnapPulse{
+    from{box-shadow:0 0 0 3px #f5b400,0 0 10px rgba(245,180,0,.7),0 2px 8px rgba(28,42,70,.35)}
+    to{box-shadow:0 0 0 7px rgba(245,180,0,.32),0 0 18px rgba(245,180,0,.95),0 2px 8px rgba(28,42,70,.35)}
+  }
 
   /* 视口左上角场景角标 */
   .viewchip{
@@ -239,6 +268,30 @@
   .viewchip b{color:var(--navy);font-weight:600}
 
   /* 提示条居中放底部，左下角留给视角立方体 */
+  /* 草图模式顶部中央的对勾：点击进入草图后显示，点它退出草图回到选择工具 */
+  .sk-done{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:8;display:none;
+    width:38px;height:38px;border-radius:50%;align-items:center;justify-content:center;cursor:pointer;
+    background:linear-gradient(180deg,#34d17e,#1eb867);border:2px solid #fff;color:#fff;
+    box-shadow:0 4px 16px rgba(24,160,88,.38)}
+  .sk-done:hover{filter:brightness(1.08);transform:translateX(-50%) scale(1.06)}
+  .sk-done svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+  /* 草图编辑态：深黄色主题，与实体建模的蓝/绿界面明确区分 */
+  body.sketch-editing #viewport::before{
+    border:2px solid rgba(176,122,10,.55);
+    background:radial-gradient(80% 60% at 50% 8%,rgba(184,134,11,.14),transparent 62%),
+               radial-gradient(70% 50% at 50% 100%,rgba(176,122,10,.11),transparent 60%);
+  }
+  body.sketch-editing .viewchip{background:rgba(255,248,226,.94);border-color:rgba(196,143,22,.7)}
+  body.sketch-editing .viewchip .ic{background:linear-gradient(140deg,#e8b83f,#a56a00);box-shadow:0 1px 3px rgba(165,106,0,.4)}
+  body.sketch-editing .viewchip b{color:#7a4f00}
+  body.sketch-editing .viewchip::after{content:"草图编辑";margin-left:6px;padding:2px 7px;border-radius:20px;background:#b8860b;color:#fff;font-size:10px;font-weight:700;letter-spacing:.04em}
+  body.sketch-editing .hintbar{background:rgba(255,248,226,.95);border-color:rgba(196,143,22,.7);color:#7a5600}
+  body.sketch-editing .hintbar b{color:#7a4f00}
+  body.sketch-editing .hintbar .dot{background:#c9962a}
+  body.sketch-editing .segmented button.on{color:#8a5900;background:#fff6df;box-shadow:0 1px 4px rgba(150,100,0,.22)}
+  body.sketch-editing .tool.on{background:#fff7e2;border-color:#e4bd63;box-shadow:0 2px 9px rgba(160,110,0,.14)}
+  body.sketch-editing .tool.on svg{stroke:#a56a00}
+  body.sketch-editing .tool.on span{color:#a56a00}
   .hintbar{
     position:absolute;left:50%;transform:translateX(-50%);bottom:15px;z-index:3;
     display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
@@ -249,6 +302,15 @@
   }
   .hintbar b{color:var(--navy);font-weight:600}
   .hintbar .dot{width:3px;height:3px;border-radius:50%;background:#b9c4d4;flex:none}
+  .hintbar .hint-content{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+  .hint-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:22px;height:22px;
+    border-radius:6px;display:grid;place-items:center;color:var(--text-3);flex:none}
+  .hint-toggle:hover{background:rgba(47,111,237,.1);color:#1d6ae5}
+  .hint-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+  .hintbar.collapsed{padding:5px;width:34px;height:34px;min-width:0;overflow:visible}
+  .hintbar.collapsed .hint-content{display:none}
+  .hintbar.collapsed .hint-toggle{right:50%;transform:translate(50%,-50%)}
+  .hintbar.collapsed .hint-toggle svg{transform:rotate(180deg)}
   kbd{
     font-family:inherit;font-size:10.5px;padding:1.5px 6px;border-radius:5px;
     background:linear-gradient(180deg,#f6f8fc,#eef2f8);border:1px solid #dde4ef;border-bottom-width:2px;color:#4a5a72;font-weight:600;
@@ -265,10 +327,11 @@
   .statusbar::before{content:"";width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.15);flex:none}
 
   /* ---------- 尺寸编辑 gizmo（3D One 式） ---------- */
-  .dimlayer{position:absolute;inset:0;z-index:3;pointer-events:none;display:none}
+  /* 浮层统一写四向定位 + 宽高：360 极速模式老内核不认 inset 简写，缺了会让箭头全消失 */
+  .dimlayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:3;pointer-events:none;display:none}
   .dimlayer.show{display:block}
-  .dimsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-  .dimlabels{position:absolute;inset:0;pointer-events:none}
+  .dimsvg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+  .dimlabels{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
   .dim-tag{
     position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
     background:rgba(255,255,255,.96);border:1px solid #d7dfea;border-radius:8px;
@@ -277,6 +340,8 @@
     transition:border-color .14s,box-shadow .14s;
   }
   .dim-tag:hover{border-color:#2f9bbd;box-shadow:0 4px 14px rgba(47,155,189,.24);color:#1a7f9c}
+  /* 悬停尺寸数字（线段长度 / 矩形长宽）：普通箭头，不叠加磁吸亮点 */
+  #segLenTag, #shapeWTag, #shapeHTag{cursor:default}
   .dim-tag input{
     width:60px;border:none;outline:none;background:transparent;font:inherit;color:inherit;
     text-align:center;padding:0;font-variant-numeric:tabular-nums;
@@ -286,15 +351,15 @@
   .dim-hit{pointer-events:stroke;cursor:grab}
   .dim-hit:active{cursor:grabbing}
   /* 三轴移动 gizmo（X/Y/Z 箭头拖拽 + 可编辑坐标），视觉复用 .dim-tag 胶囊 */
-  .movelayer{position:absolute;inset:0;z-index:3;pointer-events:none;display:none}
+  .movelayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:3;pointer-events:none;display:none}
   .movelayer.show{display:block}
-  .movesvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .movesvg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
   .mv-hit{pointer-events:stroke;cursor:grab}
   .mv-hit:active{cursor:grabbing}
   .mv-tag{border-width:1.5px}
   .mv-ax{font-weight:800;margin-right:4px}
   /* 拉伸箭头：从选中面中心沿拉伸方向，可正向/反向拖拽改高度 */
-  .exarrowlayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none}
+  .exarrowlayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:4;pointer-events:none;display:none}
   .exarrowlayer.show{display:block}
   .ex-hit{pointer-events:stroke;cursor:grab}
   .ex-hit:active{cursor:grabbing}
@@ -311,7 +376,7 @@
   .dim-confirm svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 
   /* 线段长度提示浮层：绘制中显示实时长度，成线后可点标签输入、点绿勾确定 */
-  .seglayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none}
+  .seglayer{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:4;pointer-events:none;display:none}
   .seglayer.show{display:block}
   .seg-tag{pointer-events:auto}
   .seg-confirm{padding:6px;border-radius:50%}
@@ -335,9 +400,20 @@
   }
   .toast.show{opacity:1;transform:translate(-50%,0)}
 
-  /* ---------- 右属性面板 ---------- */
+  /* ---------- 右属性面板：左边缘的细线 chevron 收起手柄 ---------- */
+  .app.panel-collapsed{grid-template-columns:236px 1fr 34px}
+  .panel-toggle{position:absolute;right:302px;top:50%;transform:translateY(-50%);z-index:12;
+    width:20px;height:52px;border:1px solid #e2e9f2;border-right:0;border-radius:9px 0 0 9px;
+    background:#fff;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    box-shadow:-3px 1px 10px rgba(28,42,70,.08);transition:background .15s,color .15s,right .18s}
+  .panel-toggle:hover{background:#f1f6ff;color:#1d6ae5}
+  .panel-toggle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .app.panel-collapsed .panel>*{display:none}
+  .app.panel-collapsed .panel{overflow:hidden}
+  .app.panel-collapsed .panel-toggle{right:34px}
+  .app.panel-collapsed .panel-toggle svg{transform:rotate(180deg)}
   .panel{
-    grid-area:panel;
+    grid-area:panel;position:relative;
     background:linear-gradient(180deg,#ffffff 0%,#fcfdff 100%);
     border-left:1px solid #e2e9f2;
     overflow-y:auto;display:flex;flex-direction:column;z-index:4;
@@ -434,6 +510,7 @@
   .tool.compact svg{width:17px;height:17px}
   .tool.compact span{font-size:9.5px}
   .tool[data-tool="sketch"]{--tc:#8b5cf6}
+  .tool[data-tool="line"]{--tc:#8b5cf6}
   .tool[data-tool="sketch-rect"]{--tc:#8b5cf6}
   .tool[data-tool="sketch-circle"]{--tc:#a855f7}
   .tool[data-tool="sketch-ellipse"]{--tc:#a855f7}
@@ -477,13 +554,20 @@
 
   /* 选中实体浮出菜单（移动 / 缩放 / 置平） */
   .obj-menu{
-    position:absolute;z-index:6;display:none;flex-direction:row;flex-wrap:wrap;width:122px;gap:2px;
+    position:absolute;z-index:6;display:none;flex-direction:column;flex-wrap:nowrap;width:236px;gap:2px;
     padding:4px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
     border:1px solid #d7e2f0;box-shadow:var(--shadow-lg),inset 0 1px 0 #fff;
     transform-origin:0 0;animation:pop .13s ease-out;
   }
   .obj-menu.show{display:flex}
-  .om-main{display:flex;gap:2px}
+  /* 浮动窗口拖拽手柄：默认停在视口上方中央，不压住网格里的模型 */
+  .om-head{display:flex;align-items:center;gap:7px;height:22px;padding:0 7px;flex:none;
+    font-size:10.5px;font-weight:700;letter-spacing:.3px;color:var(--text-3);
+    cursor:move;user-select:none;touch-action:none;border-radius:7px;background:linear-gradient(180deg,#f8fafd,#eef3fa)}
+  .om-head:hover{background:#e8f0fb;color:#1d6ae5}
+  .om-grip{width:10px;height:12px;flex:none;opacity:.65;
+    background:radial-gradient(circle,currentColor 1.2px,transparent 1.4px) 0 0/5px 5px}
+  .om-main{display:flex;gap:2px;justify-content:center;padding:2px 0 1px}
   .om-btn{
     display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:8px;
     font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;
@@ -492,7 +576,7 @@
   .om-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .om-btn:hover,.om-btn.on{background:linear-gradient(180deg,#f0f6ff,#e6efff);color:#1d6ae5}
   .om-btn .k{display:none}
-  .om-sub{padding:8px 7px 6px;margin-top:2px;border-top:1px solid var(--line-soft);width:236px}
+  .om-sub{padding:8px 7px 6px;margin-top:2px;border-top:1px solid var(--line-soft);width:100%}
   .om-row{display:flex;align-items:center;gap:5px;margin-bottom:7px;flex-wrap:wrap}
   .om-row:last-child{margin-bottom:0}
   .om-row label{font-size:10.5px;color:var(--text-3);min-width:46px}
@@ -505,6 +589,40 @@
   .om-apply{padding:5px 10px;border-radius:6px;background:#2f6fed;color:#fff;font-size:11px;font-weight:600}
   .om-apply:hover{background:#245cd0}
   .om-tip{font-size:10px;color:var(--text-3);line-height:1.5}
+  /* 移动面板选项卡：点到点 / 动态移动（仿 3D One） */
+  .om-tabs{display:flex;gap:3px;background:#eef2f8;border-radius:8px;padding:3px;margin-bottom:8px}
+  .om-tab{flex:1;padding:5px 3px;border-radius:6px;font-size:10.5px;font-weight:600;color:var(--text-3);white-space:nowrap;transition:background .13s,color .13s}
+  .om-tab:hover{color:#1d6ae5}
+  .om-tab.on{background:#fff;color:#1d6ae5;box-shadow:0 1px 4px rgba(28,42,70,.12)}
+  .om-p2p-tip{font-size:10px;line-height:1.5;color:var(--text-3);min-height:30px;padding:5px 7px;background:#f7f9fd;border:1px dashed #cdd9ea;border-radius:7px;margin-bottom:7px}
+  .om-p2p-tip b{color:#1d6ae5}
+  .om-p2p-tip .p2p-done{color:#16824a;font-weight:600}
+  /* 动态移动：中心点开关 + 三轴角度输入 */
+  .om-check{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text-2);margin:1px 0 7px;cursor:pointer;user-select:none}
+  .om-check input{width:13px;height:13px;accent-color:#2f6fed;margin:0;cursor:pointer}
+  .mv-rot-hit{pointer-events:all;cursor:grab}
+  .mv-rot-hit:active{cursor:grabbing}
+  .mv-center-hit{pointer-events:all;cursor:move}
+  .mv-center-on{cursor:move}
+  .mv-ang{font-family:inherit;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:2.5px;stroke-linejoin:round}
+  /* 旋转角标：醒目、可点击编辑 */
+  .rot-tag{display:none;pointer-events:auto;cursor:text;background:rgba(71,85,105,.92);border-color:rgba(255,255,255,.35);
+    color:#fff;font-size:12px;padding:5px 10px;border-radius:9px;box-shadow:0 3px 12px rgba(28,42,70,.25)}
+  .rot-tag:hover{background:#334155;border-color:#93c5fd;box-shadow:0 4px 16px rgba(47,111,237,.35)}
+  .rot-tag .rdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .rot-tag input{color:#fff;width:56px}
+  /* 点到点 / 测距端点：统一圆形，磁吸到实体顶点时用醒目的黄色圆圈，不用四向箭头 */
+  .p2pmark,.measuremark{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:5;
+    width:18px;height:18px;border-radius:50%;border:2px solid #fff;
+    box-shadow:0 0 0 2px #2f6fed,0 2px 8px rgba(28,42,70,.35)}
+  .p2pmark::after,.measuremark::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#2f6fed}
+  .p2pmark.end,.measuremark.end{box-shadow:0 0 0 2px #16824a,0 2px 8px rgba(28,42,70,.35)}
+  .p2pmark.end::after,.measuremark.end::after{background:#16824a}
+  .p2pmark.snap,.measuremark.snap{border-color:#fff7cc;box-shadow:0 0 0 3px #f5b400,0 0 12px rgba(245,180,0,.8),0 2px 8px rgba(28,42,70,.35)}
+  .p2pmark.snap::after,.measuremark.snap::after{background:#ffcc00}
+  .p2pmark.hover,.measuremark.hover{opacity:.6;transform:translate(-50%,-50%) scale(.78)}
+  .p2pline{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:4}
+  .measure-tag{display:none;pointer-events:none;z-index:6;border-color:#2f6fed;color:#1d4ed8;font-variant-numeric:tabular-nums}
 
   /* =========================================================
      06 · 拉伸面板（高度 + 4 张运算卡片）
@@ -520,6 +638,7 @@
     display:flex;align-items:center;justify-content:space-between;
     padding:10px 12px 9px;background:linear-gradient(180deg,#f7fbff,#eff5fe);
     border-bottom:1px solid var(--line-soft);
+    cursor:move;touch-action:none;user-select:none;   /* 与对象菜单一致：按住标题栏可拖动 */
   }
   .ex-head .t{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px}
   .ex-head .t svg{width:15px;height:15px;stroke:#2f6fed;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -532,6 +651,9 @@
   .ex-row label{font-size:11.5px;color:var(--text-2);flex:none}
   .ex-row .num{flex:1;width:auto;height:30px;text-align:right;font-size:13px;min-width:0;padding:0 7px}
   .ex-row .unit2{font-size:11px;color:var(--text-3);flex:none}
+  .ex-sel{flex:1;min-width:0;height:30px;border:1px solid var(--line);border-radius:7px;background:#fff;
+    color:var(--text);font-size:13px;padding:0 7px;cursor:pointer}
+  .ex-sel:focus{outline:none;border-color:#2f6fed;box-shadow:0 0 0 2px rgba(47,111,237,.13)}
   .ex-dir{
     display:flex;gap:2px;background:#eef2f9;padding:2px;border-radius:7px;flex:none;
   }
@@ -583,7 +705,7 @@
   .demo-entry.on{border-color:#c21875;box-shadow:0 0 0 2px rgba(194,24,117,.15)}
 
   #demoOverlay{
-    position:fixed;inset:0;z-index:120;display:none;
+    position:fixed;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:120;display:none;
     background:radial-gradient(1200px 620px at 18% -8%,#fdeef7 0%,transparent 52%),
                radial-gradient(1000px 520px at 100% 0%,#eef3ff 0%,transparent 50%),#eef2f8;
   }
@@ -760,8 +882,10 @@
       <!-- 绘制草图 -->
       <div class="fly-panel" data-panel="sketch">
         <div class="fly-head">绘制草图</div>
-        <button class="tool mitem" data-tool="sketch" title="线段 (S) · 逐点点击，回到起点闭合">
-          <svg viewBox="0 0 24 24"><path d="M4.2 16.6l5-6.8 4 3.8 6.6-8.2"/><circle cx="4.2" cy="16.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="19.8" cy="5.4" r="1.5" fill="currentColor" stroke="none"/></svg><span>线段</span></button>
+        <button class="tool mitem" data-tool="sketch" title="多线段 (S) · 逐点点击连成折线，点绿勾或回车结束本条线（仍在草图）">
+          <svg viewBox="0 0 24 24"><path d="M4.2 16.6l5-6.8 4 3.8 6.6-8.2"/><circle cx="4.2" cy="16.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="19.8" cy="5.4" r="1.5" fill="currentColor" stroke="none"/></svg><span>多线段</span></button>
+        <button class="tool mitem" data-tool="line" title="线段 (N) · 点起点、点终点画一段；长度实时显示在线上，单击数字可改，回车确认后再回车或点绿勾完成，自动准备下一段（同一次草图无需重选平面）">
+          <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="1.5" fill="currentColor" stroke="none"/></svg><span>线段</span></button>
         <button class="tool mitem" data-tool="sketch-rect" title="矩形 (R) · 对角线拖拽绘制">
           <svg viewBox="0 0 24 24"><rect x="4" y="6.5" width="16" height="11" rx="1"/></svg><span>矩形</span></button>
         <button class="tool mitem" data-tool="sketch-circle" title="圆 (O) · 圆心拖出半径">
@@ -779,10 +903,16 @@
           <svg viewBox="0 0 24 24"><path d="M5 3l6.6 16.2 2.3-6.4 6.4-2.3z"/></svg><span>选择</span></button>
         <button class="tool mitem" data-act="undo" id="btnUndo" title="撤销 (Ctrl+Z)" disabled>
           <svg viewBox="0 0 24 24"><path d="M4 9h9.5a5 5 0 0 1 0 10H8"/><path d="M8 5L4 9l4 4"/></svg><span>撤销</span></button>
+        <button class="tool mitem" data-act="redo" id="btnRedo" title="还原 (Ctrl+Y)" disabled>
+          <svg viewBox="0 0 24 24"><path d="M20 9h-9.5a5 5 0 0 0 0 10H16"/><path d="M16 5l4 4-4 4"/></svg><span>还原</span></button>
         <button class="tool mitem" data-act="delete" id="btnDelete" title="删除选中 (Del)">
           <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/></svg><span>删除</span></button>
         <button class="tool mitem" data-act="shade" id="btnShade" title="线框 / 实体着色切换">
           <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9M8 5.25v9M16 5.25v9"/></svg><span>线框</span></button>
+        <button class="tool mitem" data-act="hide" id="btnHide" title="隐藏选中的实体">
+          <svg viewBox="0 0 24 24"><path d="M3 12s3.6-6 9-6 9 6 9 6-3.6 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 20L20 4"/></svg><span>隐藏</span></button>
+        <button class="tool mitem" data-act="reveal" id="btnReveal" title="显现：点隐藏的实体让它重新显示">
+          <svg viewBox="0 0 24 24"><path d="M3 12s3.6-6 9-6 9 6 9 6-3.6 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/></svg><span>显现</span></button>
       </div>
 
       <!-- 特征工具 -->
@@ -808,7 +938,8 @@
       <!-- 测量 -->
       <div class="fly-panel" data-panel="measure">
         <div class="fly-head">测量</div>
-        <div class="fly-hint">选中实体后，右侧「尺寸 (mm)」显示精确参数；属性面板可编辑位置与尺寸。</div>
+        <button class="fly-btn" data-measure="1">测距（点选两点）</button>
+        <div class="fly-hint">点选起点与终点显示距离，靠近顶点 / 格点自动吸附；右侧「尺寸 (mm)」仍可查看实体精确参数。</div>
       </div>
     </div>
   </nav>
@@ -823,7 +954,15 @@
       <b>从左侧工具栏开始建模</b>
       选择「预设模型」里的 9 种基本体，在地面拖拽放置
     </div>
-    <div class="hintbar" id="hintbar"></div>
+    <button class="sk-done" id="skDone" title="完成草图，回到选择工具" aria-label="完成草图">
+      <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+    </button>
+    <div class="hintbar" id="hintbar">
+      <button class="hint-toggle" id="hintToggle" title="收起提示" aria-label="收起提示">
+        <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
+      <div class="hint-content" id="hintContent"></div>
+    </div>
 
     <!-- 尺寸编辑 gizmo：3D One 式箭头 + 可点击数值标签（仅刚放置、未确定时显示） -->
     <div class="dimlayer" id="dimLayer" aria-hidden="true">
@@ -838,6 +977,27 @@
     <div class="movelayer" id="moveLayer" aria-hidden="true">
       <svg class="movesvg" id="moveSvg"></svg>
       <div class="dimlabels" id="moveLabels"></div>
+      <div class="dim-tag rot-tag" id="rotAngleTag" title="点击输入旋转角度"></div>
+    </div>
+
+    <!-- 点到点移动：起点/终点屏幕标记 + 连线 -->
+    <svg class="p2pline" id="p2pLine" aria-hidden="true"></svg>
+    <div id="p2pMarks" aria-hidden="true"></div>
+
+    <!-- 测距：两点连线 + 距离标签 -->
+    <svg class="p2pline" id="measureLine" aria-hidden="true"></svg>
+    <div class="dim-tag measure-tag" id="measureTag" style="display:none"></div>
+    <div id="measureMarks" aria-hidden="true"></div>
+
+    <!-- 草图绘制/测距：跟随鼠标的实心圆点（吸附到顶点/格点时放大变黄） -->
+    <div class="cursor-dot" id="cursorDot" aria-hidden="true"></div>
+
+    <!-- 右键轻点弹出的视图菜单（右键拖动仍是旋转视图） -->
+    <div class="view-menu" id="viewMenu" aria-hidden="true">
+      <button type="button" id="vmGrid" title="快捷键 G">
+        <svg viewBox="0 0 24 24"><path d="M3.5 3.5h17v17h-17zM3.5 9.2h17M3.5 14.8h17M9.2 3.5v17M14.8 3.5v17"/></svg>
+        <span id="vmGridText">隐藏网格</span><kbd>G</kbd>
+      </button>
     </div>
 
     <!-- 拉伸箭头：从选中面中心沿拉伸方向，可正向 / 反向拖拽改变高度 -->
@@ -849,6 +1009,8 @@
     <!-- 线段长度：绘制中实时提示，成线后可输入精确长度 -->
     <div class="seglayer" id="segLayer" aria-hidden="true">
       <div class="dim-tag seg-tag" id="segLenTag"></div>
+      <div class="dim-tag seg-tag" id="shapeWTag" style="display:none" title="点击编辑长"></div>
+      <div class="dim-tag seg-tag" id="shapeHTag" style="display:none" title="点击编辑宽"></div>
       <div class="dim-confirm seg-confirm" id="segConfirm" title="确定线段长度">
         <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
       </div>
@@ -874,30 +1036,37 @@
       </button>
     </div>
 
-    <!-- 选中实体（未选面）时浮出的对象菜单：移动 / 缩放 / 置平 -->
+    <!-- 选中实体（未选面）时浮出的对象菜单：移动 / 缩放 / 平置 / 隐藏（测距不在此菜单） -->
     <div class="obj-menu" id="objMenu" style="left:-9999px;top:-9999px">
-      <button class="om-btn" data-om="move" data-tip="移动（拖拽三轴箭头）" title="移动（拖拽三轴箭头）" aria-label="移动">
-        <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M3 12l2.4-2.4M3 12l2.4 2.4M21 12l-2.4-2.4M21 12l-2.4 2.4"/></svg>
-      </button>
+      <div class="om-head" id="objMenuHead" title="拖动移动窗口"><span class="om-grip"></span><span>对象操作</span></div>
+      <div class="om-main">
+        <button class="om-btn" data-om="move" data-tip="移动（点到点 / 三轴箭头）" title="移动（点到点 / 三轴箭头）" aria-label="移动">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M3 12l2.4-2.4M3 12l2.4 2.4M21 12l-2.4-2.4M21 12l-2.4 2.4"/></svg>
+        </button>
+        <button class="om-btn" data-om="scale" data-tip="缩放（按比例放大缩小）" title="缩放（按比例放大缩小）" aria-label="缩放">
+          <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        </button>
+        <button class="om-btn" data-om="flatten" data-tip="平置（归正并贴合网格）" title="平置（归正并贴合网格）" aria-label="平置">
+          <svg viewBox="0 0 24 24"><path d="M3 17h18M5 17l2.5-9h9L19 17M8 8h8"/><path d="M3 20h18" opacity=".45"/></svg>
+        </button>
+        <button class="om-btn" data-om="hide" data-tip="隐藏（从视图移除选中对象，可用「显现」恢复）" title="隐藏（从视图移除选中对象，可用「显现」恢复）" aria-label="隐藏">
+          <svg viewBox="0 0 24 24"><path d="M3 12s3.6-6 9-6c1.7 0 3.2.5 4.5 1.3M21 12s-3.6 6-9 6c-1.7 0-3.2-.5-4.5-1.3"/><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/></svg>
+        </button>
+      </div>
       <div class="om-sub" id="omMoveSub" style="display:none">
-        <div class="om-tip" style="margin-bottom:6px">沿轴微调（按住实体也可直接拖动）</div>
-        <div class="om-row"><label>X 轴</label>
-          <button class="om-mini" data-mv="0" data-dir="-1">−</button><button class="om-mini" data-mv="0" data-dir="1">+</button>
-          <label style="min-width:0;margin-left:4px">Y 轴</label>
-          <button class="om-mini" data-mv="1" data-dir="-1">−</button><button class="om-mini" data-mv="1" data-dir="1">+</button>
+        <div class="om-tabs">
+          <button class="om-tab on" data-mvtab="p2p">点到点</button>
+          <button class="om-tab" data-mvtab="free">动态移动</button>
         </div>
-        <div class="om-row"><label>Z 轴</label>
-          <button class="om-mini" data-mv="2" data-dir="-1">−</button><button class="om-mini" data-mv="2" data-dir="1">+</button>
-          <label style="min-width:0;margin-left:4px">步进</label>
-          <input class="num" id="omStep" type="number" value="5" min="0.5" max="100" step="0.5">
+        <!-- 选项卡 1：点到点（用户直接在画布上点选起点 → 终点，实体平移对齐） -->
+        <div id="omMvP2P">
+          <div class="om-p2p-tip" id="omP2pTip">直接在画布上点选<b>起点</b>与<b>终点</b>，实体即按两点平移</div>
+        </div>
+        <!-- 选项卡 2：动态移动（只保留中心点开关；平移拖箭头，旋转拖三色圆弧） -->
+        <div id="omMvFree" style="display:none">
+          <label class="om-check" style="margin:2px 0 0"><input type="checkbox" id="omMoveCenter"> 移动中心点（靠边自动磁吸）</label>
         </div>
       </div>
-      <button class="om-btn" data-om="scale" data-tip="缩放（S）" title="缩放（S）" aria-label="缩放">
-        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
-      </button>
-      <button class="om-btn" data-om="flatten" data-tip="置平（落到网格）" title="置平（落到网格）" aria-label="置平">
-        <svg viewBox="0 0 24 24"><path d="M3 19h18M6 15l6-6 6 6M12 9V4"/></svg>
-      </button>
       <div class="om-sub" id="omScaleSub" style="display:none">
         <div class="om-row">
           <label>比例</label>
@@ -910,7 +1079,7 @@
 
     <!-- 拉伸设置面板：高度 + 4 张运算卡片 -->
     <div class="ex-pop" id="exPop">
-      <div class="ex-head">
+      <div class="ex-head" id="exPopHead" title="按住标题栏可拖动面板">
         <div class="t">
           <svg viewBox="0 0 24 24"><rect x="4.5" y="13.5" width="9" height="6.5" rx="1"/><path d="M9 11V4M9 4L6.4 6.6M9 4l2.6 2.6"/></svg>
           拉伸
@@ -920,15 +1089,20 @@
         </button>
       </div>
       <div class="ex-body">
-        <div class="ex-row">
-          <label>高度</label>
-          <input class="num" id="exH" type="number" step="1" min="0.5" value="10">
-          <span class="unit2">mm</span>
-          <div class="ex-dir" id="exDir">
-            <button data-dir="1" class="on" title="沿法向向外">正向</button>
-            <button data-dir="-1" title="反向（向内挖）">反向</button>
-          </div>
+        <div class="ex-row" id="exTypeRow">
+          <label for="exType">类型</label>
+          <select id="exType" class="ex-sel" title="拉伸类型：一边 / 两边 / 对称">
+            <option value="one" selected>一边</option>
+            <option value="two">两边</option>
+            <option value="sym">对称</option>
+          </select>
+          <span class="unit2" id="exTypeHint">沿法向单侧拉伸</span>
         </div>
+
+        <!-- 高度精确输入保留在离屏表单里：面板首行已按要求移除高度/正向/反向，
+             需要精确值时点箭头上的高度标签即可聚焦此输入框 -->
+        <input id="exH" type="number" step="1" min="0.5" value="10"
+               style="position:absolute;width:1px;height:1px;opacity:0;left:-9999px;top:-9999px" tabindex="-1">
 
         <div class="ex-row" id="exDirRow">
           <label>方向</label>
@@ -978,6 +1152,9 @@
   </main>
 
   <!-- ============ 右属性面板 ============ -->
+  <button class="panel-toggle" id="panelToggle" title="隐藏属性面板" aria-label="隐藏属性面板">
+    <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
   <aside class="panel" id="panel">
     <div class="panel-head">
       <div class="t">属性</div>
@@ -1122,7 +1299,7 @@
 
     <div class="dm-card">
       <h4><svg viewBox="0 0 24 24"><path d="M4 7.5l8-4.5 8 4.5-8 4.5z"/><path d="M4 7.5v9l8 4.5M20 7.5v9l-8 4.5"/></svg>视角</h4>
-      <div class="dm-note">在视口中 <b>左键拖动</b>旋转观察，<b>滚轮</b>缩放，<b>中键</b>平移。</div>
+      <div class="dm-note">在视口中 <b>右键拖动</b>旋转观察，<b>滚轮</b>缩放，<b>中键</b>平移；左键不旋转视图。</div>
       <div class="dm-btns" style="margin-top:9px">
         <button class="dm-btn" id="dmView1">默认视角</button>
         <button class="dm-btn" id="dmView2">正对板面</button>
@@ -5252,13 +5429,17 @@ if (csgEvaluator) csgEvaluator.attributes = ['position', 'normal'];
 /* ============================================================================
    01 · 全局状态与常量
    ========================================================================== */
-const SNAP = 5;              // 地面吸附步距（mm）
+const BASE_SNAP = 10;        // 地面吸附步距基准（mm）：格子数减半，单格更大更清晰
+let SNAP = BASE_SNAP;        // 当前吸附步距（随视图切换，顶面视图 ×1.5）
+const TOP_VIEW_SCALE = 1.5;  // 顶面视图网格边长放大系数
 const MIN_SIZE = 0.5;        // 尺寸下限，避免退化
 const ACCENT = 0x2f6fed;     // 选中主色
 const FACE_C = 0xf5871f;     // 面选中色（橙）
 const SKETCH_C = 0x1e90ff;   // 草图线色：3D One 网页版同款亮蓝细笔触
 const SKETCH_NODE_C = 0x1a1a99; // 草图端点：深蓝实心小圆点
 const SKETCH_FILL_C = 0x8ec5ff;   // 闭合草图的浅蓝半透明填充面
+const REVEAL_GHOST_FILL = 0x9fd8e8;  // 显现模式：隐藏对象的半透明预览填充
+const REVEAL_GHOST_EDGE = 0x4aa8c8;  // 显现模式：隐藏对象的半透明预览轮廓
 const WELD = 0.02;           // 拉伸体与母体之间的微量重叠，避免布尔运算遇到共面
 const FACE_OFF = 0.12;       // 面高亮沿法向的抬升量（防 z-fighting）
 
@@ -5294,9 +5475,13 @@ const PRIMITIVES = {
 };
 const PRIM_KINDS = Object.keys(PRIMITIVES);
 const isPrimitive = (k) => Object.prototype.hasOwnProperty.call(PRIMITIVES, k);
-const SKETCH_TOOLS = ['sketch', 'sketch-rect', 'sketch-circle', 'sketch-ellipse', 'sketch-poly'];
+const SKETCH_TOOLS = ['sketch', 'line', 'sketch-rect', 'sketch-circle', 'sketch-ellipse', 'sketch-poly'];
+/* 逐点绘制类工具（多线段 / 线段）：共用同一套绘制、结束与闭合逻辑 */
+const LINE_TOOLS = ['sketch', 'line'];
+const isLineTool = (t) => LINE_TOOLS.indexOf(t) >= 0;
 const SKETCH_TOOL_HINT = {
-  sketch: '逐点点击绘线 · 回到起点闭合',
+  sketch: '多线段 · 逐点点击连成折线',
+  line: '线段 · 逐点点击绘线（逻辑同多线段）',
   'sketch-rect': '对角线拖拽绘制矩形',
   'sketch-circle': '从圆心拖出半径',
   'sketch-ellipse': '从中心拖出长短轴',
@@ -5309,6 +5494,7 @@ const state = {
   tool: 'select',      // 'select' | 'box' | 'cylinder' | 'sketch*'
   selected: null,      // 选中对象 A（Object3D）
   selectedB: null,     // 布尔运算的第二选中对象 B（Shift 加选）
+  multi: [],           // Ctrl+A 全选集合：可整体高亮 / 删除 / 移动 / 布尔
   face: null,          // 选中面 { normal:Vector3, point:Vector3, loop:[Vector3] }
   faceHit: null,       // 命中信息（重算高亮用）
   draft: null,         // 草图草稿 { type, points:[[x,y],...] }（绘制平面局部坐标）
@@ -5316,23 +5502,53 @@ const state = {
   placing: null,       // 正在拖拽放置的基础实体
   placeInfo: null,     // 本次放置锁定的基准面（按下瞬间检测，拖动阶段复用）
   shade: 'solid',      // 'solid' | 'wire'
+  hidden: [],          // 被「隐藏」的对象（仍留在场景，仅 visible=false）
+  revealMode: false,   // 显现拾取模式：点隐藏对象让它重新显示
   polyN: 6,            // 正多边形边数
-  ex: { open: false, h: 10, dir: 1, op: 'new', dirVec: null, picking: false },  // 拉伸面板状态（dirVec=用户拾取的拉伸方向）
+  ex: { open: false, h: 10, h1: 10, h2: 10, type: 'one', dir: 1, op: 'new', dirVec: null, picking: false },  // 拉伸面板状态（type=一边/两边/对称；h1/h2 为两侧高度；dirVec=拾取方向）
   sketchStage: 'plane',   // 草图两段式：'plane' 选绘制平面 | 'draw' 开始绘制
   sketchPlane: null,      // 已锁定的绘制平面（见 lockSketchPlane）
+  sketchSessionId: null,  // 当前草图会话 id：同一次进入画出的草图共享，退出后清空
+  sketchSessionTool: null,// 进入本次会话时使用的草图工具（双击重入时恢复）
   placeFace: null         // 新建实体时的默认贴附面：从当前选中面派生 { normal:Vector3, point:Vector3, hostUid }
 };
 
 let drag = null;                 // 当前指针拖拽会话
 let hoverEntity = null;          // 当前悬停的实体（浅黄预览）
+/* 连续点击计数：左键单击实体 = 只选中实体；连续第二次点同一实体才进入选面。
+   不用「是否已选中」判断，因为新建/拉伸后实体会自动选中，那样首次点击就会误选面。 */
+let clickStreakRoot = null;      // 上一次左键单击命中的实体根对象
+let clickStreakTime = 0;         // 上次单击时间（超时视为新序列）
+const CLICK_STREAK_MS = 2500;
 let vcHoverTri = -1;             // 当前悬停的魔方三角（白绿渐变预览）
 let editBase = null;             // 撤销快照的事务起点
 const undoStack = [];            // 撤销栈（存整个场景快照）
+const redoStack = [];            // 还原栈（Ctrl+Y：把撤销掉的状态再恢复回来）
 
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
 const round1 = (v) => Math.round(v * 10) / 10;
+const round2 = (v) => Math.round(v * 100) / 100;   // 线段端点保留小数长度，不做格点吸附
 const snap = (v) => Math.round(v / SNAP) * SNAP;
+
+/**
+ * SVG 内容写入的跨内核兜底：360 / QQ 等双核浏览器的老 Chromium 对
+ * SVGElement.innerHTML 支持不一致，写进去却没有子节点 → 箭头整体消失。
+ * 检测到这种情况就用 DOMParser 在 SVG 命名空间里重建节点。
+ */
+function setSvgHtml(el, html) {
+  if (!el) return;
+  el.innerHTML = html;
+  if (html && html.trim() && !el.childNodes.length && typeof DOMParser !== 'undefined') {
+    try {
+      const doc = new DOMParser().parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg">' + html + '</svg>', 'image/svg+xml');
+      const nodes = Array.prototype.slice.call(doc.documentElement.childNodes);
+      while (el.firstChild) el.removeChild(el.firstChild);
+      nodes.forEach((n) => el.appendChild(document.importNode(n, true)));
+    } catch (err) { /* 解析失败就保留原样，不影响主流程 */ }
+  }
+}
 
 /* ============================================================================
    02 · 渲染器 / 场景 / 相机 / 轨道控制器
@@ -5363,12 +5579,12 @@ const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
 camera.up.set(0, 0, 1);                       // Z 朝上
 camera.position.set(190, -235, 165);
 
-/* 轨道控制器：左键拖拽（空白处）旋转视图 / 中键拖拽平移 / 滚轮缩放；右键禁用 */
+/* 轨道控制器：仅右键拖拽旋转视图；左键不参与视图旋转（只在 ViewCube 上用于转魔方）/ 中键拖拽平移 / 滚轮缩放 */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.mouseButtons = {
-  LEFT: THREE.MOUSE.ROTATE,
+  LEFT: null,
   MIDDLE: THREE.MOUSE.PAN,
-  RIGHT: null
+  RIGHT: THREE.MOUSE.ROTATE
 };
 controls.target.set(0, 0, 12);
 controls.enableDamping = true;
@@ -5415,9 +5631,12 @@ scene.add(fillLight);
 /* 地面网格：XY 平面（z=0），5 mm × 5 mm 方格，3D One 网页版顶面视图同款密度。
    原生 GridHelper 的 linewidth 在多数 WebGL 实现里恒为 1px，无法加粗；
    改用着色器平面：线宽按屏幕像素精确控制（原 1px 加粗一倍 = 2px），颜色沿用原浅灰。 */
-const GRID_STEP = 5;               // 每格 5 mm，与吸附步距 SNAP 一致
+const GRID_STEP = 10;              // 每格 10 mm（格子数减半、单格更大），与吸附步距 SNAP 一致
+/* 半宽 600 同时是基准步距 10 与顶面步距 15 的整数倍：
+   四条外边界始终落在整条格线上，切到顶面视图时不会露出未缝合的缺口。 */
+const GRID_EXTENT = 1200;
 const grid = new THREE.Mesh(
-  new THREE.PlaneGeometry(500, 500),
+  new THREE.PlaneGeometry(GRID_EXTENT, GRID_EXTENT),
   new THREE.ShaderMaterial({
     uniforms: {
       uStep: { value: GRID_STEP },
@@ -5453,6 +5672,87 @@ const grid = new THREE.Mesh(
 grid.position.z = -0.02;           // 略低于模型底面，避免深度闪烁
 grid.renderOrder = -1;
 scene.add(grid);
+
+/* ---------- 网格步距随视图切换：顶面视图 ×1.5（格子更大更少） ----------
+   相机俯视（dir.z 接近 ±1）时把步距放大，其余视图恢复基准；
+   吸附步距 SNAP 同步跟随，保证格点吸附与视觉格线始终对齐。 */
+let gridStepTarget = BASE_SNAP;    // 目标步距（顶面视图 = BASE_SNAP*1.5）
+function isTopDownView() {
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() < 1e-6) return false;
+  return Math.abs(dir.z / dir.length()) > 0.985;   // 与水平面夹角 > ~80°，视作顶/底视图
+}
+function refreshGridStep() {
+  gridStepTarget = BASE_SNAP * (isTopDownView() ? TOP_VIEW_SCALE : 1);
+}
+function stepGridZoom() {
+  /* 视觉步距平滑趋近目标；吸附步距直接取目标（离散吸附不需要平滑） */
+  const u = grid.material.uniforms.uStep;
+  u.value += (gridStepTarget - u.value) * 0.14;
+  if (Math.abs(u.value - gridStepTarget) < 0.01) u.value = gridStepTarget;
+  if (SNAP !== gridStepTarget) SNAP = gridStepTarget;   // 吸附步距与视觉格线始终对齐
+}
+
+/* ---------- 原点目标点标记（地图定位点样式）：X=0,Y=0 若隐若现闪烁浮动 ----------
+   躺在 XY 平面：外圈虚线环 + 内圈柔光 + 十字准星 + 中心实心点 + 向外扩散的脉冲环。
+   整体透明度做呼吸闪烁、沿 Z 轻微浮动，脉冲环周期性扩散淡出（地图“目标点”既视感）。 */
+const originMarker = new THREE.Group();
+originMarker.position.set(0, 0, 0.06);   // 贴在网格上方一点
+originMarker.renderOrder = 1;
+const OM_C = 0x2f6fed;                    // 与选中主色一致的定位蓝
+function omBasic(opacity) {
+  return new THREE.MeshBasicMaterial({
+    color: OM_C, transparent: true, opacity, side: THREE.DoubleSide,
+    depthWrite: false, depthTest: false
+  });
+}
+/* 柔光内圈 */
+const omGlow = new THREE.Mesh(new THREE.CircleGeometry(3.6, 48), omBasic(0.16));
+/* 中心实心点 */
+const omCore = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), omBasic(0.9));
+omCore.material.color.setHex(0xffffff);
+/* 内环 */
+const omRingIn = new THREE.Mesh(new THREE.RingGeometry(4.6, 5.0, 64), omBasic(0.65));
+/* 外圈虚线环：用多段小圆弧拼成 */
+const omDash = new THREE.Group();
+for (let i = 0; i < 24; i++) {
+  const a0 = (i / 24) * Math.PI * 2;
+  const a1 = a0 + (Math.PI * 2 / 24) * 0.5;
+  const seg = new THREE.Mesh(new THREE.RingGeometry(8.2, 8.7, 6, 1, a0, a1 - a0), omBasic(0.5));
+  omDash.add(seg);
+}
+/* 十字准星 */
+const omCrossPts = [];
+const omCrossMat = new THREE.LineBasicMaterial({ color: OM_C, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
+[[-11, 0, -6.2, 0], [6.2, 0, 11, 0], [0, -11, 0, -6.2], [0, 6.2, 0, 11]].forEach(([x1,y1,x2,y2]) => {
+  omCrossPts.push(x1, y1, 0, x2, y2, 0);
+});
+const omCrossGeo = new THREE.BufferGeometry();
+omCrossGeo.setAttribute('position', new THREE.Float32BufferAttribute(omCrossPts, 3));
+const omCross = new THREE.LineSegments(omCrossGeo, omCrossMat);
+/* 扩散脉冲环 */
+const omPulse = new THREE.Mesh(new THREE.RingGeometry(6, 6.7, 64), omBasic(0.4));
+originMarker.add(omGlow, omCore, omRingIn, omDash, omCross, omPulse);
+originMarker.traverse((o) => { o.raycast = () => {}; });   // 不参与拾取
+scene.add(originMarker);
+let originPulseT = 0;
+function stepOriginMarker(dt) {
+  originPulseT = (originPulseT + dt * 0.00055) % 1;        // ~1.8s 一个脉冲周期
+  const t = performance.now() * 0.001;
+  const breathe = 0.78 + 0.22 * Math.sin(t * 1.9);         // 呼吸闪烁 0.56~1.0
+  omGlow.material.opacity = 0.22 * breathe;
+  omRingIn.material.opacity = 0.78 * breathe;
+  omCrossMat.opacity = 0.62 * breathe;
+  omDash.children.forEach((s) => { s.material.opacity = 0.62 * breathe; });
+  omCore.material.opacity = 0.85 + 0.15 * Math.sin(t * 2.6);
+  /* 脉冲：从内向外扩散并淡出 */
+  const p = originPulseT;
+  const sc = 0.7 + p * 1.7;
+  omPulse.scale.set(sc, sc, 1);
+  omPulse.material.opacity = 0.42 * (1 - p) * (0.6 + 0.4 * breathe);
+  /* 轻微浮动：Z 方向 ~1mm 起伏 */
+  originMarker.position.z = 0.06 + 0.9 * (0.5 + 0.5 * Math.sin(t * 1.3));
+}
 
 /* 分组：模型 / 覆盖层（面高亮 · 放置预览 · 草图草稿） */
 const modelGroup = new THREE.Group();
@@ -5968,7 +6268,7 @@ function sketchBasis(desc) {
 
 /** 草图可视化部件：线段 + 顶点（闭合时附加蓝色半透明填充面 = 这个平面） */
 /** 草图笔触：WebGL 的 lineWidth 多数平台恒为 1px，用窄面片做出均匀的细蓝线 */
-function sketchStroke(pts, n, width = 1.2) {
+function sketchStroke(pts, n, width = 1.6) {
   const pos = [], idx = [];
   let k = 0;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -5988,32 +6288,55 @@ function sketchStroke(pts, n, width = 1.2) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
+  /* 放进透明渲染队列并给最高次序：半透明填充之后绘制，底面草图也清晰浮在表面之上 */
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-    color: SKETCH_C, side: THREE.DoubleSide, depthWrite: false
+    color: SKETCH_C, side: THREE.DoubleSide, transparent: true, opacity: 1,
+    depthWrite: false, depthTest: false
   }));
-  m.renderOrder = 2;
+  m.renderOrder = 12;
   return m;
 }
 
-/** 草图端点：线段/矩形这类低点数轮廓画深蓝实心圆点；圆/椭圆的高密度采样点不画 */
-function sketchNodes(pts, n, radius = 1.8) {
-  const g = new THREE.Group();
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n.clone().normalize());
-  pts.forEach((p) => {
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(radius, 14),
-      new THREE.MeshBasicMaterial({ color: SKETCH_NODE_C, side: THREE.DoubleSide, depthWrite: false })
-    );
-    dot.position.copy(p).addScaledVector(n, 0.012);
-    dot.quaternion.copy(q);
-    dot.renderOrder = 3;
-    dot.userData.isNode = true;
-    g.add(dot);
-  });
-  return g;
+/* 草图顶点共用的圆形点纹理（离屏 canvas 生成，零 CDN） */
+let _sketchNodeTex = null;
+function sketchNodeTexture() {
+  if (_sketchNodeTex) return _sketchNodeTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(32, 32, 30, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  _sketchNodeTex = new THREE.CanvasTexture(c);
+  return _sketchNodeTex;
 }
 
-function makeSketchParts(desc, lift = 0.06) {
+/**
+ * 草图端点 = 屏幕空间固定像素大小的实心圆点（THREE.Points, sizeAttenuation:false）：
+ *  · 没有世界面积、不随透视缩放、不绑定任何平面朝向 —— 同一个世界点在任何视角、
+ *    任何草图上都渲染成完全相同的一个点，视觉上绝不会「看着是两个点」。
+ *  · 位置就是真实落点（不做任何法向抬升），与磁吸共用同一世界坐标，所见即所得。
+ */
+function sketchNodes(pts, n, radius = 1.5) {
+  if (!pts || !pts.length) return new THREE.Group();
+  const pos = [];
+  pts.forEach((p) => pos.push(p.x, p.y, p.z));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({
+    color: SKETCH_NODE_C,
+    size: Math.max(6, radius * 6), sizeAttenuation: false,
+    map: sketchNodeTexture(), transparent: true, alphaTest: 0.5,
+    depthWrite: false, depthTest: false
+  });
+  const points = new THREE.Points(g, m);
+  points.renderOrder = 13;
+  points.userData.isNode = true;
+  return points;
+}
+
+function makeSketchParts(desc, lift = 0.5) {
   const { u, v, n } = sketchBasis(desc);
   const at = (x, y) => new THREE.Vector3()
     .addScaledVector(u, x).addScaledVector(v, y).addScaledVector(n, lift);
@@ -6021,8 +6344,18 @@ function makeSketchParts(desc, lift = 0.06) {
   const loop = desc.closed && pts.length ? [...pts, pts[0].clone()] : pts;
   const line = sketchStroke(loop, n);
   const parts = [line];
-  /* 线段 / 矩形端点画深蓝实心圆点；圆、椭圆的高密度采样点不画（避免锯齿颗粒） */
-  if (pts.length <= 12) parts.push(sketchNodes(pts, n));
+  /* 线段 / 矩形端点画深蓝实心圆点；圆、椭圆的高密度采样点不画（避免锯齿颗粒）。
+     节点用真实顶点（局部 u*x+v*y，不做法向 lift 抬升）：两个草图共享同一磁吸顶点时，
+     各自节点落在同一个世界点上，不会再画出两个错位圆点；同一草图内重复点也去重。 */
+  if (pts.length <= 12) {
+    const nodeLocal = desc.points.map(([x, y]) => new THREE.Vector3()
+      .addScaledVector(u, x).addScaledVector(v, y));
+    const unique = [];
+    nodeLocal.forEach((p) => {
+      if (!unique.some((q) => q.distanceToSquared(p) < 1e-6)) unique.push(p);
+    });
+    parts.push(sketchNodes(unique, n));
+  }
 
   /* 闭合轮廓 → 蓝色阴影平面：草图画完就已经「是一个面」，直接可拉伸 */
   if (desc.closed && pts.length >= 3) {
@@ -6038,6 +6371,61 @@ function makeSketchParts(desc, lift = 0.06) {
     parts.unshift(fill);
   }
   return parts;
+}
+
+/* ---------- 线框模式：只画实体真实轮廓 + 硬边，永不绘制三角面网格 ---------- */
+/** 用视线夹角只在轮廓处着色：球面/环面等无硬边时也能得到一圈干净的外轮廓 */
+function wireRimMaterial(desc) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(toneOf(desc).line) } },
+    vertexShader: `
+      varying vec3 vN;
+      varying vec3 vV;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec3 vN;
+      varying vec3 vV;
+      uniform vec3 uColor;
+      void main() {
+        float ndv = abs(dot(normalize(vN), normalize(vV)));
+        float a = smoothstep(0.88, 0.97, 1.0 - ndv);
+        if (a < 0.03) discard;
+        gl_FragColor = vec4(uColor, a);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.FrontSide
+  });
+}
+function ensureWireRim(obj) {
+  const d = obj.userData.desc || {};
+  if (!obj.isMesh) return null;
+  let rim = obj.userData.wireRim;
+  if (!rim) {
+    rim = new THREE.Mesh(obj.geometry, wireRimMaterial(d));
+    rim.userData.isWireRim = true;
+    rim.raycast = () => {};
+    rim.renderOrder = 2;
+    obj.add(rim);
+    obj.userData.wireRim = rim;
+  } else if (rim.geometry !== obj.geometry) {
+    rim.geometry = obj.geometry;   // 尺寸改动后与实体共享同一份新几何
+  }
+  return rim;
+}
+/** 线框 / 实体切换：只隐藏填充面，保留硬边与轮廓，不产生三角网格碎线 */
+function applyWireStyle(obj) {
+  if (!obj || !obj.isMesh || !obj.userData.desc) return;
+  obj.material.wireframe = false;
+  const wire = state.shade === 'wire';
+  obj.material.visible = !wire;
+  const e = obj.children.find((c) => c.userData.isEdge);
+  if (e) e.visible = true;
+  const rim = wire ? ensureWireRim(obj) : obj.userData.wireRim;
+  if (rim) rim.visible = wire;
 }
 
 let uidSeq = 0;                 // 对象稳定 id（布尔母体引用 / 目标定位用）
@@ -6060,9 +6448,11 @@ function buildObject(desc) {
       const edges = makeEdgeLines(ec, desc);
       obj.add(edges);
     }
-    if (state.shade === 'wire') obj.material.wireframe = true;
   }
   obj.userData.desc = desc;
+  applyWireStyle(obj);
+  obj.visible = !desc.hidden;        // 隐藏状态随文档持久化
+  if (desc.hidden && state.hidden.indexOf(obj) < 0) state.hidden.push(obj);
   obj.position.set(desc.pos[0], desc.pos[1], desc.pos[2]);
   /* 贴面放置的实体带方向四元数（局部 +Z 对齐所在面法向）；置平后删除 quat 归正 */
   if (desc.quat) obj.quaternion.fromArray(desc.quat);
@@ -6100,6 +6490,8 @@ function updateObject(obj) {
         obj.add(makeEdgeLines(ec, desc));
       }
     }
+    /* 几何换了，线框轮廓要跟着换成同一份几何 */
+    if (obj.userData.wireRim) obj.userData.wireRim.geometry = obj.geometry;
     /* 尺寸 / 复合运算后颜色保持一致；未确定的预览体仍是透明浅绿 */
     applyBodyAppearance(obj);
   }
@@ -6141,6 +6533,9 @@ function serializeScene() {
 
 function restoreScene(json) {
   select(null);
+  state.hidden = [];
+  state.revealMode = false;
+  const rb = $('btnReveal'); if (rb) rb.classList.remove('on');
   [...modelGroup.children].forEach((o) => { modelGroup.remove(o); disposeObject(o); });
   JSON.parse(json).forEach((d) => { d.dimPending = false; buildObject(d); });
   updateFirstRun();
@@ -6158,29 +6553,124 @@ function commitEdit() {
   if (editBase !== serializeScene()) {
     undoStack.push(editBase);
     if (undoStack.length > 60) undoStack.shift();
+    redoStack.length = 0;   // 撤销后又做了新操作：还原链作废
     updateUndoBtn();
   }
   editBase = null;
 }
 
+/* 中键单击重复上一步操作（按住拖动仍是平移视图）；草图=重新调用绘图命令，实体=复制一个 */
+let lastOp = null;
+function rememberOp(kind, desc) {
+  if (!desc) return;
+  lastOp = { kind, desc: JSON.parse(JSON.stringify(desc)) };
+}
+function repeatLastOp() {
+  if (!lastOp) return toast('没有可重复的操作');
+  /* 上一步是草图：等价于再点一次工具栏里的原绘图命令，重新选平面画一条新的，
+     不再复制出一条与原来平行/重叠的草图。 */
+  if (lastOp.kind === 'sketch') {
+    const t = lastOp.desc && lastOp.desc.sketchTool;
+    const tool = SKETCH_TOOLS.indexOf(t) >= 0 ? t : 'sketch';
+    setTool(tool);
+    const label = { sketch: '多线段', line: '线段', 'sketch-rect': '矩形',
+      'sketch-circle': '圆', 'sketch-ellipse': '椭圆', 'sketch-poly': '正多边形' }[tool] || '草图';
+    toast('已重新调用上步命令：' + label + '（点平面后继续绘制）');
+    return;
+  }
+  beginEdit();
+  const d = JSON.parse(JSON.stringify(lastOp.desc));
+  delete d.uid;
+  d.dimPending = false;
+  const dx = SNAP * 2;
+  d.pos = [d.pos[0] + dx, d.pos[1], d.pos[2]];
+  const obj = buildObject(d);
+  select(obj);
+  commitEdit();
+  setTool('select');
+  toast('已重复上步操作');
+}
+
 function undo() {
   if (!undoStack.length) return toast('没有可撤销的操作');
+  redoStack.push(serializeScene());   // 撤销前的状态入还原栈
   restoreScene(undoStack.pop());
   updateUndoBtn();
-  toast('已撤销');
+  toast('已撤销 · Ctrl+Y 可还原');
+}
+function redo() {
+  if (!redoStack.length) return toast('没有可还原的操作');
+  undoStack.push(serializeScene());   // 还原前的状态重新入撤销栈
+  restoreScene(redoStack.pop());
+  updateUndoBtn();
+  toast('已还原');
+}
+
+/** 隐藏选中对象：从场景视图移除（仍在数据里），并清掉选中态 */
+function hideSelected() {
+  let targets = state.multi.length > 1 ? state.multi.slice() : (state.selected ? [state.selected] : []);
+  targets = targets.filter((o) => o && modelGroup.children.includes(o) && state.hidden.indexOf(o) < 0);
+  if (!targets.length) return toast('请先选中要隐藏的实体');
+  targets.forEach((o) => {
+    o.visible = false;
+    if (o.userData.desc) o.userData.desc.hidden = true;
+    state.hidden.push(o);
+  });
+  clearMulti();
+  select(null);
+  state.selectedB = null;
+  updateBoolButtons();
+  updateStatus();
+  toast('已隐藏 ' + targets.length + ' 个对象（点「显现」后点击它可恢复）');
+}
+
+/** 进入/退出显现模式：所有隐藏对象先以半透明幽灵出现，点中某一个才真正显现 */
+function toggleRevealMode() {
+  if (!state.revealMode && !state.hidden.length) return toast('当前没有隐藏对象');
+  state.revealMode = !state.revealMode;
+  const btn = $('btnReveal');
+  if (btn) btn.classList.toggle('on', state.revealMode);
+  if (state.revealMode) {
+    state.hidden.forEach((o) => { o.visible = true; paintRevealGhost(o); });
+    toast('显现模式：所有隐藏对象已半透明显示，点中某一个才真正显现它（再次点「显现」退出）');
+  } else {
+    state.hidden.forEach((o) => { o.visible = false; paintEntity(o, 'normal'); });
+    toast('已退出显现模式，未点选的隐藏对象重新隐藏');
+  }
+  updateHints();
+}
+
+/** 显现模式下点了某个隐藏对象 → 只恢复被点中的这一个 */
+function revealObject(obj) {
+  const i = state.hidden.indexOf(obj);
+  if (i < 0) return false;
+  state.hidden.splice(i, 1);
+  obj.visible = true;
+  if (obj.userData.desc) delete obj.userData.desc.hidden;
+  paintEntity(obj, 'normal');   // 先脱掉幽灵外观；随后 select() 会刷成选中态
+  if (!state.hidden.length) {
+    state.revealMode = false;
+    const btn = $('btnReveal');
+    if (btn) btn.classList.remove('on');
+  }
+  updateStatus();
+  updateHints();
+  return true;
 }
 
 function deleteSelected() {
-  const obj = state.selected;
-  if (!obj) return toast('未选中对象');
+  const targets = state.multi.length > 1 ? state.multi.slice() : (state.selected ? [state.selected] : []);
+  if (!targets.length) return toast('未选中对象');
   beginEdit();
+  clearMulti();
   select(null);
-  modelGroup.remove(obj);
-  disposeObject(obj);
+  targets.forEach((obj) => { modelGroup.remove(obj); disposeObject(obj); });
+  state.selectedB = null;
+  updateBoolButtons();
   commitEdit();
   updateFirstRun();
   updateStatus();
-  toast('已删除');
+  toast('已删除 ' + targets.length + ' 个对象');
 }
 
 /* ============================================================================
@@ -6287,15 +6777,122 @@ function worldToPlane2D(p) {
   return [d.dot(u), d.dot(v)];
 }
 
-/** 拾取模型（只认带 desc 的根对象） */
+/* ---------- 线段工具「磁性吸附」：屏幕像素判定，透视/缩放下都精准 ---------- */
+const SKETCH_SNAP_PX = 14;   // 屏幕吸附半径（像素）：与测距/移动中心一致，所见即所得
+let _sketchVertSig = '', _sketchVerts2D = [];
+
+/** 收集所有实体的顶点，投影到当前绘制平面 2D（带场景签名缓存，避免每帧重算） */
+function sketchVertexCandidates() {
+  const sp = state.sketchPlane;
+  const planeSig = sp ? JSON.stringify([sp.o, sp.u, sp.v]) : 'ground';
+  const geomSig = modelGroup.children.map((o) => {
+    const d = o.userData.desc || {};
+    const g = o.geometry;
+    const cnt = g && g.attributes && g.attributes.position ? g.attributes.position.count : 0;
+    return (d.uid || '') + ':' + JSON.stringify(d.pos || []) + ':' + cnt
+      + (d.kind === 'sketch' ? ':' + JSON.stringify(d.points || []) : '');
+  }).join('|') + '#' + planeSig
+    + '#' + (state.draft && state.draft.type === 'line' ? JSON.stringify(state.draft.points) : '');
+  if (geomSig === _sketchVertSig) return _sketchVerts2D;
+
+  const o = new THREE.Vector3().fromArray(sp ? sp.o : [0, 0, 0]);
+  const u = new THREE.Vector3().fromArray(sp ? sp.u : [1, 0, 0]);
+  const v = new THREE.Vector3().fromArray(sp ? sp.v : [0, 1, 0]);
+  const tmp = new THREE.Vector3();
+  const out = [];
+  for (const obj of modelGroup.children) {
+    const d = obj.userData.desc;
+    if (!d || d.kind === 'sheet') continue;
+    if (d.kind === 'sketch' && Array.isArray(d.points)) {
+      /* 已画草图的端点也是候选：连续绘制时下一段起点/终点可吸到旧线段端点 */
+      const pl = d.plane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+      const so = new THREE.Vector3().fromArray(pl.o);
+      const su = new THREE.Vector3().fromArray(pl.u);
+      const sv = new THREE.Vector3().fromArray(pl.v);
+      d.points.forEach(([x, y]) => {
+        tmp.copy(so).addScaledVector(su, x).addScaledVector(sv, y).sub(o);
+        out.push([tmp.dot(u), tmp.dot(v)]);
+      });
+      continue;
+    }
+    const g = obj.geometry;
+    if (!g || !g.attributes || !g.attributes.position) continue;
+    obj.updateMatrixWorld(true);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      tmp.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld).sub(o);
+      out.push([tmp.dot(u), tmp.dot(v)]);
+    }
+  }
+  /* 当前草稿的落点也是候选：回到起点时才能严格重合闭合成面（不靠容差） */
+  if (state.draft && state.draft.type === 'line') {
+    state.draft.points.forEach(([x, y]) => out.push([x, y]));
+  }
+  _sketchVertSig = geomSig;
+  _sketchVerts2D = out;
+  return out;
+}
+
+/**
+ * 线段落点磁性吸附（屏幕像素判定，透视/缩放下都精准）：
+ *  · 光标屏幕 SKETCH_SNAP_PX 内若有顶点候选 → 返回该顶点的原始局部坐标，
+ *    同一个点每次都吸到完全相同的值，首尾严格 === 闭合成立，公共顶点真正重合；
+ *  · 否则屏幕内有格点 → 吸到格点；都不命中 → 保留两位小数的自由落点。
+ * px,py 是光标在绘制平面上的局部坐标，即光标世界位置，投影后就是光标屏幕位置。
+ */
+function magnetSnap2D(px, py) {
+  const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0] };
+  const worldOf = (x, y) => new THREE.Vector3().fromArray(sp.o)
+    .addScaledVector(new THREE.Vector3().fromArray(sp.u), x)
+    .addScaledVector(new THREE.Vector3().fromArray(sp.v), y);
+  const screen = projectToScreen(worldOf(px, py));
+  let best = null, bestD = SKETCH_SNAP_PX;
+  for (const [vx, vy] of sketchVertexCandidates()) {
+    const s = projectToScreen(worldOf(vx, vy));
+    const d = Math.hypot(s.x - screen.x, s.y - screen.y);
+    if (d < bestD) { bestD = d; best = [vx, vy]; }
+  }
+  if (best) return best;   // 顶点原样返回（不 round2）：所见即所得、同一个点就是同一个点
+  const gx = snap(px), gy = snap(py);
+  const gs = projectToScreen(worldOf(gx, gy));
+  if (Math.hypot(gs.x - screen.x, gs.y - screen.y) <= SKETCH_SNAP_PX) return [gx, gy];
+  return [round2(px), round2(py)];
+}
+
+/** 判断某个根对象是否处于隐藏态（显式隐藏标记或整组不可见）。
+    Three.js 的 Raycaster 不会因 visible=false 自动跳过对象，必须在拾取处自行过滤，
+    否则隐藏实体会挡在可见草图前面，导致闭合平面点不中、无法拉伸。 */
+function isPickHidden(root) {
+  if (!root) return false;
+  return state.hidden.indexOf(root) >= 0
+      || root.visible === false
+      || (root.userData.desc && root.userData.desc.hidden === true);
+}
+
+/** 拾取模型（只认带 desc 的根对象；隐藏对象不参与拾取，显现模式除外）
+    优先级：草图实线/顶点 > 草图填充面 > 实体。
+    这样一张铺满的大半透明草图面不会挡住后面用户真正想选的水平草图/折线；
+    同时「单击闭合草图面内部空白即可拉伸」仍然有效（无实线命中时用填充面）。 */
 function pick(e) {
   setRay(e);
   const hits = raycaster.intersectObjects(modelGroup.children, true);
+  let solidSketch = null, sketchFill = null, solidEntity = null;
   for (const h of hits) {
     const root = rootOf(h.object);
-    if (root) return { hit: h, root };
+    if (!root) continue;
+    /* 显现模式：隐藏对象以幽灵态显示，必须能被点中才能恢复；
+       普通模式：一律跳过，避免它们遮挡可见的闭合草图。 */
+    if (!state.revealMode && isPickHidden(root)) continue;
+    const isSketch = root.userData.desc && root.userData.desc.kind === 'sketch';
+    if (isSketch && !h.object.userData.isFill) {
+      if (!solidSketch) solidSketch = { hit: h, root };   // 草图线/顶点：最高优先
+    } else if (isSketch && h.object.userData.isFill) {
+      if (!sketchFill) sketchFill = { hit: h, root };     // 草图填充面：次优先
+    } else if (!solidEntity) {
+      solidEntity = { hit: h, root };                      // 实体：兜底
+    }
   }
-  return null;
+  return solidSketch || sketchFill || solidEntity;
 }
 
 /** 向上找到带 desc 的根对象 */
@@ -6331,9 +6928,34 @@ const LOOK_DRAG    = { fill: PENDING_FILL, edge: PENDING_EDGE, emis: 0x2f8f5a, e
 const LOOK_B       = { fill: FACE_C, edge: FACE_C, emis: FACE_C, ei: 0.12, opacity: 0.97, depth: true };
 
 /** 直接把对象刷成指定交互态（normal / hover / selected / drag / B） */
+/** 显现模式下的隐藏对象：只显示为半透明“幽灵”，直到用户点中它才真正恢复 */
+function paintRevealGhost(obj) {
+  if (!obj) return;
+  if (obj.isMesh && obj.material && obj.material.color) {
+    obj.material.color.setHex(REVEAL_GHOST_FILL);
+    obj.material.transparent = true;
+    obj.material.opacity = 0.25;
+    obj.material.depthWrite = false;
+    if (obj.material.emissive) { obj.material.emissive.setHex(0); obj.material.emissiveIntensity = 0; }
+    const e = obj.children.find((c) => c.userData.isEdge);
+    if (e && e.material) { e.material.color.setHex(REVEAL_GHOST_EDGE); e.material.opacity = 0.55; }
+  } else if (!obj.isMesh) {
+    obj.traverse((c) => {
+      if (!c.material || !c.material.color) return;
+      c.material.transparent = true;
+      if (c.material.depthWrite !== undefined) c.material.depthWrite = false;
+      if (c.userData.isNode) { c.material.color.setHex(REVEAL_GHOST_EDGE); c.material.opacity = 0.6; }
+      else if (c.userData.isFill) { c.material.color.setHex(REVEAL_GHOST_FILL); c.material.opacity = 0.12; }
+      else { c.material.color.setHex(REVEAL_GHOST_EDGE); c.material.opacity = 0.35; }
+    });
+  }
+}
+
 function paintEntity(obj, look) {
   if (!obj) return;
   const d = obj.userData.desc;
+  /* 显现模式里的隐藏对象始终保持半透明预览，hover / 选中都不能把它刷成实体 */
+  if (state.revealMode && state.hidden.indexOf(obj) >= 0) { paintRevealGhost(obj); return; }
   /* 刚放置未确定的模型保持浅绿预览，只有拖动态会重新落到同一套浅绿 */
   if (d && d.dimPending === true && look !== 'drag' && look !== 'B') {
     applyBodyAppearance(obj);
@@ -6423,10 +7045,58 @@ function updateBoolButtons() {
   return ready;
 }
 
+/** 清除多选集合（普通单选时调用） */
+function clearMulti() {
+  state.multi.forEach((o) => { if (o !== state.selected && o !== state.selectedB) setHighlight(o, false); });
+  state.multi = [];
+}
+
+/** Ctrl+A：全选场景中的实体、草图与线段拉伸出的面，统一高亮；布尔 A/B 仍只取前两个实体 */
+function selectAllEntities() {
+  clearMulti();
+  const objs = modelGroup.children.filter((o) => {
+    const d = o.userData && o.userData.desc;
+    return !!d;   // 实体 + 草图 + 线段拉伸出的面（sheet）全部选中
+  });
+  if (!objs.length) return toast('场景中没有可选对象');
+  state.multi = objs.slice();
+  /* 草图没有体积，不能当布尔母体：A/B 只在实体里取 */
+  const solids = objs.filter((o) => {
+    const k = o.userData && o.userData.desc && o.userData.desc.kind;
+    return k && k !== 'sketch' && k !== 'sheet';
+  });
+  state.selected = solids[0] || objs[0];
+  state.selectedB = solids[1] || null;
+  state.face = null; state.faceHit = null;
+  clearGroup(faceGroup); hideFaceMenu(); hideObjMenu();
+  objs.forEach((o) => setHighlight(o, true, o === state.selectedB));
+  updateBoolButtons();
+  syncPanel(); updateStatus();
+  const nSketch = objs.filter((o) => o.userData.desc.kind === 'sketch').length;
+  const nSheet = objs.filter((o) => o.userData.desc.kind === 'sheet').length;
+  toast('已选中 ' + objs.length + ' 个对象（实体 ' + (objs.length - nSketch - nSheet)
+    + ' · 草图 ' + nSketch + ' · 面 ' + nSheet + '；可整体移动 / 删除，前两个实体可做布尔）');
+}
+
+/** 取同一草图会话里的全部草图；旧数据没有 session 时退化为单个对象 */
+function sketchGroupOf(obj) {
+  const d = obj && obj.userData && obj.userData.desc;
+  if (!d || d.kind !== 'sketch') return obj ? [obj] : [];
+  const sid = d.sketchSession;
+  if (!sid) return [obj];
+  const group = modelGroup.children.filter((o) => {
+    const od = o && o.userData && o.userData.desc;
+    return od && od.kind === 'sketch' && od.sketchSession === sid;
+  });
+  return group.length ? group : [obj];
+}
+
 function select(obj) {
+  clearMulti();
   setEntityHover(null);
   autoConfirmDim();   // 切换对象时，上一个未确定的模型视为已确定
-  if (obj !== segObj) clearSegOverlay();
+  /* 重新选中同一个矩形时保留长宽标签，避免标签一闪就没、看起来不可编辑 */
+  if (obj !== segObj && obj !== shapeObj) clearSegOverlay();
   if (state.selected && state.selected !== obj) setHighlight(state.selected, false);
   if (state.selectedB && state.selectedB !== obj) { setHighlight(state.selectedB, false, true); state.selectedB = null; }
   state.selected = obj || null;
@@ -6438,7 +7108,15 @@ function select(obj) {
   clearGroup(ghostGroup);
   hideFaceMenu();
   hideObjMenu();
-  if (obj) setHighlight(obj, true);
+  if (obj) {
+    setHighlight(obj, true);
+    /* 同一次草图会话里的草图成组选中；不同会话互不牵连 */
+    const group = sketchGroupOf(obj);
+    if (group.length > 1) {
+      state.multi = group.slice();
+      group.forEach((o) => { if (o !== obj) setHighlight(o, true); });
+    }
+  }
   syncPanel();
   updateStatus();
   updateBoolButtons();
@@ -6629,6 +7307,54 @@ function rasterFaceLoops(picked, vx, vy, vz, mw, normal) {
   return { loops: filtered, best };
 }
 
+/** 把光栅追踪得到的近似边界点吸附回真实三角边，消除栅格中心带来的半格偏移。
+    栅格点落在格子中心，最多偏离真实边半个格子；直接拿它拉伸会让新实体
+    与基体侧面错开一小截。这里先投影回共面三角的真实边，再做圆拟合。 */
+function alignLoopsToFaceEdges(loops, picked, vx, vy, vz, mw) {
+  if (!loops || !loops.length) return loops;
+  const seen = new Set(), edges = [];
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const wv = (i) => {
+    const p = new THREE.Vector3(vx(i), vy(i), vz(i)).applyMatrix4(mw);
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+    return p;
+  };
+  for (let j = 0; j < picked.length; j += 3) {
+    const tri = [picked[j], picked[j + 1], picked[j + 2]], wp = tri.map(wv);
+    for (let k = 0; k < 3; k++) {
+      const ia = tri[k], ib = tri[(k + 1) % 3];
+      const ek = ia < ib ? ia + '_' + ib : ib + '_' + ia;
+      if (seen.has(ek)) continue;
+      seen.add(ek);
+      edges.push([wp[k], wp[(k + 1) % 3]]);
+    }
+  }
+  const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+  const tol = Math.max(0.08, span * 0.012);   // 覆盖栅格半格误差，又不至于跨到别的边
+  const clean = (pts) => {
+    const out = [];
+    for (const p of pts) {
+      if (out.length && out[out.length - 1].distanceToSquared(p) < 1e-10) continue;
+      out.push(p);
+    }
+    if (out.length > 2 && out[0].distanceToSquared(out[out.length - 1]) < 1e-10) out.pop();
+    return out;
+  };
+  return loops.map((lp) => {
+    const snapped = clean(lp.map((p) => {
+      let best = null, bd = tol;
+      for (const [a, b] of edges) {
+        const q = closestOnSegment(p, a, b), d = q.distanceTo(p);
+        if (d < bd) { bd = d; best = q; }
+      }
+      return best || p;
+    }));
+    return snapped.length >= 3 ? snapped : lp;
+  });
+}
+
 /**
  * 从命中面提取「整个面」：局部坐标里做共面三角形聚类 + 边界环提取，
  * 返回值全部为世界坐标。
@@ -6763,10 +7489,33 @@ function faceBoundary(obj, hit) {
   const mw = obj.matrixWorld;
   const worldNormal = new THREE.Vector3(nx, ny, nz)
     .applyMatrix3(new THREE.Matrix3().getNormalMatrix(mw)).normalize();
-  const traced = rasterFaceLoops(picked, vx, vy, vz, mw, worldNormal);
-  if (!traced) return null;
-  const loop = traced.best;
-  const loopsWorld = traced.loops;
+  const traced0 = rasterFaceLoops(picked, vx, vy, vz, mw, worldNormal);
+  if (!traced0) return null;
+  /* 关键：栅格边界先吸附回真实三角边，拉伸体才能与基体侧面严丝合缝 */
+  const aligned = alignLoopsToFaceEdges(traced0.loops, picked, vx, vy, vz, mw);
+  const bestIdx = traced0.loops.indexOf(traced0.best);
+  const traced = { loops: aligned, best: aligned[bestIdx >= 0 ? bestIdx : 0] };
+
+  /* —— 近圆轮廓拟合：栅格追踪得到的圆环带 0.2mm 阶梯，选面高亮会看出锯齿。
+     在面平面内做最小二乘圆拟合，重建为 128 点等角环；矩形/异形轮廓不受影响。
+     拟合后的环同时供高亮、草图平面、拉伸体使用，后续 CSG 也不会再切出薄片。 */
+  const { u: pu, v: pv } = planeBasis(worldNormal);
+  const origin = new THREE.Vector3();
+  traced.best.forEach((p) => origin.add(p));
+  origin.multiplyScalar(1 / traced.best.length);
+  const fitRing = (ring) => {
+    if (!ring || ring.length < 12) return ring;
+    const pts2 = ring.map((p) => {
+      const d = p.clone().sub(origin);
+      return [d.dot(pu), d.dot(pv)];
+    });
+    if (!isRoundishPts(pts2)) return ring;
+    const fitted = fitCircleRing(pts2, Math.max(128, ring.length));
+    if (!fitted) return ring;
+    return fitted.map(([x, y]) => origin.clone().addScaledVector(pu, x).addScaledVector(pv, y));
+  };
+  const loop = fitRing(traced.best);
+  const loopsWorld = traced.loops.map(fitRing);
 
   const fillCoords = [];
   for (let j = 0; j < picked.length; j += 3) {
@@ -6850,7 +7599,8 @@ function buildFaceHighlight(loopWorld, normal, loopsWorld, fillCoords) {
 /* ============================================================================
    08 · 草图绘制（线段 / 矩形 / 圆 / 椭圆 / 正多边形）
    ----------------------------------------------------------------------------
-   · 线段：逐点点击绘线，回到起点（或按 Enter）闭合
+   · 线段：点起点 + 终点画一段，长度可单击修改，回车确认后再回车（或点绿勾）提交
+   · 多线段：逐点点击连成折线，回到起点闭合；绿勾 / 回车结束当前折线
    · 矩形 / 圆 / 椭圆 / 正多边形：按住左键拖出尺寸，松开即生成
    不管用哪种工具，结果都是同一件事：XZ 平面上一组闭合的轮廓点，
    所以后面的「线 → 面 → 体」拉伸流程对它们完全通用。
@@ -6869,71 +7619,40 @@ function renderDraft() {
     .addScaledVector(u, x).addScaledVector(v, y).addScaledVector(n, 0.08);
   const pts = d.points.map(([x, y]) => at(x, y));
   const isLine = (d.type || 'line') === 'line';
-  const lineMat = new THREE.LineBasicMaterial({ color: SKETCH_C });
 
   if (isLine) {
-    if (pts.length > 1) {
-      draftGroup.add(sketchStroke(pts, n));
-      draftGroup.add(sketchNodes(pts, n));
-    }
-    /* 橡皮筋：最后一点 → 自动吸附到 5mm 格点的落点（带锚定提示） */
-    if (state.hoverPoint && !state.closeReady) {
+    if (pts.length > 1) draftGroup.add(sketchStroke(pts, n));
+    if (pts.length) draftGroup.add(sketchNodes(pts, n, 1.2));
+    /* 橡皮筋：跟随真实光标落点（不再吸附 5mm 格点），实线 + 实心小点。
+       去掉了原来的虚线、格点准星环、正交辅助线和起点空心环，视觉与成线后一致。 */
+    /* 线段工具定完终点后不再画橡皮筋：光标位置不再改变这条线段，长度只由两端决定 */
+    const rubberBand = state.hoverPoint && !state.closeReady && !(d.tool === 'line' && pts.length >= 2);
+    if (rubberBand) {
       const last = pts[pts.length - 1];
       const [hx, hy] = worldToPlane2D(state.hoverPoint);
-      const gx = snap(hx), gy = snap(hy);
-      const hp = at(gx, gy);
-      state.segHoverLocal = [gx, gy];
+      const [sx, sy] = magnetSnap2D(hx, hy);   // 预览与实际落点用同一吸附，所见即所得
+      const hp = at(sx, sy);
+      state.segHoverLocal = [sx, sy];
       if (last.distanceTo(hp) > 0.5) {
-        const lastLocal = d.points[d.points.length - 1];
-        const ortho = lastLocal[0] === gx || lastLocal[1] === gy;
-        const rubber = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([last, hp]),
-          new THREE.LineDashedMaterial({
-            color: ortho ? 0x8b5cf6 : ACCENT, dashSize: 3, gapSize: 3,
-            transparent: true, opacity: 0.9
-          })
-        );
-        rubber.computeLineDistances();
-        draftGroup.add(rubber);
-
-        /* 格点锚定提示：小圆环准星；与起点水平/垂直时变紫并延长虚线 */
-        const marker = new THREE.Mesh(
-          new THREE.RingGeometry(1.5, 2.5, 20),
-          new THREE.MeshBasicMaterial({
-            color: ortho ? 0x8b5cf6 : ACCENT, transparent: true, opacity: 0.95,
-            side: THREE.DoubleSide, depthWrite: false
-          })
-        );
-        marker.position.copy(hp).addScaledVector(n, 0.03);
-        marker.lookAt(n);
-        draftGroup.add(marker);
-        if (ortho) {
-          const ext = at(gx + (lastLocal[0] === gx ? 0 : 6), gy + (lastLocal[1] === gy ? 0 : 6));
-          const guide = new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints([hp, ext]),
-            new THREE.LineDashedMaterial({ color: 0x8b5cf6, dashSize: 2.5, gapSize: 2.5, transparent: true, opacity: 0.75 })
-          );
-          guide.computeLineDistances();
-          draftGroup.add(guide);
-        }
+        draftGroup.add(sketchStroke([last, hp], n));
+        draftGroup.add(sketchNodes([hp], n, 1.2));
       }
     } else {
       state.segHoverLocal = null;
     }
-    /* 不渲染采样顶点：线段轮廓只保留连线，起点闭合提示环保留 */
-    /* 起点闭合提示 */
-    if (pts.length >= 3) {
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(2.4, 3.6, 26),
+    /* 多段线回到起点：先补上闭合边，再铺半透明蓝色阴影，让用户看到它将成为一个面 */
+    if (d.tool !== 'line' && state.closeReady && pts.length >= 3) {
+      draftGroup.add(sketchStroke([pts[pts.length - 1], pts[0]], n));
+      const fill = new THREE.Mesh(
+        polygonGeometry(pts, n, 0.01),
         new THREE.MeshBasicMaterial({
-          color: state.closeReady ? FACE_C : ACCENT,
-          transparent: true, opacity: state.closeReady ? 0.95 : 0.3,
-          depthWrite: false, side: THREE.DoubleSide
+          color: SKETCH_FILL_C, transparent: true, opacity: 0.36,
+          side: THREE.DoubleSide, depthWrite: false
         })
       );
-      ring.lookAt(n);   // 圆环立到绘制平面上
-      ring.position.copy(pts[0]).addScaledVector(n, 0.02);
-      draftGroup.add(ring);
+      fill.userData.isFill = true;
+      fill.renderOrder = 1;
+      draftGroup.add(fill);
     }
     return;
   }
@@ -6950,34 +7669,43 @@ function renderDraft() {
   draftGroup.add(fill);
 }
 
-/** 逐点绘制时追加一个点（仅线段工具）：世界点 → 绘制平面局部坐标 */
+/** 逐点绘制时追加一个点：世界点 → 绘制平面局部坐标 */
 function addSketchPoint(worldP) {
+  clearSegOverlay();   // 落新点：清掉上一段线段残留的长度浮层（若还在）
   const [px, py] = worldToPlane2D(worldP);
-  const x = snap(px);
-  const y = snap(py);
-  if (!state.draft || state.draft.type !== 'line') state.draft = { type: 'line', points: [] };
+  /* 磁性吸附：靠近格点/实体顶点才吸（<=1.7mm），否则保留两位小数，可画任意小数长度 */
+  const [x, y] = magnetSnap2D(px, py);
+  const tool = state.tool;
+  if (!state.draft || state.draft.type !== 'line' || state.draft.tool !== tool) {
+    state.draft = { type: 'line', tool, points: [] };
+  }
   const pts = state.draft.points;
 
-  /* 回到起点 → 闭合 */
+  /* 线段工具：一次只画一段。第一点定起点、第二点定终点，之后停在这段上等待确认。 */
+  if (tool === 'line') {
+    const last = pts[pts.length - 1];
+    if (last && last[0] === x && last[1] === y) return;
+    if (pts.length >= 2) { toast('一段线段已定好：可单击上方数字改长度，回车确认后再回车或点对勾'); return; }
+    pts.push([x, y]);
+    state.closeReady = false;
+    renderDraft();
+    toast(pts.length === 1 ? '再点一次确定终点；长度会显示在线段上方正中'
+                           : '单击上方数字可改长度；回车确认长度，再回车或点对勾完成');
+    return;
+  }
+
+  /* 多线段：逐点累加折线；点对勾 / 回车结束，点回起点（完全重合）闭合成面 */
   if (pts.length >= 3) {
     const [fx, fy] = pts[0];
-    if (Math.hypot(x - fx, y - fy) < 1e-6) { closeSketch(); return; }
+    if (x === fx && y === fy) { closeSketch(); return; }
   }
-  /* 去重 */
   const last = pts[pts.length - 1];
   if (last && last[0] === x && last[1] === y) return;
 
   pts.push([x, y]);
   state.closeReady = false;
   renderDraft();
-  /* 两点即成线：第二点落下就结束绘制，提交为开放线段（无需双击） */
-  if (pts.length === 2) {
-    const linePts = pts.map((p) => [...p]);
-    state.draft = null;
-    clearGroup(draftGroup);
-    commitSketch(linePts, null, false);
-    updateFirstRun();
-  }
+  if (pts.length === 2) toast('继续点下一点，或点对勾结束；点回起点闭合成面');
 }
 
 /**
@@ -7036,7 +7764,8 @@ function startShapeSketch(e) {
   const p = planePoint(e);
   if (!p) return;
   const [x, y] = worldToPlane2D(p);
-  state.draft = { type: state.tool, points: [], start: [snap(x), snap(y)] };
+  /* 弱磁吸：仅靠近格点/顶点/已有端点才吸，其余保留小数落点 */
+  state.draft = { type: state.tool, points: [], start: magnetSnap2D(x, y) };
   renderDraft();
 }
 
@@ -7047,7 +7776,8 @@ function updateShapeSketch(e) {
   const p = planePoint(e);
   if (!p) return;
   const [x, y] = worldToPlane2D(p);
-  const pts = shapePoints(d.type, d.start[0], d.start[1], snap(x), snap(y), state.polyN);
+  const [sx, sy] = magnetSnap2D(x, y);
+  const pts = shapePoints(d.type, d.start[0], d.start[1], sx, sy, state.polyN);
   d.points = pts;
   renderDraft();
 }
@@ -7055,50 +7785,71 @@ function updateShapeSketch(e) {
 /** 拖拽类形状：松开 → 生成闭合草图 */
 function finishShapeSketch() {
   const d = state.draft;
+  const wasRect = !!d && d.type === 'sketch-rect';
   if (!d || !d.start) { cancelDraft(); return; }
   if (!d.points || d.points.length < 3) {
     cancelDraft();
     toast('拖拽范围太小，再拖大一点');
     return;
   }
-  commitSketch(d.points);
+  const obj = commitSketch(d.points);
+  /* 矩形：从左上拖到右下松开就算画完 —— 立刻回到选择箭头，
+     并把刚画的矩形重新武装为可编辑对象，长 / 宽标签保持显示、可直接点改尺寸。 */
+  if (wasRect && obj) {
+    setTool('select');
+    select(obj);
+    shapeObj = obj;
+    updateSegOverlay();
+    toast('矩形已画好：点下边长、右侧宽标签可直接改尺寸');
+  }
 }
 
 /** 生成草图对象（所有草图工具的公共出口）：点集存绘制平面局部坐标 */
-function commitSketch(points, tip, closed = true) {
+function commitSketch(points, tip, closed = true, stayInLine = false) {
   if (!points || points.length < (closed ? 3 : 2)) {
     return toast(closed ? '至少需要 3 个点才能闭合' : '至少需要 2 个点才能成线');
   }
   beginEdit();
   const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], isGround: true };
+  /* 同一次进入草图画出的所有草图共享 session id；下次进入自动换号，互不混选 */
+  if (!state.sketchSessionId) state.sketchSessionId = 'sk' + (++sketchSessionSeq);
   const desc = {
     kind: 'sketch',
     pos: [...sp.o],
     points: points.map((p) => [...p]),
     closed,
     plane: { o: [...sp.o], u: [...sp.u], v: [...sp.v], n: [...sp.n], isGround: !!sp.isGround },
-    hostUid: sp.hostUid == null ? null : sp.hostUid   /* 草图画在实体表面时，记住母体（供加/减/交用） */
+    hostUid: sp.hostUid == null ? null : sp.hostUid,   /* 草图画在实体表面时，记住母体（供加/减/交用） */
+    sketchSession: state.sketchSessionId,
+    sketchTool: state.tool
   };
   state.draft = null;
   state.closeReady = false;
   clearGroup(draftGroup);
   const obj = buildObject(desc);
-  setMode('object');
+  /* 草图工具提交后仍留在草图会话（由调用方决定是否退回选择箭头）；非草图工具回对象模式 */
+  if (!stayInLine && !SKETCH_TOOLS.includes(state.tool)) setMode('object');
   clearSegOverlay();
   select(obj);
   commitEdit();
-  if (!closed) segObj = obj;   // 线段：显示长度标签，可输入精确值 / 绿勾确定
+  if (!closed) segObj = obj;   // 线段：显示长度标签，可输入精确值
+  else if (state.tool === 'sketch-rect') shapeObj = obj;   // 矩形：显示宽高标签，可编辑
   updateFirstRun();
   updateStatus();
   toast(tip || (closed
     ? '闭合草图已成面（蓝色阴影）：点它或右侧面板都能拉伸成实体'
-    : '线段已生成：选中它，可拉伸成面'));
+    : stayInLine
+      ? '线段已画好并自动确认：直接点下一段起点继续画'
+      : '线段已生成：选中它，可拉伸成面'));
+  rememberOp('sketch', desc);   // 中键短按重复上步操作时，最后一步应是刚画的草图而不是更早的实体
+  return obj;
 }
 
 function closeSketch() {
   const pts = state.draft && state.draft.points;
   if (!pts || pts.length < 3) return toast('至少需要 3 个点才能闭合');
-  commitSketch(pts);
+  commitSketch(pts, null, true);
+  backToSketchSelect();   // 闭合 = 绘制完成，退回选择箭头但仍留在草图；点蓝色阴影面即可拉伸
 }
 
 function cancelDraft() {
@@ -7110,12 +7861,14 @@ function cancelDraft() {
 
 /* ============================================================================
    08.5 · 线段长度浮层
-   · 绘制中：橡皮筋中点显示实时长度（端点已吸附 5mm 格点）
-   · 成线后：点白色标签可输入精确长度，点绿色对勾确定
+   · 线段工具：两端定好后，白色标签贴在线段上方正中，单击可输入精确长度
+   · 多线段工具：橡皮筋中点显示实时长度，绿勾结束整条折线
+   · 长度编辑后第一次回车确认数值，第二次回车（或点绿勾）提交线段，并自动武装下一段（同一次草图）
    ========================================================================== */
 const segLayer = $('segLayer'), segLenTag = $('segLenTag'), segConfirm = $('segConfirm');
-let segObj = null;          // 刚生成、还没点绿勾的线段
+let segObj = null;          // 旧流程遗留：已提交、等待确认的线段
 let segEditing = false;
+let shapeObj = null, shapeEditing = false, shapePendingConfirm = false;
 
 function planeLocalWorld(sp, x, y, lift = 0) {
   return new THREE.Vector3().fromArray(sp.o || [0, 0, 0])
@@ -7127,8 +7880,71 @@ function planeLocalWorld(sp, x, y, lift = 0) {
 function clearSegOverlay() {
   segObj = null;
   segEditing = false;
+  shapeObj = null;
+  shapeEditing = false;
+  shapePendingConfirm = false;
+  const shapeWTag = $('shapeWTag'), shapeHTag = $('shapeHTag');
+  if (shapeWTag) shapeWTag.style.display = 'none';
+  if (shapeHTag) shapeHTag.style.display = 'none';
   segLenTag.classList.remove('editing');
   segLayer.classList.remove('show');
+}
+
+/** 结束当前绘制，退回选择箭头；保留草图会话与顶部绿勾（真正退出只由 skDone 负责） */
+function backToSketchSelect() {
+  cancelDraft();
+  clearSegOverlay();
+  state.tool = 'select';
+  hideCursorDot();
+  syncToolUI();
+  updateSketchDone();
+}
+
+/** 线段工具完成一段后：仍选中「线段」，直接武装下一段；保留同一次草图的平面，不再重选平面 */
+function rearmLineTool() {
+  clearSegOverlay();
+  state.tool = 'line';
+  state.mode = 'sketch';
+  state.sketchStage = 'draw';
+  state.draft = { type: 'line', tool: 'line', points: [] };
+  state.closeReady = false;
+  state.segHoverLocal = null;
+  renderDraft();
+  hideCursorDot();
+  syncToolUI();
+  updateSketchDone();
+}
+
+/** 线旁绿勾 / 回车 = 结束当前折线或线段（首尾完全重合则闭合成面），仍留在草图 */
+function finishDraftWithCheck() {
+  const d = state.draft;
+  if (!d || d.type !== 'line') return false;
+  const wasLineTool = d.tool === 'line' || state.tool === 'line';
+  const pts = d.points.map((p) => [...p]);
+  if (pts.length < 2) { toast('至少点两个点才能成线'); return true; }
+  /* 闭合判定：起点与终点必须完全重合（经磁吸取整后 === 比较），不存在容差 */
+  let closed = false;
+  if (pts.length >= 4 && pts[0][0] === pts[pts.length - 1][0]
+                      && pts[0][1] === pts[pts.length - 1][1]) {
+    pts.pop();
+    closed = true;
+  }
+  state.draft = null;
+  state.closeReady = false;
+  state.segHoverLocal = null;
+  clearGroup(draftGroup);
+  commitSketch(pts, null, closed, true);
+  /* 提交后再切工具：commitSketch 需要读到当前草图工具写入 sketchTool */
+  if (wasLineTool) {
+    /* 线段是一次一段的工具：完成后默认继续下一段，仍是同一次草图，不用重新选平面 */
+    rearmLineTool();
+    toast('线段已完成，已就绪画下一段（同一次草图，无需重选平面）；点顶部绿勾才退出草图');
+  } else {
+    backToSketchSelect();
+    toast(closed ? '闭合面已成（蓝色阴影）：单击它即可拉伸，仍留在草图'
+                 : '本条折线已画好，已退回选择箭头；仍在草图，点顶部绿勾才退出');
+  }
+  return true;
 }
 
 /** 每帧跟随相机更新长度标签位置与数值 */
@@ -7136,7 +7952,9 @@ function updateSegOverlay() {
   if (segEditing) { segLayer.classList.add('show'); return; }
   let a = null, b = null, editable = false;
   if (segObj) {
-    if (state.selected !== segObj || state.mode !== 'object') { clearSegOverlay(); }
+    /* 终点即确认：浮层在画下一段前一直保留（可点标签输入精确长度），
+       仅在选中其它对象时清除；画新起点时 addSketchPoint 开头也会清。 */
+    if (state.selected !== segObj) { clearSegOverlay(); }
     else {
       const d = segObj.userData.desc;
       const sp = d.plane || { o: d.pos, u: [1,0,0], v: [0,1,0], n: [0,0,1] };
@@ -7145,66 +7963,225 @@ function updateSegOverlay() {
       editable = true;
     }
   }
+  /* 线段工具：两端已定 → 长度标签贴在这条线段正中上方，数字可单击修改 */
   if (!a && state.mode === 'sketch' && state.draft && state.draft.type === 'line'
-      && state.draft.points.length === 1 && state.segHoverLocal && state.hoverPoint) {
+      && state.draft.tool === 'line' && state.draft.points.length >= 2) {
     const sp = state.sketchPlane || { o: [0,0,0], u: [1,0,0], v: [0,1,0], n: [0,0,1] };
-    a = planeLocalWorld(sp, state.draft.points[0][0], state.draft.points[0][1]);
-    b = planeLocalWorld(sp, state.segHoverLocal[0], state.segHoverLocal[1]);
+    const d = state.draft;
+    a = planeLocalWorld(sp, d.points[0][0], d.points[0][1]);
+    b = planeLocalWorld(sp, d.points[1][0], d.points[1][1]);
+    editable = true;
   }
+  /* 多线段绘制中：每落一点都显示对勾，预览线跟随光标到下一个点 */
+  else if (!a && state.mode === 'sketch' && state.draft && state.draft.type === 'line'
+      && state.draft.points.length >= 1) {
+    const sp = state.sketchPlane || { o: [0,0,0], u: [1,0,0], v: [0,1,0], n: [0,0,1] };
+    const d = state.draft;
+    const lastPt = d.points[d.points.length - 1];
+    a = planeLocalWorld(sp, lastPt[0], lastPt[1]);
+    b = (state.segHoverLocal && state.hoverPoint)
+      ? planeLocalWorld(sp, state.segHoverLocal[0], state.segHoverLocal[1])
+      : a.clone();
+  }
+  /* 矩形：长、宽分别显示，各自可点击编辑 */
+  const shapeWTag = $('shapeWTag'), shapeHTag = $('shapeHTag');
+  let shapePts = null, shapePlane = null;
+  if (!a && shapeObj && shapeObj.userData.desc && shapeObj.userData.desc.kind === 'sketch') {
+    const d = shapeObj.userData.desc;
+    shapePts = d.points; shapePlane = d.plane;
+  } else if (!a && state.mode === 'sketch' && state.draft && state.draft.type === 'sketch-rect'
+             && state.draft.points.length >= 3 && state.sketchPlane) {
+    shapePts = state.draft.points; shapePlane = state.sketchPlane;
+  } else if (!a && state.selected && state.selected.userData.desc
+             && state.selected.userData.desc.kind === 'sketch'
+             && state.selected.userData.desc.sketchTool === 'sketch-rect') {
+    /* 兜底：切工具 / 撤销 / 重开文件后 shapeObj 可能为空，只要选中的是矩形草图就恢复标签 */
+    shapeObj = state.selected;
+    const d = shapeObj.userData.desc;
+    shapePts = d.points; shapePlane = d.plane;
+  }
+  if (shapePts && shapePlane && shapePts.length >= 3 && !shapeEditing) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    shapePts.forEach(([x, y]) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); });
+    const w = maxX - minX, h = maxY - minY;
+    /* 长标签在下边外侧、宽标签在右边外侧，留出足够间距不与图形边框/填充相交 */
+    const sw = projectToScreen(planeLocalWorld(shapePlane, (minX + maxX) / 2, minY));
+    const sh = projectToScreen(planeLocalWorld(shapePlane, maxX, (minY + maxY) / 2));
+    if (shapeWTag && shapeHTag) {
+      shapeWTag.style.display = 'block';
+      shapeWTag.style.left = sw.x.toFixed(1) + 'px';
+      shapeWTag.style.top = (sw.y + 30).toFixed(1) + 'px';
+      shapeWTag.innerHTML = w.toFixed(2) + '<span class="u"> mm</span>';
+      shapeWTag._dim = 'w'; shapeWTag._wh = [w, h]; shapeWTag._plane = shapePlane;
+      shapeHTag.style.display = 'block';
+      shapeHTag.style.left = (sh.x + 34).toFixed(1) + 'px';
+      shapeHTag.style.top = sh.y.toFixed(1) + 'px';
+      shapeHTag.innerHTML = h.toFixed(2) + '<span class="u"> mm</span>';
+      shapeHTag._dim = 'h'; shapeHTag._wh = [w, h]; shapeHTag._plane = shapePlane;
+    }
+    segLenTag.style.display = 'none';
+    segConfirm.style.display = 'none';
+    segLayer.classList.add('show');
+    return;
+  }
+  if (shapeWTag) shapeWTag.style.display = 'none';
+  if (shapeHTag) shapeHTag.style.display = 'none';
+  segLenTag.style.display = '';
   if (!a || !b) { segLayer.classList.remove('show'); return; }
   const sa = projectToScreen(a), sb = projectToScreen(b);
   const len = a.distanceTo(b);
   segLenTag.style.left = ((sa.x + sb.x) / 2) + 'px';
   segLenTag.style.top = ((sa.y + sb.y) / 2 - 18) + 'px';
-  segLenTag.innerHTML = len.toFixed(1) + '<span class="u"> mm</span>';
+  segLenTag.innerHTML = len.toFixed(2) + '<span class="u"> mm</span>';
   segLenTag._len = len;
-  segConfirm.style.left = (sb.x + 24) + 'px';
-  segConfirm.style.top = (sb.y - 6) + 'px';
-  segConfirm.style.display = editable ? '' : 'none';
+  /* 对勾固定在落点旁，不跟随光标 —— 否则光标永远追不上对勾、点不中。
+     线段工具两端已定时贴在终点旁，多段线则贴在最后落点旁。 */
+  const draftingNow = state.draft && state.draft.type === 'line' && state.draft.points.length >= 1;
+  const lineDone = state.draft && state.draft.tool === 'line' && state.draft.points.length >= 2;
+  const cp = lineDone ? sb : (draftingNow ? sa : sb);
+  segConfirm.style.left = (cp.x + 24) + 'px';
+  segConfirm.style.top = (cp.y - 6) + 'px';
+  /* 长度确认后绿勾仍在：第二次回车或鼠标点它都能完成线段 */
+  segConfirm.style.display = ((editable || draftingNow) && !segEditing) ? '' : 'none';
   segLayer.classList.add('show');
 }
 
+/** 单击长度数字：线段工具在提交前就能改精确长度，改完按回车确认、再回车完成 */
 segLenTag.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (!segObj || segEditing) return;
+  e.stopPropagation();   // 不让它冒泡到视口的「单击落点 / 双击结束绘制」
+  if (segEditing) return;
+  /* 优先改尚未提交的线段草稿；segObj 仅作为旧流程兜底 */
+  const draftLine = state.draft && state.draft.type === 'line'
+    && state.draft.tool === 'line' && state.draft.points.length >= 2;
+  if (!draftLine && !segObj) return;
   segEditing = true;
   segConfirm.style.display = 'none';
-  segLenTag.innerHTML = `<input type="number" step="1" min="1" value="${round1(segLenTag._len || 1)}">`;
+  segLenTag.innerHTML = `<input type="number" step="0.01" min="0.01" value="${round2(segLenTag._len || 1)}">`;
   const input = segLenTag.querySelector('input');
   input.focus(); input.select();
   const finish = (commit) => {
     if (!segEditing) return;
     const v = commit ? parseFloat(input.value) : NaN;
     segEditing = false;
-    if (isFinite(v) && v > 0 && segObj) {
-      const d = segObj.userData.desc;
-      const [x0, y0] = d.points[0], [x1, y1] = d.points[1];
-      const dx = x1 - x0, dy = y1 - y0;
-      const old = Math.hypot(dx, dy);
-      if (old > 0) {
-        beginEdit();
-        d.points[1] = [round1(x0 + dx / old * v), round1(y0 + dy / old * v)];
-        updateObject(segObj);
-        commitEdit();
-        syncPanel();
-        toast('线段长度已改为 ' + round1(v) + ' mm');
+    if (isFinite(v) && v > 0) {
+      if (draftLine) {
+        const d = state.draft;
+        const [x0, y0] = d.points[0], [x1, y1] = d.points[1];
+        const dx = x1 - x0, dy = y1 - y0;
+        const old = Math.hypot(dx, dy);
+        if (old > 0) {
+          d.points[1] = [round2(x0 + dx / old * v), round2(y0 + dy / old * v)];
+          renderDraft();
+          toast('线段长度已改为 ' + round2(v) + ' mm，已确认：再按回车或点绿勾完成');
+        }
+      } else if (segObj) {
+        const d = segObj.userData.desc;
+        const [x0, y0] = d.points[0], [x1, y1] = d.points[1];
+        const dx = x1 - x0, dy = y1 - y0;
+        const old = Math.hypot(dx, dy);
+        if (old > 0) {
+          beginEdit();
+          d.points[1] = [round2(x0 + dx / old * v), round2(y0 + dy / old * v)];
+          updateObject(segObj);
+          commitEdit();
+          syncPanel();
+          toast('线段长度已改为 ' + round2(v) + ' mm');
+        }
       }
     }
+    /* 输入框里的回车已经完成「确认长度」；这里只刷新标签，绿勾保留等待下一次回车/点击 */
     updateSegOverlay();
   };
-  input.addEventListener('keydown', (e) => {
-    e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  input.addEventListener('keydown', (ev) => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
   });
   input.addEventListener('blur', () => finish(true));
 });
 
 segConfirm.addEventListener('click', (e) => {
   e.stopPropagation();
+  /* 鼠标点绿勾 = 直接完成当前线段/折线；长度确认过与否都不影响 */
+  if (finishDraftWithCheck()) return;
   clearSegOverlay();
-  toast('线段长度已确定');
+  toast('已确认');
 });
+
+/** 第二次回车：确认当前矩形并继续画下一个 */
+function confirmPendingShape() {
+  if (!shapePendingConfirm) return false;
+  clearSegOverlay();
+  if (state.mode === 'sketch' && state.sketchStage === 'draw') {
+    state.draft = null;
+    renderDraft();
+  }
+  toast('图形尺寸已确定，继续画下一个');
+  return true;
+}
+
+/** 矩形长/宽标签：点击其中一个，单独输入该方向尺寸，另一方向保持不变。
+    同时支持「已提交矩形(shapeObj)」与「绘制中的 draft 矩形」——后者 shapeObj 为 null，
+    以前被 !shapeObj 提前挡掉，导致标签点了没反应（反复反馈不可编辑的根因）。 */
+function beginShapeDimEdit(dim) {
+  const tag = $(dim === 'w' ? 'shapeWTag' : 'shapeHTag');
+  if (!tag || shapeEditing) return;
+  /* 找到当前矩形的点数组：优先已提交对象，其次绘制中的 draft */
+  let ptsRef = null, objToUpdate = null;
+  if (shapeObj && shapeObj.userData.desc && shapeObj.userData.desc.kind === 'sketch') {
+    ptsRef = shapeObj.userData.desc.points;
+    objToUpdate = shapeObj;
+  } else if (state.mode === 'sketch' && state.draft && state.draft.type === 'sketch-rect'
+             && state.draft.points.length >= 3) {
+    ptsRef = state.draft.points;
+  } else if (state.selected && state.selected.userData.desc
+             && state.selected.userData.desc.kind === 'sketch'
+             && state.selected.userData.desc.sketchTool === 'sketch-rect') {
+    ptsRef = state.selected.userData.desc.points;
+    objToUpdate = state.selected;
+    shapeObj = state.selected;
+  }
+  if (!ptsRef) return;
+  shapeEditing = true;
+  const [w, h] = tag._wh || [10, 10];
+  tag.innerHTML = `<input type="number" step="0.01" min="0.01" value="${round2(dim === 'w' ? w : h)}" style="width:64px">`;
+  const input = tag.querySelector('input');
+  input.focus(); input.select();
+  const finish = (commit) => {
+    if (!shapeEditing) return;
+    const v = commit ? parseFloat(input.value) : NaN;
+    shapeEditing = false;
+    if (isFinite(v) && v > 0) {
+      let minX = Infinity, minY = Infinity;
+      ptsRef.forEach(([x, y]) => { minX = Math.min(minX, x); minY = Math.min(minY, y); });
+      const nw = dim === 'w' ? v : w;
+      const nh = dim === 'h' ? v : h;
+      const next = [
+        [round2(minX), round2(minY)], [round2(minX + nw), round2(minY)],
+        [round2(minX + nw), round2(minY + nh)], [round2(minX), round2(minY + nh)]
+      ];
+      for (let i = 0; i < next.length; i++) ptsRef[i] = next[i];
+      if (objToUpdate) {
+        beginEdit(); updateObject(objToUpdate); commitEdit(); syncPanel();
+      } else if (state.draft) {
+        renderDraft();   // draft：重画橡皮筋与顶点，实时反馈新尺寸
+      }
+      toast('矩形尺寸已改为 ' + round2(nw) + ' × ' + round2(nh) + ' mm');
+    }
+    shapePendingConfirm = true;   // 第一次回车确定尺寸，第二次回车确认图形并继续
+    updateSegOverlay();
+  };
+  input.addEventListener('keydown', (ev) => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+/* 矩形长/宽标签：点击其中一个，单独输入该方向尺寸，另一方向保持不变 */
+const shapeWTag = $('shapeWTag'), shapeHTag = $('shapeHTag');
+if (shapeWTag) shapeWTag.addEventListener('click', (e) => { e.stopPropagation(); beginShapeDimEdit('w'); });
+if (shapeHTag) shapeHTag.addEventListener('click', (e) => { e.stopPropagation(); beginShapeDimEdit('h'); });
 
 /* ============================================================================
    09 · 基础实体拖拽放置
@@ -7224,7 +8201,7 @@ function startPlacement(e) {
   state.placing = {
     kind: state.tool,
     start,
-    size: 20,
+    size: 40,   // 基本体默认尺寸 40mm（方块/圆柱/圆锥等）
     /* 贴面放置：记录法向 / 朝向 / 是否地面，供预览与落盘使用 */
     normal: info.n.clone(),
     quat: info.isGround ? null : new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), info.n),
@@ -7244,7 +8221,7 @@ function updatePlacement(e) {
   /* 沿放置平面内的拖拽距离决定尺寸（斜面也按面内实际距离算） */
   const rel = p.clone().sub(pl.start);
   const dist = Math.hypot(rel.dot(pl.u), rel.dot(pl.v)) * 2;
-  pl.size = Math.max(5, snap(dist));
+  pl.size = Math.max(40, snap(dist));   // 默认最小 40mm，拖得更远才放大
   updateGhost();
 }
 
@@ -7314,10 +8291,11 @@ function finishPlacement() {
   clearGroup(ghostGroup);
   if (!pl) return;
 
-  const s = Math.max(5, pl.size);
+  const s = Math.max(40, pl.size);
   const { pos, quat } = placementTransform(pl, s);
   const desc = primitiveDesc(pl.kind, s, pos);
   if (quat) desc.quat = quat;
+  rememberOp(pl.kind, desc);
 
   beginEdit();
   const obj = buildObject(desc);
@@ -7438,8 +8416,10 @@ function dedupeRing(pts) {
  * @param dir      1 = 正向（沿法向），-1 = 反向（扎进去）
  * @param weld     是否与母体轻微重叠（布尔运算前必须，避免共面导致的破面）
  * @param customDir 用户拾取的拉伸方向（世界坐标，可空 = 默认沿面法向）
+ * @param span     两侧高度 { front, back }（可选）：从 -back 拉到 +front；
+ *                 不传则按旧的 dir/height 单向拉伸。用于「两边 / 对称」类型。
  */
-function faceExtrudeDesc(boundary, height, dir, weld, customDir) {
+function faceExtrudeDesc(boundary, height, dir, weld, customDir, span) {
   const n = (customDir ? customDir.clone() : boundary.normal.clone()).normalize();
   const { u, v } = planeBasis(n);
   const c = boundary.center.clone();
@@ -7466,8 +8446,11 @@ function faceExtrudeDesc(boundary, height, dir, weld, customDir) {
     if (fitted) pts = fitted;
   }
 
-  const thickness = Math.max(MIN_SIZE, Math.abs(height));
-  const back = dir < 0 ? -thickness : 0;        // 反向：底面挪到法向的另一侧
+  /* 类型：span 存在时从 -back 拉到 +front（两边 / 对称）；否则旧的单向拉伸 */
+  const front = span ? Math.max(MIN_SIZE, span.front) : Math.max(MIN_SIZE, Math.abs(height));
+  const backSpan = span ? Math.max(MIN_SIZE, span.back) : 0;
+  const thickness = front + backSpan;
+  const back = span ? -backSpan : (dir < 0 ? -thickness : 0);  // 反向：底面挪到法向的另一侧
   const weldOff = weld ? -WELD : 0;             // 焊接：整体再往母体里压一点点
   const origin = c.clone().addScaledVector(n, back + weldOff);
 
@@ -7476,9 +8459,20 @@ function faceExtrudeDesc(boundary, height, dir, weld, customDir) {
     pos: [origin.x, origin.y, origin.z],
     params: { depth: thickness + (weld ? WELD : 0) },
     basis: { u: u.toArray(), v: v.toArray(), n: n.toArray() },
-    pts2d: pts.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]),
+    pts2d: pts.map(([x, y]) => [Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]),
     tone: (state.selected && state.selected.userData.desc.tone) || 0
   };
+}
+
+/** 当前拉伸类型对应的两侧跨度；一边 = null（走旧的单向 dir/height） */
+function extrudeSpan() {
+  const ex = state.ex;
+  if (ex.type === 'two') return { front: Math.max(MIN_SIZE, ex.h1), back: Math.max(MIN_SIZE, ex.h2) };
+  if (ex.type === 'sym') {
+    const h = Math.max(MIN_SIZE, ex.h1);
+    return { front: h, back: h };
+  }
+  return null;
 }
 
 /** 拉伸体预览（半透明蓝色） */
@@ -7517,6 +8511,156 @@ function worldGeometryOf(desc) {
   return g;
 }
 
+/** 把规则几何打包成布尔结果通用的 {p,i,n}（objA 局部坐标，顶点按三角展开） */
+function geometryPins(geo, offsetZ) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const pos = g.attributes.position, nor = g.attributes.normal;
+  const p = [], n = [], index = [];
+  for (let k = 0; k < pos.count; k++) {
+    p.push(
+      Math.round(pos.getX(k) * 100) / 100,
+      Math.round(pos.getY(k) * 100) / 100,
+      Math.round((pos.getZ(k) + (offsetZ || 0)) * 100) / 100
+    );
+    if (nor) n.push(
+      Math.round(nor.getX(k) * 10000) / 10000,
+      Math.round(nor.getY(k) * 10000) / 10000,
+      Math.round(nor.getZ(k) * 10000) / 10000
+    );
+    index.push(k);
+  }
+  if (g !== geo) g.dispose();
+  geo.dispose();
+  return { p, i: index, n };
+}
+
+/**
+ * 同轴等截面规则体的相切/重叠布尔快速路径。
+ * 两个圆柱首尾相接时，CSG 虽然能算出正确外表面，但接缝两侧的三角划分相位不同，
+ * 渲染后会留下一条隐约的弧线。这里直接合成为一根规则圆柱（盒体同理），
+ * 法线连续、没有接缝；端面整圈切除也按缩短尺寸处理，不产生薄片。
+ * 不满足条件返回 null，交回 three-bvh-csg 处理一般形状。
+ */
+function fastPrimitiveBoolean(objA, descB, op) {
+  const da = objA.userData && objA.userData.desc;
+  if (!da || !descB || da.kind !== descB.kind || da.quat || descB.quat) return null;
+  const pa = da.params || {}, pb = descB.params || {};
+  if (!isFinite(pa.h) || !isFinite(pb.h) || pa.h <= 0 || pb.h <= 0) return null;
+  if (!Array.isArray(da.pos) || !Array.isArray(descB.pos)) return null;
+  if (Math.hypot(da.pos[0] - descB.pos[0], da.pos[1] - descB.pos[1]) > 0.01) return null;
+
+  if (da.kind === 'cylinder') {
+    if (Math.abs((pa.r || 0) - (pb.r || 0)) > 0.01) return null;
+  } else if (da.kind === 'box') {
+    if (Math.abs((pa.w || 0) - (pb.w || 0)) > 0.01 ||
+        Math.abs((pa.d || 0) - (pb.d || 0)) > 0.01) return null;
+  } else {
+    return null;                          // 锥 / 环 / 复合体仍走 CSG
+  }
+
+  const za = da.pos[2], zb = descB.pos[2];
+  const aTop = za + pa.h / 2, aBot = za - pa.h / 2;
+  const bTop = zb + pb.h / 2, bBot = zb - pb.h / 2;
+  let h, zc;
+  if (op === 'add') {
+    if (bTop < aBot - 0.01 || bBot > aTop + 0.01) return null;  // 完全分离，不是相切/重叠
+    h = Math.max(aTop, bTop) - Math.min(aBot, bBot);
+    zc = (Math.max(aTop, bTop) + Math.min(aBot, bBot)) / 2;
+  } else if (op === 'sub') {
+    if (pb.r != null && pa.r != null && pb.r < pa.r - 0.01) return null; // 只切中间一孔 → CSG
+    if (Math.abs(bTop - aTop) < 0.01 && bBot >= aBot - 0.01 && pb.h <= pa.h + 0.01) {
+      h = pa.h - pb.h; zc = za - pb.h / 2;             // 顶面齐平，往下挖掉一层
+    } else if (Math.abs(bBot - aBot) < 0.01 && bTop <= aTop + 0.01 && pb.h <= pa.h + 0.01) {
+      h = pa.h - pb.h; zc = za + pb.h / 2;             // 底面齐平，往上挖掉一层
+    } else return null;
+  } else {
+    return null;
+  }
+  if (!(h > 0.01)) return null;
+  const merged = { kind: da.kind, params: { ...pa, h } };
+  const geo = makeGeometry(merged);
+  return geometryPins(geo, zc - za);                   // 返回值在 objA 局部坐标
+}
+
+/**
+ * 「精确面延伸」快速路径：拉伸体若正好铺满规则体的某个平面端面，
+ * 并集结果等价于把母体在这一侧延长一段。直接重建一个更大的规则体，
+ * 从数学上就不存在接触面：侧面法线、顶点拓扑全部连续，比 CSG 拼合更干净。
+ * 不满足严格重合条件返回 null，交由 CSG + 法线归并兜底。
+ */
+function exactExtrudeUnion(objA, bDesc) {
+  if (!bDesc || bDesc.kind !== 'extrude' || !objA || !objA.userData) return null;
+  const da = objA.userData.desc;
+  if (!da || (da.kind !== 'box' && da.kind !== 'cylinder') || da.quat) return null;
+  const pts = bDesc.pts2d || [], b = bDesc.basis, p = da.params || {};
+  if (pts.length < 3 || !b || !isFinite(p.h) || p.h <= 0) return null;
+  const n = new THREE.Vector3().fromArray(b.n).normalize();
+  const depth = Number(bDesc.params && bDesc.params.depth) || 0;
+  if (!(depth > 0)) return null;
+  const far = new THREE.Vector3().fromArray(bDesc.pos).addScaledVector(n, depth);
+  const DIMS = da.kind === 'box'
+    ? [Math.abs(p.w || 0), Math.abs(p.d || 0), Math.abs(p.h || 0)]
+    : [2 * (p.r || 0), 2 * (p.r || 0), Math.abs(p.h || 0)];
+  if (DIMS.some((v) => !(v > 0))) return null;
+
+  /* 拉伸方向必须是某一根世界轴（规则体未旋转） */
+  let axis = -1, sign = 0;
+  for (let i = 0; i < 3; i++) {
+    const c = n.getComponent(i);
+    if (Math.abs(c) > 0.999) { axis = i; sign = c > 0 ? 1 : -1; }
+    else if (Math.abs(c) > 0.02) return null;
+  }
+  if (axis < 0 || (da.kind === 'cylinder' && axis !== 2)) return null;
+  const tol = Math.max(0.08, WELD * 3);
+  const faceCoord = da.pos[axis] + sign * DIMS[axis] / 2;
+  const basePt = new THREE.Vector3().fromArray(bDesc.pos);
+  if (Math.abs(basePt.getComponent(axis) - faceCoord) > tol) return null;
+  for (let i = 0; i < 3; i++) {
+    if (i !== axis && Math.abs(basePt.getComponent(i) - da.pos[i]) > tol) return null;
+  }
+  const extend = (far.getComponent(axis) - faceCoord) * sign;
+  if (!(extend > 0.01)) return null;                 // 向体内拉伸属于差集，不走这里
+
+  /* 轮廓必须铺满整张端面：盒体是同尺寸矩形，圆柱是同半径圆 */
+  if (da.kind === 'box') {
+    if (pts.length < 4 || pts.length > 16) return null;
+    let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity, area2 = 0;
+    pts.forEach(([x, y], k) => {
+      minU = Math.min(minU, x); maxU = Math.max(maxU, x); minV = Math.min(minV, y); maxV = Math.max(maxV, y);
+      const next = pts[(k + 1) % pts.length];
+      area2 += x * next[1] - next[0] * y;
+    });
+    const ua = dominantAxis(b.u), va = dominantAxis(b.v);
+    if (ua === va || ua === axis || va === axis) return null;
+    const wantW = DIMS[ua], wantH = DIMS[va];
+    if (Math.abs((maxU - minU) - wantW) > tol || Math.abs((maxV - minV) - wantH) > tol) return null;
+    if (Math.abs(Math.abs(area2) / 2 - wantW * wantH) > Math.max(2, wantW * wantH * 0.01)) return null;
+  } else {
+    if (!isRoundishPts(pts)) return null;
+    let cx = 0, cy = 0;
+    pts.forEach(([x, y]) => { cx += x; cy += y; });
+    cx /= pts.length; cy /= pts.length;
+    let r = 0;
+    pts.forEach(([x, y]) => { r = Math.max(r, Math.hypot(x - cx, y - cy)); });
+    if (Math.abs(r - (p.r || 0)) > Math.max(0.15, (p.r || 0) * 0.01)) return null;
+  }
+
+  const params = Object.assign({}, p);
+  params[da.kind === 'box' ? ['w', 'd', 'h'][axis] : 'h'] = DIMS[axis] + extend;
+  const geo = makeGeometry({ kind: da.kind, params });
+  const off = new THREE.Vector3();
+  off.setComponent(axis, sign * extend / 2);
+  geo.translate(off.x, off.y, off.z);
+  return geometryPins(geo, 0);
+}
+
+function dominantAxis(v) {
+  const a = Array.isArray(v) ? v : [v.x, v.y, v.z];
+  let best = 0;
+  for (let i = 1; i < 3; i++) if (Math.abs(a[i]) > Math.abs(a[best])) best = i;
+  return best;
+}
+
 /**
  * 草图布尔的母体（规则A）：
  *   1) 画在实体表面 → 用记录的宿主实体 uid
@@ -7548,6 +8692,14 @@ function findSketchBooleanHost(sketchObj, sDesc) {
  * 结果保存成顶点表，所以撤销 / 重开都能原样还原。
  */
 function booleanWith(objA, descB, op) {
+  /* 规则体相切/重叠的合成先走快速路径：无共面碎片、无接缝弧线，也快得多 */
+  const fast = fastPrimitiveBoolean(objA, descB, op);
+  if (fast) return fast;
+  /* 拉伸体铺满规则体端面 → 精确面延伸，直接生成单个规则体，从根源消除接触缝 */
+  if (op === 'add') {
+    const exact = exactExtrudeUnion(objA, descB);
+    if (exact) return exact;
+  }
   if (!CSG || !csgEvaluator) throw new Error('布尔运算库未加载（需联网）');
 
   objA.updateMatrixWorld();
@@ -7619,6 +8771,10 @@ function booleanWith(objA, descB, op) {
   const i = index;
   geoA.dispose();
   geoB.dispose();
+  /* 法线直接用 CSG 的原始值：打包时已按顶点索引去重，同一顶点被多个三角共享的关系完整保留，
+     CSG 已为硬边两侧分配好各自的法线。绝不能再按「空间位置」归并——交集边缘同一位置属于
+     多个不同朝向的面，位置归并会把硬边法线拉偏（实测最大偏差达 56°），渲染出来就是破碎三角片。
+     故这里直接返回 CSG 原始法线，不再做任何位置归并。 */
   return { p, i, n };
 }
 
@@ -7670,7 +8826,13 @@ function entityBoolean(op) {
  * 绕开 CSG，既没有共面碎片，也不必对 128 段圆柱做昂贵的布尔求值。
  */
 function fastCapCut(obj, desc0, depth) {
-  if (state.ex.dir !== -1 || state.ex.dirVec || !state.face) return false;
+  if (!state.face || depth <= 0) return false;
+  /* 默认方向 = 沿面法向反向扎进去；自定义方向只要与面法向平行、合成方向向内，
+     同样可以按“直接减小尺寸”处理，避免落到 CSG 上切出弧形薄片。 */
+  const faceN = state.face.normal.clone().normalize();
+  const dirN = state.ex.dirVec ? state.ex.dirVec.clone().normalize() : faceN.clone();
+  const effective = dirN.multiplyScalar(state.ex.dir < 0 ? -1 : 1);
+  if (effective.dot(faceN) > -0.999) return false;
   const d = desc0, p = d.params;
   if (!p || !d.pos || !Array.isArray(d.pos)) return false;
   const nWorld = state.face.normal.clone().normalize();
@@ -7707,8 +8869,10 @@ function applyExtrude() {
   if (!obj || !state.face) return toast('请先选择一个面');
   const desc0 = obj.userData.desc;
 
-  const h = Math.max(MIN_SIZE, parseFloat($('exH').value) || state.ex.h);
+  const h = Math.max(MIN_SIZE, parseFloat($('exH').value) || state.ex.h1);
   state.ex.h = h;
+  state.ex.h1 = h;
+  if (state.ex.type === 'sym') state.ex.h2 = h;
   const op = state.ex.op;
 
   /* —— 草图拉伸：new=独立实体；加/减/交=作用于宿主实体，草图生成后消耗 —— */
@@ -7745,7 +8909,7 @@ function applyExtrude() {
       }
     }
 
-    const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir, useOp !== 'new', state.ex.dirVec);
+    const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir, useOp !== 'new', state.ex.dirVec, extrudeSpan());
     if (!bDesc) return toast('轮廓无效，无法拉伸');
 
     beginEdit();
@@ -7801,7 +8965,6 @@ function applyExtrude() {
   }
   /* 端面整圈减运算：直接改尺寸，结果与 3D One 一致（圆柱高度降低），且瞬时完成 */
   if (useOp === 'sub' && !isSheet && desc0.kind !== 'sketch'
-      && state.ex.dir === -1 && !state.ex.dirVec
       && fastCapCut(obj, desc0, h)) {
     syncPanel();
     updateStatus();
@@ -7811,7 +8974,7 @@ function applyExtrude() {
   }
 
   const bDesc = faceExtrudeDesc(state.face, h, state.ex.dir,
-    useOp !== 'new', state.ex.dirVec);   // 与母体布尔 → 焊接重叠，保证真实合并
+    useOp !== 'new', state.ex.dirVec, extrudeSpan());   // 与母体布尔 → 焊接重叠，保证真实合并
   if (!bDesc) return toast('这个面的轮廓不闭合，无法拉伸');
 
   beginEdit();
@@ -7863,7 +9026,18 @@ function applyExtrude() {
 const faceMenuEl = $('faceMenu');
 const exPopEl = $('exPop');
 const objMenuEl = $('objMenu');
+let objMenuPos = null;        // 用户拖动后的自定义位置；null = 视口上方中央
+let objMenuDrag = null;       // 浮动窗口拖拽会话
+let exPopPos = null;          // 拉伸面板自定义位置；null = 视口上方中央（网格外）
+let exPopDrag = null;         // 拉伸面板标题栏拖拽会话
 let moveActive = false;   // 是否处于「移动模式」：只有点了「移动」才显示三轴箭头
+let lastMoveEnter = 0;    // 动态移动：两次回车确认并退出
+/* 点到点移动（仿 3D One）：用户点选起点 → 终点，实体按两点差值平移 */
+let p2pActive = false;    // 是否正在点到点拾取
+let p2pStage = 0;         // 0 = 等起点，1 = 已选起点等终点
+let p2pStart = null;      // 起点世界坐标 THREE.Vector3
+let p2pRoot = null;       // 被移动的实体
+let moveTab = 'p2p';      // 当前移动选项卡：'p2p' | 'free'
 
 /* ---------- 选中实体浮出菜单：移动 / 缩放 / 置平 ---------- */
 function showObjMenu() {
@@ -7882,6 +9056,8 @@ function hideObjMenu(opts) {
   if (ss) ss.style.display = 'none';
   objMenuEl.querySelectorAll('.om-btn').forEach((b) => b.classList.remove('on'));
   if (!opts || !opts.keepMove) moveActive = false;   // 关闭菜单即退出移动模式（点「移动」时例外）
+  lastMoveEnter = 0;
+  if (!opts || !opts.keepMove) cancelP2p();          // 关闭菜单同时取消点到点拾取
 }
 
 /** 实体在屏幕上的投影包围盒：菜单避让它，避免压住模型 */
@@ -7900,44 +9076,83 @@ function projectedObjectRect(obj) {
   return { left, right, top, bottom };
 }
 
-/** 对象菜单贴着实体外侧摆放：优先左右，其次上下；始终贴近但不遮挡模型 */
+/** 对象菜单默认停在视口上方中央（网格外），用户拖动后沿用自定义位置 */
 function positionObjUI() {
-  const obj = state.selected;
-  if (!obj || !objMenuEl.classList.contains('show')) return;
+  if (!objMenuEl.classList.contains('show')) return;
   const vw = viewport.clientWidth, vh = viewport.clientHeight;
   if (!vw || !vh) return;
-  const er = projectedObjectRect(obj);
   const w = objMenuEl.offsetWidth, h = objMenuEl.offsetHeight;
-  const gap = 12;
-  const midX = (er.left + er.right) / 2 - w / 2;
-  const midY = (er.top + er.bottom) / 2 - h / 2;
-  const candidates = [
-    { x: er.right + gap, y: midY }, { x: er.left - gap - w, y: midY },
-    { x: midX, y: er.top - gap - h }, { x: midX, y: er.bottom + gap },
-    { x: er.right + gap, y: er.top - 4 }, { x: er.left - gap - w, y: er.top - 4 },
-    { x: er.right + gap, y: er.bottom - h + 4 }, { x: er.left - gap - w, y: er.bottom - h + 4 }
-  ];
-  const clamp = (p) => ({
-    x: Math.max(8, Math.min(p.x, Math.max(8, vw - w - 8))),
-    y: Math.max(8, Math.min(p.y, Math.max(8, vh - h - 8)))
-  });
-  const overlap = (p) => Math.max(0, Math.min(p.x + w, er.right + 2) - Math.max(p.x, er.left - 2))
-    * Math.max(0, Math.min(p.y + h, er.bottom + 2) - Math.max(p.y, er.top - 2));
-  let best = null, bestArea = Infinity;
-  for (const raw of candidates) {
-    const p = clamp(raw), area = overlap(p);
-    if (area < 1) { best = p; break; }
-    if (area < bestArea) { best = p; bestArea = area; }
-  }
-  objMenuEl.style.left = best.x + 'px';
-  objMenuEl.style.top = best.y + 'px';
+  const raw = objMenuPos || { x: (vw - w) / 2, y: 12 };
+  const x = Math.max(8, Math.min(raw.x, Math.max(8, vw - w - 8)));
+  const y = Math.max(8, Math.min(raw.y, Math.max(8, vh - h - 8)));
+  objMenuEl.style.left = Math.round(x) + 'px';
+  objMenuEl.style.top = Math.round(y) + 'px';
 }
+
+/* 浮动窗口：按住标题栏拖动（按钮与子面板不参与拖动） */
+const objMenuHead = $('objMenuHead');
+if (objMenuHead) objMenuHead.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  objMenuDrag = {
+    sx: e.clientX, sy: e.clientY,
+    ox: parseFloat(objMenuEl.style.left) || 0,
+    oy: parseFloat(objMenuEl.style.top) || 0
+  };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!objMenuDrag) return;
+  const w = objMenuEl.offsetWidth, h = objMenuEl.offsetHeight;
+  objMenuPos = {
+    x: Math.max(8, Math.min(objMenuDrag.ox + e.clientX - objMenuDrag.sx, Math.max(8, viewport.clientWidth - w - 8))),
+    y: Math.max(8, Math.min(objMenuDrag.oy + e.clientY - objMenuDrag.sy, Math.max(8, viewport.clientHeight - h - 8)))
+  };
+  positionObjUI();
+  e.preventDefault();
+});
+window.addEventListener('pointerup', () => { objMenuDrag = null; });
+
+/** 拉伸面板默认停在视口上方中央（网格外），用户拖动后沿用自定义位置 */
+function positionExPop() {
+  if (!exPopEl.classList.contains('show')) return;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  if (!vw || !vh) return;
+  const w = exPopEl.offsetWidth, h = exPopEl.offsetHeight;
+  const raw = exPopPos || { x: (vw - w) / 2, y: 12 };
+  const x = Math.max(8, Math.min(raw.x, Math.max(8, vw - w - 8)));
+  const y = Math.max(8, Math.min(raw.y, Math.max(8, vh - h - 8)));
+  exPopEl.style.left = Math.round(x) + 'px';
+  exPopEl.style.top = Math.round(y) + 'px';
+}
+
+const exPopHead = $('exPopHead');
+if (exPopHead) exPopHead.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || e.target.closest('.ex-close')) return;
+  e.preventDefault(); e.stopPropagation();
+  exPopDrag = {
+    sx: e.clientX, sy: e.clientY,
+    ox: parseFloat(exPopEl.style.left) || 0,
+    oy: parseFloat(exPopEl.style.top) || 0
+  };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!exPopDrag) return;
+  const w = exPopEl.offsetWidth, h = exPopEl.offsetHeight;
+  exPopPos = {
+    x: Math.max(8, Math.min(exPopDrag.ox + e.clientX - exPopDrag.sx, Math.max(8, viewport.clientWidth - w - 8))),
+    y: Math.max(8, Math.min(exPopDrag.oy + e.clientY - exPopDrag.sy, Math.max(8, viewport.clientHeight - h - 8)))
+  };
+  positionExPop();
+  e.preventDefault();
+});
+window.addEventListener('pointerup', () => { exPopDrag = null; });
 
 /** 「移动」：沿世界轴按步进微调选中实体（撤销友好） */
 function nudgeSelected(axis, dir) {
   const obj = state.selected;
   if (!obj || !obj.userData.desc) return;
-  const step = Math.max(0.5, parseFloat($('omStep').value) || 5);
+  const stepEl = $('omStep');
+  const step = Math.max(0.5, parseFloat(stepEl && stepEl.value) || 5);
   beginEdit();
   const d = obj.userData.desc;
   d.pos[axis] = round1(d.pos[axis] + dir * step);
@@ -8048,7 +9263,7 @@ function positionFaceUI() {
   };
 
   place(faceMenuEl, 16, 8);
-  place(exPopEl, 16, 8);
+  /* 拉伸面板不再贴着面摆放：固定为视口上方中央的浮动窗（拖动后保留自定义位置） */
 }
 
 function openExtrudePanel() {
@@ -8058,11 +9273,14 @@ function openExtrudePanel() {
   state.ex.picking = false;
   hideFaceMenu();
   exPopEl.classList.add('show');
-  $('exH').value = state.ex.h;
+  /* 默认「一边」；h1 承接上一次高度，h2 默认同高 */
+  if (!state.ex.h1) state.ex.h1 = state.ex.h;
+  if (!state.ex.h2) state.ex.h2 = state.ex.h;
+  $('exType').value = state.ex.type;
+  $('exH').value = state.ex.h1;
   syncExUI();
-  positionFaceUI();
+  positionExPop();
   refreshExtrudePreview();
-  setTimeout(() => { const el = $('exH'); el.focus(); el.select(); }, 30);
 }
 
 function closeExtrudePanel(silent) {
@@ -8080,9 +9298,16 @@ function closeExtrudePanel(silent) {
 function syncExUI() {
   const d0 = state.selected && state.selected.userData.desc;
   const isSketch = !!d0 && d0.kind === 'sketch';
-  document.querySelectorAll('#exDir button').forEach((b) => {
-    b.classList.toggle('on', Number(b.dataset.dir) === state.ex.dir);
-  });
+  /* 类型下拉与说明 */
+  const typeSel = $('exType');
+  if (typeSel && typeSel.value !== state.ex.type) typeSel.value = state.ex.type;
+  const typeHint = {
+    one: '沿法向单侧拉伸',
+    two: '两侧独立，拖两个箭头分别设高度',
+    sym: '两侧等高，拖任一箭头同步'
+  };
+  const hintEl = $('exTypeHint');
+  if (hintEl) hintEl.textContent = typeHint[state.ex.type] || '';
   document.querySelectorAll('#exModes .ex-mode').forEach((b) => {
     b.classList.toggle('on', b.dataset.op === state.ex.op);
   });
@@ -8120,7 +9345,7 @@ function syncExUI() {
   if (document.activeElement !== $('dvZ')) $('dvZ').value = dv ? round1(dv.z) : '';
 }
 
-/* ---------- 拉伸箭头：面中心出发，正向 / 反向拖拽直接改高度 ---------- */
+/* ---------- 拉伸箭头：一边单箭头；两边双箭头各自拖；对称双箭头联动 ---------- */
 const exArrowLayer = $('exArrowLayer'), exArrowSvg = $('exArrowSvg'), exArrowLabels = $('exArrowLabels');
 let exArrowDrag = null;
 
@@ -8129,51 +9354,83 @@ function extrudeArrowDir() {
   return state.face ? state.face.normal.clone().normalize() : new THREE.Vector3(0, 0, 1);
 }
 
+/** 某侧的箭头信息（side=+1 正向 / -1 反向）：屏幕起点、单位方向、尖端、每毫米像素 */
+function exArrowSideInfo(side) {
+  const center = state.face.center;
+  const normal = extrudeArrowDir().multiplyScalar(side);
+  const cS = projectToScreen(center);
+  const oneS = projectToScreen(center.clone().add(normal));
+  let ux = oneS.x - cS.x, uy = oneS.y - cS.y;
+  const len = Math.hypot(ux, uy);
+  if (len < 0.08) { ux = 0; uy = -1; } else { ux /= len; uy /= len; }
+  const h = side > 0 ? state.ex.h1 : state.ex.h2;
+  const pxPerMM = Math.max(0.35, len);
+  const visualL = Math.max(42, h * pxPerMM);
+  return {
+    side, ux, uy, cS, pxPerMM,
+    tip: { x: cS.x + ux * visualL, y: cS.y + uy * visualL },
+    h
+  };
+}
+
 function updateExtrudeArrow() {
   if (!state.ex.open || !state.face || state.ex.picking || !state.selected) {
     exArrowLayer.classList.remove('show');
     return;
   }
-  /* 箭头严格沿选中面的法向：终点 = 面中心 + 法向 × 有符号高度，再投影到屏幕。
-     正向指法向外，反向（拖过面中心）指法向内，方向始终来自同一个三维法向。 */
-  const center = state.face.center;
-  const normal = extrudeArrowDir();
-  const signed = state.ex.h * state.ex.dir;
-  const cS = projectToScreen(center);
-  const tWorld = center.clone().addScaledVector(normal, signed);
-  const tS = projectToScreen(tWorld);
-  let ux = tS.x - cS.x, uy = tS.y - cS.y;
-  let len = Math.hypot(ux, uy);
-  if (len < 0.08) {
-    /* 法向几乎正对镜头：投影退化为一点，保留一个最小可见方向，不再假装它是法向投影 */
-    ux = 0; uy = -1; len = 0;
-  } else { ux /= len; uy /= len; }
-  const visualL = len > 0 ? Math.max(42, len) : 42;
-  const tip = { x: cS.x + ux * visualL, y: cS.y + uy * visualL };
+  const type = state.ex.type;
+  /* 一边：只有正向箭头（保留旧的 h/dir 语义）；两边/对称：正反两支箭头 */
+  let sides;
+  if (type === 'one') sides = [1];
+  else if (type === 'two') sides = [1, -1];
+  else sides = [1, -1];
 
   let svg = '';
-  svg += `<line x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}"`
-    + ` stroke="#2f6fed" stroke-width="3" opacity=".95"/>`;
-  svg += arrowHeadAt(tip, ux, uy, '#2f6fed');
-  svg += `<line class="ex-hit" x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}"`
-    + ` stroke="transparent" stroke-width="18" pointer-events="stroke"/>`;
+  const labelData = [];
+  sides.forEach((side) => {
+    const A = exArrowSideInfo(side);
+    const color = side > 0 ? '#2f6fed' : '#e0762a';
+    svg += `<line x1="${A.cS.x.toFixed(1)}" y1="${A.cS.y.toFixed(1)}" x2="${A.tip.x.toFixed(1)}" y2="${A.tip.y.toFixed(1)}"`
+      + ` stroke="${color}" stroke-width="3" opacity=".95"/>`;
+    svg += arrowHeadAt(A.tip, A.ux, A.uy, color);
+    svg += `<line class="ex-hit" data-side="${side}" x1="${A.cS.x.toFixed(1)}" y1="${A.cS.y.toFixed(1)}" x2="${A.tip.x.toFixed(1)}" y2="${A.tip.y.toFixed(1)}"`
+      + ` stroke="transparent" stroke-width="18" pointer-events="stroke"/>`;
+    labelData.push({ side, A, color });
+  });
+  /* 中心点只画一个 */
+  const cS = projectToScreen(state.face.center);
   svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="5" fill="#fff" stroke="#2f6fed" stroke-width="2"/>`;
   exArrowSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
-  exArrowSvg.innerHTML = svg;
+  setSvgHtml(exArrowSvg, svg);
 
-  if (!exArrowLabels.children.length) {
-    exArrowLabels.innerHTML = '<div class="dim-tag ex-tag" id="exArrowTag"></div>';
-    exArrowLabels.firstElementChild.addEventListener('click', (e) => {
+  /* 标签数量随类型变化：一边 1 个、两边/对称 2 个 */
+  while (exArrowLabels.children.length < labelData.length) {
+    const el = document.createElement('div');
+    el.className = 'dim-tag ex-tag';
+    el.addEventListener('click', (e) => {
       e.stopPropagation();
-      $('exH').focus(); $('exH').select();
+      const which = Number(el.dataset.side || 1);
+      /* 精确输入：复用离屏输入框，提交时写入对应侧 */
+      const inp = $('exH');
+      inp.dataset.side = String(which);
+      inp.value = which > 0 ? state.ex.h1 : state.ex.h2;
+      inp.focus(); inp.select();
     });
+    exArrowLabels.appendChild(el);
   }
-  const tag = exArrowLabels.firstElementChild;
-  tag.title = '点击可输入精确高度';
-  tag.style.left = (tip.x + ux * 30) + 'px';
-  tag.style.top = (tip.y + uy * 30) + 'px';
-  tag.innerHTML = `<span class="mv-ax" style="color:#2f6fed">H</span>${round1(state.ex.h).toFixed(1)}<span class="u"> mm</span>`
-    + (state.ex.dir < 0 ? '<span class="u">·反向</span>' : '');
+  while (exArrowLabels.children.length > labelData.length) {
+    exArrowLabels.removeChild(exArrowLabels.lastElementChild);
+  }
+  labelData.forEach((L, i) => {
+    const el = exArrowLabels.children[i];
+    el.dataset.side = String(L.side);
+    el.title = '点击输入精确高度';
+    el.style.left = (L.A.tip.x + L.A.ux * 30) + 'px';
+    el.style.top = (L.A.tip.y + L.A.uy * 30) + 'px';
+    el.style.borderColor = L.color;
+    const prefix = type === 'one' ? 'H' : (L.side > 0 ? 'H+' : 'H−');
+    el.innerHTML = `<span class="mv-ax" style="color:${L.color}">${prefix}</span>${round1(L.A.h).toFixed(1)}<span class="u"> mm</span>`;
+  });
   exArrowLayer.classList.add('show');
 }
 
@@ -8181,15 +9438,11 @@ exArrowSvg.addEventListener('pointerdown', (e) => {
   const hit = e.target.closest && e.target.closest('.ex-hit');
   if (!hit || !state.ex.open || !state.face) return;
   e.preventDefault(); e.stopPropagation();
-  const center = state.face.center, normal = extrudeArrowDir();
-  const cS = projectToScreen(center), oneS = projectToScreen(center.clone().add(normal));
-  let ux = oneS.x - cS.x, uy = oneS.y - cS.y;
-  const len = Math.hypot(ux, uy);
-  if (len < 0.08) { ux = 0; uy = -1; } else { ux /= len; uy /= len; }
+  const side = Number(hit.dataset.side || 1);
+  const A = exArrowSideInfo(side);
   exArrowDrag = {
-    sx: e.clientX, sy: e.clientY, ux, uy,
-    pxPerMM: Math.max(0.35, len),           // 法向在屏幕上的真实投影比例（1mm 对应像素）
-    signed0: state.ex.h * state.ex.dir
+    side, sx: e.clientX, sy: e.clientY, ux: A.ux, uy: A.uy,
+    pxPerMM: A.pxPerMM, h0: A.h
   };
 });
 
@@ -8197,10 +9450,23 @@ window.addEventListener('pointermove', (e) => {
   if (!exArrowDrag || !state.ex.open) return;
   const m = exArrowDrag;
   const along = (e.clientX - m.sx) * m.ux + (e.clientY - m.sy) * m.uy;
-  const signed = round1(m.signed0 + along / m.pxPerMM);
-  state.ex.h = Math.max(0.5, Math.abs(signed));
-  state.ex.dir = signed < 0 ? -1 : 1;
-  $('exH').value = round1(state.ex.h);
+  const h = Math.max(0.5, round1(m.h0 + along / m.pxPerMM));
+  if (state.ex.type === 'one') {
+    /* 一边：拖过面中心翻到反向，保留旧的有符号语义 */
+    const signed = round1(m.h0 * state.ex.dir + along / m.pxPerMM);
+    state.ex.h1 = Math.max(0.5, Math.abs(signed));
+    state.ex.dir = signed < 0 ? -1 : 1;
+  } else if (m.side > 0) {
+    state.ex.h1 = h;
+    if (state.ex.type === 'sym') state.ex.h2 = h;   // 对称联动
+    state.ex.dir = 1;
+  } else {
+    state.ex.h2 = h;
+    if (state.ex.type === 'sym') state.ex.h1 = h;
+    state.ex.dir = 1;
+  }
+  state.ex.h = state.ex.h1;
+  $('exH').value = round1(state.ex.h1);
   syncExUI();
   refreshExtrudePreview();
   updateExtrudeArrow();
@@ -8244,8 +9510,10 @@ document.querySelectorAll('#objMenu .om-btn').forEach((btn) => {
 
 function refreshExtrudePreview() {
   if (!state.ex.open || !state.selected || !state.face) return;
-  const h = Math.max(MIN_SIZE, parseFloat($('exH').value) || state.ex.h);
+  const h = Math.max(MIN_SIZE, parseFloat($('exH').value) || state.ex.h1);
   state.ex.h = h;
+  state.ex.h1 = h;
+  if (state.ex.type === 'sym') state.ex.h2 = h;   // 对称：两侧同步
   const d0 = state.selected.userData.desc;
   if (d0.kind === 'sketch' && !d0.closed) {
     /* 开放线段：沿方向扫掠成带状面的预览 */
@@ -8255,7 +9523,7 @@ function refreshExtrudePreview() {
   previewExtrudeGhost(faceExtrudeDesc(
     state.face, h, state.ex.dir,
     d0.kind !== 'sketch' && state.ex.op !== 'new',   // 草图无母体，不需要焊接
-    state.ex.dirVec
+    state.ex.dirVec, extrudeSpan()
   ));
 }
 
@@ -8265,31 +9533,50 @@ faceMenuEl.addEventListener('click', (e) => {
   if (btn && btn.dataset.fm === 'extrude') openExtrudePanel();
 });
 
-/* ---------- 对象菜单事件：移动 / 缩放 / 置平 ---------- */
+/* ---------- 对象菜单事件：移动 ---------- */
 objMenuEl.addEventListener('click', (e) => {
   /* 子面板里的轴微调按钮 */
   const mv = e.target.closest('[data-mv]');
   if (mv) { e.stopPropagation(); nudgeSelected(Number(mv.dataset.mv), Number(mv.dataset.dir)); return; }
+  /* 移动面板内的选项卡 / 点到点按钮（它们没有 data-om，必须在 btn 检查之前处理） */
+  const tabBtn = e.target.closest('[data-mvtab]');
+  if (tabBtn) { e.stopPropagation(); setMoveTab(tabBtn.dataset.mvtab); return; }
   const btn = e.target.closest('[data-om]');
   if (!btn) return;
   e.stopPropagation();
   const act = btn.dataset.om;
   const moveSub = $('omMoveSub'), scaleSub = $('omScaleSub');
   if (act === 'move') {
-    /* 点「移动」→ 三个操作菜单立即收起，改由 X/Y/Z 三轴箭头接管，避免视觉打架 */
-    hideObjMenu({ keepMove: true });
-    moveActive = true;
-    updateMoveGizmo();
-    toast('移动模式：拖动 X/Y/Z 箭头，或点坐标标签输入数值 · Esc 退出');
+    /* 点「移动」→ 展开移动面板，默认「点到点」选项卡（三箭头在「动态移动」选项卡） */
+    const willOpen = moveSub.style.display !== 'block';
+    if (scaleSub) scaleSub.style.display = 'none';
+    const scaleBtn = objMenuEl.querySelector('[data-om="scale"]');
+    if (scaleBtn) scaleBtn.classList.remove('on');
+    if (willOpen) {
+      moveSub.style.display = 'block';
+      btn.classList.add('on');
+      setMoveTab('p2p');
+      positionObjUI();
+    } else {
+      moveSub.style.display = 'none';
+      btn.classList.remove('on');
+      cancelP2p();
+      moveActive = false;
+      moveLayer.classList.remove('show');
+    }
   } else if (act === 'scale') {
     const willOpen = scaleSub.style.display !== 'block';
     scaleSub.style.display = willOpen ? 'block' : 'none';
     moveSub.style.display = 'none';
     btn.classList.toggle('on', willOpen);
     objMenuEl.querySelector('[data-om="move"]').classList.remove('on');
+    cancelP2p(); moveActive = false; moveLayer.classList.remove('show');
     if (willOpen) { positionObjUI(); setTimeout(() => { const el = $('omScaleVal'); el.focus(); el.select(); }, 30); }
   } else if (act === 'flatten') {
     flattenSelected();
+  } else if (act === 'hide') {
+    hideSelected();
+    hideObjMenu();   // 隐藏后已无选中对象，收起菜单
   }
 });
 
@@ -8307,18 +9594,34 @@ $('exClose').addEventListener('click', () => closeExtrudePanel());
 $('exCancel').addEventListener('click', () => closeExtrudePanel());
 $('exOk').addEventListener('click', applyExtrude);
 
-$('exH').addEventListener('input', refreshExtrudePreview);
+$('exH').addEventListener('input', (e) => {
+  const v = Math.max(0.5, parseFloat(e.target.value) || 0.5);
+  const side = Number(e.target.dataset.side || 1);
+  if (side > 0) {
+    state.ex.h1 = v;
+    if (state.ex.type === 'sym') state.ex.h2 = v;
+  } else {
+    state.ex.h2 = v;
+    if (state.ex.type === 'sym') state.ex.h1 = v;
+  }
+  state.ex.h = state.ex.h1;
+  refreshExtrudePreview();
+  updateExtrudeArrow();
+});
 $('exH').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); applyExtrude(); }
   if (e.key === 'Escape') { e.preventDefault(); closeExtrudePanel(); }
 });
 
-$('exDir').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-dir]');
-  if (!b) return;
-  state.ex.dir = Number(b.dataset.dir);
+/* 拉伸类型：一边 / 两边 / 对称 */
+$('exType').addEventListener('change', (e) => {
+  state.ex.type = e.target.value;
+  /* 切到对称时两侧等高；切回两边保留 h2；一边用 h1 */
+  if (state.ex.type === 'sym') state.ex.h2 = state.ex.h1;
+  $('exH').value = state.ex.h1;
   syncExUI();
   refreshExtrudePreview();
+  updateExtrudeArrow();
 });
 
 /* ---------- 拉伸方向：拾取一条边 / 恢复默认 ---------- */
@@ -8664,12 +9967,70 @@ function syncToolUI() {
   document.querySelectorAll('#modeSwitch [data-mode]').forEach((b) => {
     b.classList.toggle('on', b.dataset.mode === state.mode);
   });
-  const toolActive = state.mode === 'sketch' || isPrimitive(state.tool);
+  const toolActive = (state.mode === 'sketch' && state.tool !== 'select') || isPrimitive(state.tool);
   viewport.classList.toggle('cross', toolActive);
   if (!toolActive) renderer.domElement.style.cursor = 'default';
   /* 正多边形边数设置只在多边形工具下露出 */
   $('skOpt').classList.toggle('show', state.mode === 'sketch' && state.tool === 'sketch-poly');
   updateHints();
+}
+
+let sketchSessionSeq = 0;
+/** 进入一次全新的草图会话；同一次会话内提交的所有草图共享 session id */
+function beginSketchSession() {
+  state.sketchSessionId = 'sk' + (++sketchSessionSeq);
+  state.sketchSessionTool = state.tool;
+}
+/** 退出草图会话；下次进入会拿到新的 session id，与本次隔离 */
+function endSketchSession() {
+  state.sketchSessionId = null;
+  state.sketchSessionTool = null;
+}
+
+/** 双击某次草图：恢复该次会话的绘制平面 / 工具，顶部绿色对勾重新出现 */
+function reenterSketchSession(obj) {
+  const d = obj && obj.userData && obj.userData.desc;
+  if (!d || d.kind !== 'sketch') return false;
+  /* 旧版本草图没有 session 时，按自身 uid 补一个独立会话，保证重入后仍与其他草图隔离 */
+  const sid = d.sketchSession || ('legacy-' + d.uid);
+  d.sketchSession = sid;
+  sketchGroupOf(obj).forEach((o) => {
+    const od = o && o.userData && o.userData.desc;
+    if (od && od.kind === 'sketch' && !od.sketchSession) od.sketchSession = sid;
+  });
+  select(obj);   // 同次会话的草图会一起高亮
+
+  state.mode = 'sketch';
+  state.tool = SKETCH_TOOLS.includes(d.sketchTool) ? d.sketchTool : 'sketch';
+  state.sketchSessionId = sid;
+  state.sketchSessionTool = state.tool;
+  state.sketchStage = 'draw';
+  state.hoverPoint = null;
+  clearSegOverlay();
+  cancelDraft();
+
+  const pl = d.plane || { o: d.pos, u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], isGround: true };
+  if (pl.isGround) {
+    clearGroup(faceGroup);
+    clearGroup(ghostGroup);
+    state.sketchPlane = {
+      o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1],
+      isGround: true, hostUid: null, mathPlane: groundPlane
+    };
+  } else {
+    const o = new THREE.Vector3().fromArray(d.pos || pl.o);
+    const u = new THREE.Vector3().fromArray(pl.u);
+    const v = new THREE.Vector3().fromArray(pl.v);
+    const n = new THREE.Vector3().fromArray(pl.n);
+    const loop = (d.points || []).map(([x, y]) => o.clone().addScaledVector(u, x).addScaledVector(v, y));
+    lockSketchPlane({ normal: n, center: o, loop }, d.hostUid);
+  }
+  syncToolUI();
+  updateSketchDone();
+  updateHints();
+  updateFirstRun();
+  toast('已回到这次草图：继续绘制，点顶部对勾完成');
+  return true;
 }
 
 function setMode(m) {
@@ -8684,28 +10045,35 @@ function setMode(m) {
     if (state.selectedB) { setHighlight(state.selectedB, false, true); state.selectedB = null; updateBoolButtons(); }
     if (!SKETCH_TOOLS.includes(state.tool)) state.tool = 'sketch';
     if (prev !== 'sketch') {
+      beginSketchSession();
       state.sketchStage = 'plane';
       state.sketchPlane = null;
       cancelDraft();
       clearGroup(faceGroup);
       toast('草图模式：先点一次选择绘制平面（地面或实体表面）');
     }
-  } else if (SKETCH_TOOLS.includes(state.tool)) {
-    state.tool = 'select';
-    state.sketchStage = 'plane';
-    state.sketchPlane = null;
-    cancelDraft();
-    clearGroup(faceGroup);
+  } else {
+    endSketchSession();
+    if (SKETCH_TOOLS.includes(state.tool)) {
+      state.tool = 'select';
+      state.sketchStage = 'plane';
+      state.sketchPlane = null;
+      cancelDraft();
+      clearGroup(faceGroup);
+    }
   }
 
   syncToolUI();
+  updateSketchDone();
   updateFirstRun();
 }
 
 function setTool(t) {
   autoConfirmDim();
   clearSegOverlay();
+  const wasSketch = state.mode === 'sketch';
   if (SKETCH_TOOLS.includes(t)) {
+    if (!wasSketch) beginSketchSession();
     state.tool = t;
     state.mode = 'sketch';
     if (state.sketchStage !== 'draw') {
@@ -8717,7 +10085,8 @@ function setTool(t) {
     syncToolUI();
     updateFirstRun();
     const tip = {
-      sketch: '线段：点起点→点终点，端点自动吸附格点，标签可填长度，点✓确定',
+      sketch: '多线段：逐点点击连成折线，每落一点出现绿勾；点绿勾或按回车结束本条线并退回选择箭头（仍在草图）；起点终点完全重合才闭合成面，Backspace 撤一点',
+      line: '线段：先点起点再点终点，一次只画一段；长度实时显示在线段上方正中，单击数字可改；回车确认长度，再回车或点绿勾完成，并自动准备下一段（同一次草图无需重选平面）',
       'sketch-rect': '矩形：按住左键对角线拖出',
       'sketch-circle': '圆：从圆心往外拖出半径',
       'sketch-ellipse': '椭圆：从中心拖出长短轴',
@@ -8726,6 +10095,7 @@ function setTool(t) {
     if (tip && state.sketchStage === 'draw') toast(tip);
     return;
   }
+  endSketchSession();
   state.tool = t;
   state.mode = 'object';
   state.sketchStage = 'plane';
@@ -8740,15 +10110,40 @@ function setTool(t) {
     toast('将以选中的面为基准放置新实体（点空白处可改回地面）');
   }
   syncToolUI();
+  updateSketchDone();
   updateFirstRun();
 }
+
+/** 隐藏 / 显现地面网格：只改可见性，格点吸附与步距不受影响（右键轻点或 G） */
+function toggleGrid() {
+  grid.visible = !grid.visible;
+  const label = $('vmGridText');
+  if (label) label.textContent = grid.visible ? '隐藏网格' : '显现网格';
+  toast(grid.visible ? '地面网格已显现（G / 右键菜单可再隐藏）'
+                     : '地面网格已隐藏（格点吸附仍可用）');
+}
+
+const viewMenuEl = $('viewMenu');
+function hideViewMenu() {
+  if (viewMenuEl) viewMenuEl.classList.remove('show');
+}
+function showViewMenu(clientX, clientY) {
+  if (!viewMenuEl) return;
+  const r = viewport.getBoundingClientRect();
+  viewMenuEl.style.left = Math.max(6, Math.min(clientX - r.left, r.width - 168)) + 'px';
+  viewMenuEl.style.top = Math.max(6, Math.min(clientY - r.top, r.height - 52)) + 'px';
+  viewMenuEl.classList.add('show');
+}
+if ($('vmGrid')) $('vmGrid').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleGrid();
+  hideViewMenu();
+});
 
 function toggleShade() {
   state.shade = state.shade === 'solid' ? 'wire' : 'solid';
   const wire = state.shade === 'wire';
-  modelGroup.traverse((o) => {
-    if (o.isMesh && o.userData.desc) o.material.wireframe = wire;
-  });
+  modelGroup.traverse((o) => { if (o.isMesh && o.userData.desc) applyWireStyle(o); });
   const btn = $('btnShade');
   btn.classList.toggle('on', wire);
   btn.querySelector('span').textContent = wire ? '实体' : '线框';
@@ -8767,14 +10162,53 @@ $('toolbar').addEventListener('click', (e) => {
   if (btn.dataset.tool) setTool(btn.dataset.tool);
   else if (btn.dataset.bool) entityBoolean(btn.dataset.bool);
   else if (btn.dataset.act === 'undo') undo();
+  else if (btn.dataset.act === 'redo') redo();
   else if (btn.dataset.act === 'delete') deleteSelected();
   else if (btn.dataset.act === 'shade') toggleShade();
+  else if (btn.dataset.act === 'hide') hideSelected();
+  else if (btn.dataset.act === 'reveal') toggleRevealMode();
+  else if (btn.dataset.measure) { if (measureActive) cancelMeasure(); else startMeasure(); }
 });
 
 $('modeSwitch').addEventListener('click', (e) => {
   const b = e.target.closest('[data-mode]');
   if (b) setMode(b.dataset.mode);
 });
+
+/* 属性面板折叠 / 展开 */
+const appEl = document.querySelector('.app');
+const panelToggle = $('panelToggle');
+if (panelToggle && appEl) panelToggle.addEventListener('click', () => {
+  const collapsed = appEl.classList.toggle('panel-collapsed');
+  panelToggle.title = collapsed ? '展开属性面板' : '隐藏属性面板';
+  panelToggle.setAttribute('aria-label', panelToggle.title);
+  setTimeout(resize, 30);
+});
+
+/* 中键：短按 = 重复上步操作；按住拖动仍交给 OrbitControls 平移 */
+let midPress = null;
+/* 右键：拖动仍旋转视图；轻点（无位移）弹出视图菜单，避开 OrbitControls 拖拽 */
+let rightPress = null;
+window.addEventListener('pointerdown', (e) => {
+  if (e.button === 1) midPress = { x: e.clientX, y: e.clientY, t: performance.now() };
+  if (e.button === 2) {
+    rightPress = e.target.closest('.view-menu') ? null : { x: e.clientX, y: e.clientY, t: performance.now() };
+  } else if (!e.target.closest('.view-menu')) hideViewMenu();
+}, true);
+window.addEventListener('pointerup', (e) => {
+  if (e.button === 1 && midPress) {
+    const dt = performance.now() - midPress.t;
+    const dist = Math.hypot(e.clientX - midPress.x, e.clientY - midPress.y);
+    midPress = null;
+    if (dt < 260 && dist < 6) { e.preventDefault(); repeatLastOp(); }
+    return;
+  }
+  if (e.button !== 2 || !rightPress) return;
+  const dt = performance.now() - rightPress.t;
+  const dist = Math.hypot(e.clientX - rightPress.x, e.clientY - rightPress.y);
+  rightPress = null;
+  if (dt < 400 && dist < 5 && viewport.contains(e.target)) showViewMenu(e.clientX, e.clientY);
+}, true);
 
 /* 正多边形边数 */
 $('polyN').addEventListener('change', () => {
@@ -8789,12 +10223,25 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') e.target.blur();
     return;
   }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
     undo();
     return;
   }
+  /* 还原：Ctrl+Y（同时兼容 Ctrl+Shift+Z） */
+  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y'
+      || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    selectAllEntities();
+    return;
+  }
   if (e.key === 'Escape') {
+    if (viewMenuEl && viewMenuEl.classList.contains('show')) { hideViewMenu(); return; }
     if (state.ex.picking) {
       state.ex.picking = false;
       viewport.style.cursor = '';
@@ -8808,6 +10255,8 @@ window.addEventListener('keydown', (e) => {
       backToPickPlane();          // 从绘制状态退回「选平面」
       return;
     }
+    if (measureActive) { cancelMeasure(); toast('已退出测距'); return; }
+    if (p2pActive) { cancelP2p(); updateP2pTip(); toast('已取消点到点'); return; }
     if (moveActive) { hideObjMenu(); toast('已退出移动模式'); return; }
     if (objMenuEl.classList.contains('show')) { hideObjMenu(); return; }
     if (state.placeFace) {         // 放弃贴附基准，回到地面放置
@@ -8819,8 +10268,26 @@ window.addEventListener('keydown', (e) => {
     setTool('select');
     return;
   }
-  if (e.key === 'Enter' && state.ex.open) { applyExtrude(); return; }
-  if (e.key === 'Enter' && state.draft && state.draft.type === 'line') { closeSketch(); return; }
+  if (e.key === 'Enter') {
+    /* 动态移动：两次回车 = 确认并退出移动模式 */
+    if (moveActive && moveTab === 'free') {
+      const now = performance.now();
+      if (now - lastMoveEnter < 900) {
+        lastMoveEnter = 0;
+        hideObjMenu();
+        toast('已确认动态移动');
+        return;
+      }
+      lastMoveEnter = now;
+      toast('再按一次回车确认并退出');
+      return;
+    }
+    /* 绘制中（多线段 / 线段）回车 = 线旁绿勾：提交整条线并退回选择箭头，仍留在草图。
+       线段长度编辑框里的回车已就地确认数值并阻止冒泡，所以下一次回车直接到这里。 */
+    if (state.draft && state.draft.type === 'line') { finishDraftWithCheck(); return; }
+    if (confirmPendingShape()) return;     // 已提交矩形的长宽：确认并继续下一个
+    if (state.ex.open) { applyExtrude(); return; }
+  }
   if (e.key === 'Backspace' || e.key === 'Delete') {
     if (state.draft && state.draft.type === 'line' && state.draft.points.length) {
       state.draft.points.pop();
@@ -8836,27 +10303,31 @@ window.addEventListener('keydown', (e) => {
   if (k === 'b') setTool('box');
   if (k === 'c') setTool('cylinder');
   if (k === 's') setTool('sketch');
+  if (k === 'n') setTool('line');
   if (k === 'r') setTool('sketch-rect');
   if (k === 'o') setTool('sketch-circle');
   if (k === 'l') setTool('sketch-ellipse');
   if (k === 'p') setTool('sketch-poly');
+  if (k === 'g') toggleGrid();          // 网格隐藏/显现（替代左侧按钮）
   if (k === 'e' && state.face && !state.ex.open) openExtrudePanel();
 });
 
 /* ============================================================================
    13 · 指针交互（对齐 3D One 的手感）
-   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键拖动空白 = 旋转视图
-   · 中键拖动 = 平移视图；滚轮 = 缩放；右键禁用
+   · 物体模式：左键按在实体上 = 选中并可直接拖动移动；左键只用于选中/绘制/魔方，不旋转视图；右键拖动 = 旋转视图
+   · 中键拖动 = 平移视图；滚轮 = 缩放；右键拖动 = 旋转，右键轻点弹视图菜单
    · 悬停实体 = 浅黄预览，选中 = 深黄，拖动中 = 透明浅绿
    · 草图模式两段式：第一次点击选绘制平面（地面或实体面），第二次起才开始绘制
    · 视口左下角 ViewCube 区域的左键事件归视角立方体处理，悬停呈白绿渐变预览
    ========================================================================== */
-/* 全页面彻底禁用右键：菜单 + 浏览器「按住右键拖拽 = 前进/后退」手势。
-   关键：手势由 mousedown 触发，必须在捕获阶段拦掉，仅在 contextmenu 阶段拦来不及。 */
+/* 右键拖动仍旋转视图：拦掉浏览器原生菜单与「按住右键拖拽」手势，不阻断事件传给 OrbitControls；
+   无位移的右键轻点由下面的 pointerup 打开自己的视图菜单。侧键(3/4)彻底禁用。
+   关键：手势由 mousedown 触发，必须在捕获阶段处理。 */
 document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
 document.addEventListener('auxclick', (e) => { if (e.button !== 0) e.preventDefault(); }, true);
 document.addEventListener('mousedown', (e) => {
-  if (e.button === 2 || e.button === 3 || e.button === 4) {
+  if (e.button === 2) { e.preventDefault(); return; }   // 右键：禁菜单/手势，放行给轨道控制器旋转
+  if (e.button === 3 || e.button === 4) {
     e.preventDefault();
     e.stopPropagation();
   }
@@ -8867,12 +10338,12 @@ document.addEventListener('dragstart', (e) => {
 }, true);
 
 viewport.addEventListener('pointerdown', (e) => {
-  /* 右键 / 侧键：一律禁用，不弹菜单、不触发前进后退、不产生任何建模动作 */
-  if (e.button !== 0) {                 // 中键(1)交给 OrbitControls 平移，其余拦截
-    if (e.button !== 1) e.preventDefault();
+  /* 右键(2)交给 OrbitControls 旋转视图；中键(1)平移；侧键/其他一律忽略 */
+  if (e.button !== 0) {
+    if (e.button !== 1 && e.button !== 2) e.preventDefault();
     return;
   }
-  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
+  if (e.target.closest('.face-menu, .obj-menu, .ex-pop, .sk-opt, .dim-tag, .dim-hit, .dim-confirm, .mv-tag, .mv-hit, .mv-rot-hit, .mv-center-hit, .ex-hit, .ex-tag')) return;  // 浮层上的点击按 DOM 处理
 
   /* ViewCube 区域：交给视角立方体（点击切视角 / 拖拽只转魔方） */
   if (inViewCube(e)) {
@@ -8882,7 +10353,7 @@ viewport.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  /* Shift + 左键：物体模式下加选第二实体 B（布尔用）；点空白仍放行给 OrbitControls 旋转 */
+  /* Shift + 左键：物体模式下加选第二实体 B（布尔用）；点空白不旋转视图（左键已从视图旋转中移除） */
   if (e.shiftKey) {
     if (state.mode === 'object' && state.tool === 'select') {
       const sh = pick(e);
@@ -8904,19 +10375,50 @@ viewport.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  const toolActive = state.mode === 'sketch' || isPrimitive(state.tool);
+  /* 测距模式：点选两点，只更新距离标签，不改选中状态 */
+  if (measureActive) {
+    e.preventDefault();
+    e.stopPropagation();
+    measureClick(e);
+    return;
+  }
+
+  /* 点到点移动拾取模式：这次点击作为起点 / 终点，不走选中实体 */
+  if (p2pActive) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.shiftKey) handleP2pClick(e);
+    return;
+  }
+
+  /* 草图会话内退回选择箭头后，仍走正常的选中/拖动逻辑，不再落笔 */
+  const toolActive = (state.mode === 'sketch' && state.tool !== 'select') || isPrimitive(state.tool);
 
   if (!toolActive) {
     const hit = pick(e);
     if (!hit) {
+      clickStreakRoot = null;                                 // 点空白 → 打断连续点击序列
       drag = { kind: 'click', x: e.clientX, y: e.clientY };   // 空白处：交给控制器旋转
+      return;
+    }
+    /* 显现模式：隐藏对象已临时可见，点中它 → 恢复显现，不走选中/拖动 */
+    if (state.revealMode && state.hidden.indexOf(hit.root) >= 0) {
+      e.preventDefault(); e.stopPropagation();
+      revealObject(hit.root);
+      select(hit.root);
       return;
     }
     /* 命中实体：拦下左键 → 选中 + 进入拖动移动 */
     e.preventDefault();
     e.stopPropagation();
-    const wasSelected = state.selected === hit.root;
-    if (!wasSelected) select(hit.root);
+    /* 连续第二次点同一实体 → 选面；否则只选中实体（即便它此前已被新建/拉伸自动选中） */
+    const now = performance.now();
+    /* detail>=2 表示这是双击的第二下：不进入选面，交给 dblclick 处理草图重入 */
+    const isSecondClick = (e.detail || 1) < 2 && clickStreakRoot === hit.root && (now - clickStreakTime) < CLICK_STREAK_MS;
+    clickStreakRoot = hit.root;
+    clickStreakTime = now;
+    if (!isSecondClick) select(hit.root);
+    else if (state.selected !== hit.root) select(hit.root);   // 选中态若被别处改过，补一次
 
     beginEdit();
     const grabZ = hit.hit.point.z;
@@ -8928,9 +10430,11 @@ viewport.addEventListener('pointerdown', (e) => {
       moved: false,
       root: hit.root,
       faceHit: hit.hit,
-      wasSelected,
+      isSecondClick,
       grabZ,
       origin: hit.root.userData.desc.pos.slice(),
+      multiOrigins: state.multi.length > 1 ? state.multi.map((o) => [o, o.userData.desc.pos.slice()]) : [],
+      baseVerts: kd === 'sketch' ? null : entityWorldVertsXY(hit.root),  // 拖动起始顶点快照（磁吸用）
       startXZ: g ? [g.x, g.y] : null,
       sketchOrigin: null,
       planeLocked: kd === 'sketch' && !(hit.root.userData.desc.plane || {}).isGround
@@ -8950,7 +10454,7 @@ viewport.addEventListener('pointerdown', (e) => {
       drag = { kind: 'pickplane', x: e.clientX, y: e.clientY, moved: false };
       return;
     }
-    if (state.tool === 'sketch') {
+    if (isLineTool(state.tool)) {
       drag = { kind: 'sketch', x: e.clientX, y: e.clientY, moved: false };
     } else {
       drag = { kind: 'shape', x: e.clientX, y: e.clientY, moved: false };
@@ -8970,7 +10474,85 @@ function groundPointAt(e, h) {
   return raycaster.ray.intersectPlane(plane, p) ? p : null;
 }
 
+/**
+ * 跟随鼠标的实心落点圆点：草图绘制 / 测距 / 点到点共用。
+ * 吸附到顶点或格点时放大变黄 + 呼吸外圈，未吸附时普通蓝点；退出相应状态即隐藏。
+ */
+/** 鼠标是否正靠近绿勾或可编辑尺寸数字——是则隐藏跟随圆点，改用普通鼠标箭头 */
+function cursorNearCheck(e) {
+  const mx = e.clientX, my = e.clientY;
+  const ids = ['segConfirm', 'skDone', 'segLenTag', 'shapeWTag', 'shapeHTag'];
+  for (const id of ids) {
+    const b = $(id);
+    if (!b) continue;
+    /* 内联 display:none 或祖先 .ex-/浮层隐藏时都视为不可见 */
+    let node = b, visible = true;
+    while (node && node !== document.body) {
+      const cs = getComputedStyle(node);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity || '1') < 0.05) { visible = false; break; }
+      node = node.parentElement;
+    }
+    if (!visible) continue;
+    const r = b.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    /* 尺寸数字：鼠标进入标签（含 10px 提前量）就要变成箭头，单击改数前不再出现亮点 */
+    if (id === 'segLenTag' || id === 'shapeWTag' || id === 'shapeHTag') {
+      if (mx >= r.left - 10 && mx <= r.right + 10 && my >= r.top - 10 && my <= r.bottom + 10) return true;
+      continue;
+    }
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (Math.hypot(mx - cx, my - cy) < 34) return true;   // 34px 半径：给用户明确的"要对勾了"的提前量
+  }
+  return false;
+}
+
+function updateCursorDot(e) {
+  const el = $('cursorDot');
+  if (!el) return;
+  /* 靠近绿勾、线旁/矩形尺寸数字时隐藏实心圆点，交给普通鼠标箭头 */
+  if (cursorNearCheck(e)) { el.style.display = 'none'; return; }
+  let world = null, snapped = false;
+  if (!drag && (measureActive || p2pActive)) {
+    /* 测距 / 点到点：复用统一的吸附拾取（含草图顶点 + 格点） */
+    const info = p2pPickPointInfo(e);
+    if (info) { world = info.point; snapped = !!info.vertex; }
+  } else if (!drag && state.mode === 'sketch' && state.sketchStage === 'draw' && state.tool !== 'select') {
+    /* 草图绘制中才有落点圆点；退回选择箭头后不再显示 */
+    const p = planePoint(e);
+    if (p) {
+      const [hx, hy] = worldToPlane2D(p);
+      const [sx, sy] = magnetSnap2D(hx, hy);
+      const sp = state.sketchPlane || { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+      world = planeLocalWorld(sp, sx, sy, 0.15);
+      /* 「已吸附」高亮与实际落点用同一套屏幕像素判定，所见即所得：
+         吸附落点与原始落点坐标不同即说明吸到了顶点/格点。 */
+      snapped = sx !== round2(hx) || sy !== round2(hy);
+    }
+  }
+  if (!world) { el.style.display = 'none'; return; }
+  const s = projectToScreen(world);
+  el.style.display = 'block';
+  el.style.left = s.x.toFixed(1) + 'px';
+  el.style.top = s.y.toFixed(1) + 'px';
+  el.className = 'cursor-dot' + (snapped ? ' snap' : '');
+}
+function hideCursorDot() {
+  const el = $('cursorDot');
+  if (el) el.style.display = 'none';
+}
+
 window.addEventListener('pointermove', (e) => {
+  updateCursorDot(e);
+  /* 测距：起点确定后跟随光标实时预览距离 */
+  if (measureActive && measureStart && !drag) {
+    const info = p2pPickPointInfo(e);
+    if (info) { measureEnd = info.point; measureEndVertex = info.vertex; updateMeasureOverlay(); }
+  }
+  /* 点到点：已设起点后，鼠标移动实时画预览虚线 */
+  if (p2pActive && p2pStage === 1 && !drag) {
+    const info = p2pPickPointInfo(e);
+    if (info) p2pRenderMarks(info);
+  }
   if (!drag) return;
   if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
   if (drag.kind === 'vcube' && drag.moved) {
@@ -8983,7 +10565,38 @@ window.addEventListener('pointermove', (e) => {
   if (drag.kind === 'move' && drag.moved) moveByDrag(e);
 });
 
-/** 拖动移动：地面平移量按 5mm 吸附，实体改 pos，地面草图整体平移原点 */
+/** 收集实体的世界坐标顶点（XY 去重，供拖动时顶点磁吸用） */
+function entityWorldVertsXY(obj) {
+  obj.updateMatrixWorld(true);
+  const g = obj.geometry;
+  if (!g || !g.attributes || !g.attributes.position) return [];
+  const pos = g.attributes.position, out = [], seen = new Set(), tmp = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    tmp.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+    const k = Math.round(tmp.x * 100) + ',' + Math.round(tmp.y * 100);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push([tmp.x, tmp.y]);
+  }
+  return out;
+}
+
+/** 实体拖动顶点磁吸：基于「按下时的初始顶点」+ 原始位移，若某顶点接近格点则微调让它精确落格。
+    baseVerts 必须是拖动开始时的顶点快照，否则每帧读当前位置会与累计位移叠加导致错位。 */
+function magnetSnapMoveDelta(baseVerts, rawDx, rawDy) {
+  if (!baseVerts || !baseVerts.length) return [rawDx, rawDy];
+  const tol = SNAP * 0.5;   // 顶点吸附半径（半个格距，近才吸）
+  let best = null, bestD = tol;
+  for (const [vx, vy] of baseVerts) {
+    const tx = vx + rawDx, ty = vy + rawDy;
+    const gx = snap(tx), gy = snap(ty);
+    const dd = Math.hypot(tx - gx, ty - gy);
+    if (dd < bestD) { bestD = dd; best = [gx - vx, gy - vy]; }
+  }
+  return best || [rawDx, rawDy];   // 未命中顶点 → 保留自由落点（可小数摆放）
+}
+
+/** 拖动移动：带顶点实体磁吸格点；地面草图整体平移原点 */
 function moveByDrag(e) {
   const d = drag;
   if (!d || !d.startXZ) return;
@@ -8991,9 +10604,14 @@ function moveByDrag(e) {
   const p = groundPointAt(e, d.grabZ);
   if (!p) return;
 
-  const dx = snap(p.x - d.startXZ[0]);
-  const dy = snap(p.y - d.startXZ[1]);
   const desc = d.root.userData.desc;
+  let dx, dy;
+  if (desc.kind === 'sketch') {
+    dx = snap(p.x - d.startXZ[0]);
+    dy = snap(p.y - d.startXZ[1]);
+  } else {
+    [dx, dy] = magnetSnapMoveDelta(d.baseVerts, p.x - d.startXZ[0], p.y - d.startXZ[1]);
+  }
 
   if (desc.kind === 'sketch') {
     if (!d.sketchOrigin) d.sketchOrigin = [...desc.pos];
@@ -9004,6 +10622,14 @@ function moveByDrag(e) {
     desc.pos[1] = d.origin[1] + dy;
   }
   updateObject(d.root);
+  /* 多选：其余实体同步整体平移相同增量 */
+  d.multiOrigins.forEach(([o, orig]) => {
+    if (o === d.root || !o.userData.desc) return;
+    o.userData.desc.pos[0] = orig[0] + dx;
+    o.userData.desc.pos[1] = orig[1] + dy;
+    updateObject(o);
+    paintEntity(o, 'drag');
+  });
   paintEntity(d.root, 'drag');   // updateObject 会重刷正式配色，这里补回拖动浅绿
   clearGroup(faceGroup);
   state.face = null;
@@ -9024,12 +10650,14 @@ window.addEventListener('pointerup', (e) => {
   } else if (d.kind === 'click') {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
       /* 空白处单击 → 取消选择 */
+      clickStreakRoot = null;
       select(null);
     }
   } else if (d.kind === 'pickplane') {
     if (!d.moved) chooseSketchPlane(e);
   } else if (d.kind === 'sketch') {
     if (!d.moved) {
+      /* 线段工具：终点落下即成线、即确认；下一次点击直接作为新线段起点，连续画线 */
       const p = planePoint(e);
       if (p) addSketchPoint(p);
     }
@@ -9040,32 +10668,49 @@ window.addEventListener('pointerup', (e) => {
     finishPlacement();
   } else if (d.kind === 'move') {
     /* 松手：拖动态浅绿 → 选中态深黄（未选中则恢复原色） */
-    paintEntity(d.root, state.selected === d.root ? 'selected' : 'normal');
+    paintEntity(d.root, d.multiOrigins.length ? 'selected' : (state.selected === d.root ? 'selected' : 'normal'));
+    d.multiOrigins.forEach(([o]) => { if (o !== d.root) paintEntity(o, 'selected'); });
     if (d.moved) {
+      clickStreakRoot = null;   // 拖动过 → 打断连续点击序列，下次点击只选中实体
       commitEdit();
       updateStatus();
       toast('已移动');
     } else {
-      /* 没有位移 = 一次单击：已选中的对象再点一次 → 选面（闭合草图 = 蓝色平面本身） */
-      if (d.wasSelected && d.faceHit.face) {
-        const kd = d.root.userData.desc.kind;
-        if (kd === 'sketch') pickSketchFace(d.root);
-        else pickFace(d.root, d.faceHit);
+      /* 没有位移 = 一次单击：
+         闭合草图（蓝色阴影面）单击一次就直接弹拉伸菜单，不再要求 2.5 秒内的第二次点击；
+         其它实体仍沿用「第二次点同一实体 → 选面」。双击重入由 dblclick 事件接管。 */
+      const kd = d.root.userData.desc.kind;
+      const closedSketch = kd === 'sketch' && !!d.root.userData.desc.closed;
+      if (closedSketch) {
+        clickStreakRoot = null;   // 单击即选面 → 重置，避免后续点击又被当作连击
+        pickSketchFace(d.root);
+      } else if (d.isSecondClick && d.faceHit.face) {
+        clickStreakRoot = null;   // 已进入选面 → 重置，避免第三次点击又选面
+        pickFace(d.root, d.faceHit);
       }
       commitEdit();   // 无实际变化时不会入撤销栈
     }
   }
 });
 
-/* 双击 = 结束线段绘制，保留【开放】线段（可拉伸成面）；回到起点才是闭合 */
+/* 双击：物体模式下重入某次草图会话；草图绘制中继续沿用「结束开放线段」的原语义 */
 viewport.addEventListener('dblclick', (e) => {
+  /* 浮层（尺寸标签 / 各类菜单）上的双击按 DOM 自身处理，不当成画布双击结束绘制 / 重入草图 */
+  if (e.target.closest('.dim-tag, .face-menu, .obj-menu, .ex-pop, .sk-opt, .mv-tag, .mv-hit, .mv-rot-hit, .mv-center-hit, .ex-hit, .ex-tag')) return;
+  if (state.mode === 'object' && state.tool === 'select') {
+    const hit = pick(e);
+    if (hit && hit.root && hit.root.userData && hit.root.userData.desc
+        && hit.root.userData.desc.kind === 'sketch') {
+      e.preventDefault();
+      e.stopPropagation();
+      reenterSketchSession(hit.root);
+      return;
+    }
+  }
   if (state.mode !== 'sketch' || !state.draft || state.draft.type !== 'line') return;
   e.preventDefault();
-  const pts = state.draft.points;
-  state.draft = null;
-  clearGroup(draftGroup);
-  if (pts.length >= 2) commitSketch(pts, null, false);
-  else toast('至少点击 2 个点再结束');
+  /* 双击结束与线旁绿勾 / 回车同义：提交本条线，退回选择箭头但仍留在草图 */
+  finishDraftWithCheck();
 });
 
 /* ============================================================================
@@ -9158,21 +10803,60 @@ function backToPickPlane() {
   toast('重新选择绘制平面：点击地面或实体表面');
 }
 
-/** 选平面阶段的悬停预览：鼠标悬在哪个实体面上，就淡橙色预览哪个面 */
+/** 选平面阶段的悬停预览：在命中点浮现一小块半透明虚拟网格，明确提示「这个面可画」 */
 function renderPlaneHover(hit) {
   clearGroup(draftGroup);
   if (!hit || hit.root.userData.desc.kind === 'sketch') return;
   const b = faceBoundary(hit.root, hit.hit);
   if (!b) return;
+  const { u, v } = planeBasis(b.normal);
+  const center = hit.hit.point.clone().addScaledVector(b.normal, FACE_OFF + 0.12);
+  /* 网格范围按识别出的整块面计算，铺满整个平面，而不是写死的 30mm 小方块 */
+  const o = new THREE.Vector3().fromArray(
+    hit.root.userData.desc && hit.root.userData.desc.pos ? hit.root.userData.desc.pos : [0, 0, 0]);
+  let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+  const lp = b.loop.map((p) => p.clone().sub(o));
+  lp.forEach((p) => {
+    const a = p.dot(u), c = p.dot(v);
+    minU = Math.min(minU, a); maxU = Math.max(maxU, a);
+    minV = Math.min(minV, c); maxV = Math.max(maxV, c);
+  });
+  /* 兜底：识别异常时给一个不小于单格的范围，避免退化为 0 宽 */
+  if (!isFinite(minU) || maxU - minU < 1) { minU = -30; maxU = 30; }
+  if (!isFinite(minV) || maxV - minV < 1) { minV = -30; maxV = 30; }
+  const step = 10;
+  const at = (x, y) => center.clone().addScaledVector(u, x).addScaledVector(v, y);
+  /* 柔和底片：覆盖整块面 */
+  const quad = [at(minU, minV), at(maxU, minV), at(maxU, maxV), at(minU, maxV)];
   const fill = new THREE.Mesh(
-    polygonGeometry(b.loop, b.normal, FACE_OFF),
+    polygonGeometry(quad, b.normal, 0),
     new THREE.MeshBasicMaterial({
-      color: FACE_C, transparent: true, opacity: 0.14,
-      side: THREE.DoubleSide, depthWrite: false
+      color: FACE_C, transparent: true, opacity: 0.12,
+      side: THREE.DoubleSide, depthWrite: false, depthTest: false
     })
   );
-  fill.renderOrder = 3;
+  fill.renderOrder = 8;
   draftGroup.add(fill);
+  /* 10mm 细网格 + 外框：沿整块面范围铺开 */
+  const segs = [];
+  for (let k = Math.ceil(minU / step) * step; k <= maxU + 1e-6; k += step) {
+    segs.push(at(k, minV), at(k, maxV));
+  }
+  for (let k = Math.ceil(minV / step) * step; k <= maxV + 1e-6; k += step) {
+    segs.push(at(minU, k), at(maxU, k));
+  }
+  const grid = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(segs),
+    new THREE.LineBasicMaterial({ color: FACE_C, transparent: true, opacity: 0.55, depthTest: false })
+  );
+  grid.renderOrder = 9;
+  draftGroup.add(grid);
+  const border = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([...quad, quad[0].clone()]),
+    new THREE.LineBasicMaterial({ color: FACE_C, transparent: true, opacity: 0.95, depthTest: false })
+  );
+  border.renderOrder = 10;
+  draftGroup.add(border);
 }
 
 /** 单击闭合草图（蓝色平面）→ 视口浮出「拉伸」菜单（与实体选面一致） */
@@ -9245,13 +10929,14 @@ viewport.addEventListener('pointermove', (e) => {
     if (p && state.draft.points.length >= 3) {
       const [fx, fy] = state.draft.points[0];
       const [px, py] = worldToPlane2D(p);
-      state.closeReady = Math.hypot(px - fx, py - fy) <= 3;
+      const [sx, sy] = magnetSnap2D(px, py);   // 与真正落笔同一套吸附，预览与闭合结果一致
+      state.closeReady = sx === fx && sy === fy;   // 严格重合，无容差
     }
     renderDraft();
     return;
   }
 
-  if (state.mode === 'object' && state.tool === 'select') {
+  if (state.tool === 'select') {
     const hit = pick(e);
     renderer.domElement.style.cursor = hit ? 'move' : 'default';
     setEntityHover(hit && hit.root);
@@ -9260,19 +10945,57 @@ viewport.addEventListener('pointermove', (e) => {
   }
 });
 
-/** 实体悬停三态：浅黄预览；已选中保持深黄；移开恢复原色 */
+/** 实体悬停三态：浅黄预览；已选中保持深黄；移开恢复原色。
+    同一次草图会话内的所有草图视为一组：悬停任一元素，整组一起高亮。 */
+let hoverGroup = [];
 function setEntityHover(obj) {
   const next = obj || null;
   if (hoverEntity === next) return;
-  const prev = hoverEntity;
+  const prevGroup = hoverGroup;
   hoverEntity = next;
-  if (prev && prev !== state.selected && prev !== state.selectedB) paintEntity(prev, 'normal');
-  if (next && next !== state.selected && next !== state.selectedB) paintEntity(next, 'hover');
+  hoverGroup = next ? sketchGroupOf(next) : [];
+  prevGroup.forEach((o) => {
+    if (o !== state.selected && o !== state.selectedB && !hoverGroup.includes(o)) paintEntity(o, 'normal');
+  });
+  hoverGroup.forEach((o) => {
+    if (o !== state.selected && o !== state.selectedB) paintEntity(o, 'hover');
+  });
 }
 
 viewport.addEventListener('pointerleave', () => {
   setEntityHover(null);
   setViewCubeHover(null);
+});
+
+/** 草图模式顶部对勾：显示/隐藏并完成草图；同步深黄色编辑态主题 */
+function updateSketchDone() {
+  const on = state.mode === 'sketch' && state.sketchStage === 'draw';
+  document.body.classList.toggle('sketch-editing', on);
+  const btn = $('skDone');
+  if (!btn) return;
+  btn.style.display = on ? 'flex' : 'none';
+}
+const skDone = $('skDone');
+if (skDone) skDone.addEventListener('click', (e) => {
+  e.stopPropagation();
+  e.currentTarget.blur();   // 避免焦点残留后按回车触发按钮点击，误把草图退出
+  /* 顶部草图对勾 = 真正退出草图；线旁绿勾 / 回车只结束本条线、退回选择箭头但不退出。
+     退出前若还有正在画的线，先提交掉，避免丢失。 */
+  if (state.draft && state.draft.type === 'line' && state.draft.points.length >= 2) {
+    const pts = state.draft.points.map((p) => [...p]);
+    let closed = false;
+    if (pts.length >= 4 && pts[0][0] === pts[pts.length - 1][0]
+                        && pts[0][1] === pts[pts.length - 1][1]) { pts.pop(); closed = true; }
+    state.draft = null;
+    state.closeReady = false;
+    state.segHoverLocal = null;
+    clearGroup(draftGroup);
+    commitSketch(pts, null, closed, true);
+  }
+  if (state.draft) cancelDraft();
+  clearSegOverlay();
+  setTool('select');
+  toast('草图已完成，已回到选择工具');
 });
 
 /* ============================================================================
@@ -9282,29 +11005,54 @@ function updateHints() {
   const dots = '<span class="dot"></span>';
   let html = '';
 
-  if (state.mode === 'sketch') {
+  if (state.revealMode) {
+    html = `<b>显现模式</b>${dots}所有隐藏对象已半透明显示${dots}点中某一个才真正显现它${dots}再次点「显现」按钮退出`;
+  } else if (state.hidden.length) {
+    html = `<b>已有 ${state.hidden.length} 个对象被隐藏</b>${dots}点「显现」后它们会半透明出现，点中某一个才恢复`;
+  } else if (measureActive) {
+    html = `<b>测距</b>${dots}点选起点与终点，显示两点间距离${dots}靠近顶点/格点自动吸附${dots}<kbd>Esc</kbd> 退出`;
+  } else if (state.mode === 'sketch') {
     if (state.sketchStage === 'plane') {
       html = `<b>第 1 步 · 选择绘制平面</b>${dots}点击【地面网格】或某个【实体表面】作为草图平面${dots}悬停可预览${dots}<kbd>Esc</kbd> 退出`;
+    } else if (state.tool === 'select') {
+      html = `<b>草图 · 选择</b>${dots}已退回选择箭头，可点选/拉伸已画草图${dots}点工具栏「多线段 / 线段」继续画${dots}点顶部绿勾才退出草图`;
+    } else if (state.tool === 'line') {
+      html = `<b>第 2 步 · 线段</b>${dots}点起点、点终点画一段${dots}长度实时显示在线段上方正中，单击数字可改${dots}回车确认长度，再回车或点绿勾完成${dots}自动准备下一段（无需重选平面）${dots}点顶部绿勾才退出草图`;
     } else if (state.tool === 'sketch') {
-      html = `<b>第 2 步 · 线段</b>${dots}左键点起点、再点终点即成线${dots}端点自动吸附 5mm 格点并高亮${dots}点白色标签可填长度、点绿勾确定${dots}<b>双击</b> 结束开放线段${dots}<kbd>Enter</kbd> 闭合并退出`;
+      html = `<b>第 2 步 · 多线段</b>${dots}逐点点击连成折线，每点一点出现绿勾${dots}点绿勾或按 <kbd>Enter</kbd> 结束本条线并退回选择箭头${dots}起点终点完全重合才闭合成蓝色面${dots}Backspace 撤一点`;
     } else {
       html = `<b>第 2 步 · ${SKETCH_TOOL_HINT[state.tool] || '拖拽绘制'}</b>${dots}按住左键在所选平面上拖出尺寸${dots}松开生成草图${dots}<kbd>Esc</kbd> 重新选平面`;
     }
   } else if (isPrimitive(state.tool)) {
-    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>左键</kbd>拖动空白处旋转视角${dots}<kbd>Esc</kbd> 取消`;
+    html = `<b>拖拽放置</b>${dots}在地面按住左键拖出尺寸${dots}松开完成${dots}<kbd>右键</kbd>拖动旋转视角${dots}<kbd>Esc</kbd> 取消`;
   } else if (state.face) {
     html = `<b>已选面</b>${dots}点浮出的「<b>拉伸</b>」或按 <kbd>E</kbd>${dots}可选 新建 / 加 / 减 / 交 运算${dots}<kbd>Esc</kbd> 取消`;
   } else {
-    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}悬停浅黄、选中深黄、拖动透明浅绿${dots}<b>左键拖动空白处</b> 旋转${dots}<b>中键拖动</b> 平移${dots}<b>滚轮</b> 缩放${dots}左下角魔方切视角`;
+    html = `<b>选中实体</b> 后点「移动」才出三轴箭头${dots}悬停浅黄、选中深黄、拖动透明浅绿${dots}<b>右键拖动</b> 旋转${dots}<b>中键单击</b>重复上步${dots}<b>Ctrl+Z</b> 撤销 / <b>Ctrl+Y</b> 还原${dots}<b>右键轻点 / G</b> 切换网格${dots}左下角魔方切视角`;
   }
-  $('hintbar').innerHTML = html;
+  const hc = $('hintContent');
+  if (hc) hc.innerHTML = html;
+}
+
+/* 提示条收起 / 展开：默认展开，点小箭头收起为一个图标，不再长期占屏幕中央 */
+const hintBarEl = $('hintbar');
+if (hintBarEl && $('hintToggle')) {
+  $('hintToggle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const collapsed = hintBarEl.classList.toggle('collapsed');
+    const t = $('hintToggle');
+    t.title = collapsed ? '展开提示' : '收起提示';
+    t.setAttribute('aria-label', t.title);
+  });
 }
 
 function updateStatus() {
   const n = modelGroup.children.length;
   const desc = state.selected && state.selected.userData.desc;
+  const allSketch = state.multi.length > 1 && state.multi.every((o) => o.userData && o.userData.desc && o.userData.desc.kind === 'sketch');
+  const groupTip = state.multi.length > 1 ? ` · ${allSketch ? '同次草图' : '已多选'} ${state.multi.length} 个` : '';
   $('statusbar').textContent = desc
-    ? `${n} 个对象 · 已选中 ${TYPE_LABEL[desc.kind]}${state.selectedB ? ' + B（可布尔运算）' : ' · Shift 点第二个实体做布尔'}`
+    ? `${n} 个对象 · 已选中 ${TYPE_LABEL[desc.kind]}${groupTip}${state.selectedB ? ' + B（可布尔运算）' : ' · Shift 点第二个实体做布尔'}`
     : `${n} 个对象`;
   updateFirstRun();   // 任何状态刷新都同步首帧引导的显隐，避免残留
 }
@@ -9316,6 +11064,8 @@ function updateFirstRun() {
 
 function updateUndoBtn() {
   $('btnUndo').disabled = undoStack.length === 0;
+  const rb = $('btnRedo');
+  if (rb) rb.disabled = redoStack.length === 0;
 }
 
 let toastTimer = null;
@@ -9748,6 +11498,17 @@ function arrowHeadAt(tip, ux, uy, color) {
     + `fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`;
 }
 
+/** 旋转弧用的小箭头：比平移箭头轻，三色弧不会挤在一起 */
+function arcArrowHead(tip, ux, uy, color) {
+  const len = 11, half = 5;
+  const px = -uy, py = ux;
+  const bx = tip.x - ux * len, by = tip.y - uy * len;
+  return `<path d="M${tip.x.toFixed(1)},${tip.y.toFixed(1)} `
+    + `L${(bx + px * half).toFixed(1)},${(by + py * half).toFixed(1)} `
+    + `L${(bx - px * half).toFixed(1)},${(by - py * half).toFixed(1)} Z" `
+    + `fill="${color}" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>`;
+}
+
 function updateDimGizmo() {
   const obj = state.selected;
   const desc0 = obj && obj.userData.desc;
@@ -9829,7 +11590,7 @@ function updateDimGizmo() {
       + `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="3" fill="#e0453f"/>`;
 
   dimSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
-  dimSvg.innerHTML = svg;
+  setSvgHtml(dimSvg, svg);
 
   const confirm = $('dimConfirm');
   confirm.style.left = cS.x + 'px';
@@ -9981,6 +11742,259 @@ $('dimConfirm').addEventListener('click', (e) => { e.stopPropagation(); confirmD
    · 拖箭头 → 沿该世界轴平移实体；点标签 → 输入精确坐标
    · 与尺寸 gizmo 互斥：刚放置(dimPending)先改尺寸，点确定后再显示移动箭头
    ========================================================================== */
+/* ---------- 点到点移动（仿 3D One）：点选起点 → 终点，实体按差值平移 ---------- */
+let p2pEnd = null;        // 终点世界坐标
+let p2pStartVertex = false, p2pEndVertex = false;   // 端点是否磁吸到实体顶点（黄色圆圈）
+
+/** 世界点磁吸详情：优先吸到顶点（实体几何顶点 + 草图轮廓端点，vertex=true），其次吸到格点。
+    顶点判定用屏幕像素半径，视图缩放后吸附手感一致；格点吸附仍按世界步距。 */
+function worldSnapPointInfo(p) {
+  const ps = projectToScreen(p);
+  const VERTEX_PX = 16;                 // 屏幕上 16px 内即吸到顶点
+  let best = null, bestD = VERTEX_PX;
+  const tmp = new THREE.Vector3();
+  for (const obj of modelGroup.children) {
+    const d = obj.userData && obj.userData.desc;
+    if (!d) continue;
+    obj.updateMatrixWorld(true);
+    if (d.kind === 'sketch' && Array.isArray(d.points)) {
+      /* 草图顶点在 desc.points（局部 2D）里，几何 buffer 里只有描边窄面片，不能直接当顶点候选 */
+      const pl = d.plane || { u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+      const u = new THREE.Vector3().fromArray(pl.u);
+      const v = new THREE.Vector3().fromArray(pl.v);
+      for (const [x, y] of d.points) {
+        tmp.set(0, 0, 0).addScaledVector(u, x).addScaledVector(v, y).applyMatrix4(obj.matrixWorld);
+        const s = projectToScreen(tmp);
+        if (s.z < -1 || s.z > 1) continue;
+        const dd = Math.hypot(s.x - ps.x, s.y - ps.y);
+        if (dd < bestD) { bestD = dd; best = tmp.clone(); }
+      }
+      continue;
+    }
+    const g = obj.geometry;
+    if (!g || !g.attributes || !g.attributes.position) continue;
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      tmp.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+      const s = projectToScreen(tmp);
+      if (s.z < -1 || s.z > 1) continue;
+      const dd = Math.hypot(s.x - ps.x, s.y - ps.y);
+      if (dd < bestD) { bestD = dd; best = tmp.clone(); }
+    }
+  }
+  if (best) return { point: best, vertex: true, snapped: true };
+  return { point: new THREE.Vector3(snap(p.x), snap(p.y), snap(p.z)), vertex: false, snapped: false };
+}
+function worldSnapPoint(p) { return worldSnapPointInfo(p).point; }
+
+/** 拾取画布上的世界点：命中实体表面取命中点，否则取地面点；再磁吸 */
+function p2pPickPointInfo(e) {
+  setRay(e);
+  const hits = raycaster.intersectObjects(modelGroup.children, true);
+  let p = null;
+  for (const h of hits) {
+    if (rootOf(h.object)) { p = h.point.clone(); break; }
+  }
+  if (!p) {
+    p = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(groundPlane, p)) return null;
+  }
+  return worldSnapPointInfo(p);
+}
+function p2pPickPoint(e) {
+  const info = p2pPickPointInfo(e);
+  return info ? info.point : null;
+}
+
+/**
+ * 渲染起点/终点标记与连线。
+ * hoverInfo = { point, vertex }（鼠标预览点）；吸附到顶点时端点改画黄色圆圈。
+ */
+function p2pRenderMarks(hoverInfo) {
+  const lineEl = $('p2pLine'), marksEl = $('p2pMarks');
+  if (!lineEl || !marksEl) return;
+  let html = '';
+  if (p2pStart) {
+    const s = projectToScreen(p2pStart);
+    html += `<div class="p2pmark${p2pStartVertex ? ' snap' : ''}" style="left:${s.x.toFixed(1)}px;top:${s.y.toFixed(1)}px"></div>`;
+  }
+  if (p2pEnd) {
+    const t = projectToScreen(p2pEnd);
+    html += `<div class="p2pmark end${p2pEndVertex ? ' snap' : ''}" style="left:${t.x.toFixed(1)}px;top:${t.y.toFixed(1)}px"></div>`;
+  } else if (p2pStart && hoverInfo && hoverInfo.point) {
+    const h = projectToScreen(hoverInfo.point);
+    html += `<div class="p2pmark hover${hoverInfo.vertex ? ' snap' : ''}" style="left:${h.x.toFixed(1)}px;top:${h.y.toFixed(1)}px"></div>`;
+  }
+  marksEl.innerHTML = html;
+  const target = p2pEnd || (hoverInfo && hoverInfo.point);
+  if (p2pStart && target) {
+    const s = projectToScreen(p2pStart), t = projectToScreen(target);
+    setSvgHtml(lineEl, `<line x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}"`
+      + ` stroke="#2f6fed" stroke-width="2" stroke-dasharray="6 4" opacity=".85"/>`);
+  } else setSvgHtml(lineEl, '');
+}
+
+function updateP2pTip() {
+  const el = $('omP2pTip');
+  if (!el) return;
+  el.innerHTML = p2pStage === 0
+    ? '直接在画布上点<b>起点</b>（实体顶点或格点），再点<b>终点</b>，实体按两点平移'
+    : '已设起点 · 现在点选<b>终点</b>（点空白处吸附格点）';
+}
+
+/* ============================================================================
+   测距：点选两点测三维距离（磁吸顶点/格点，但不显示任何吸附提示）
+   ========================================================================== */
+let measureActive = false, measureStart = null, measureEnd = null;
+let measureStartVertex = false, measureEndVertex = false;   // 是否磁吸到顶点
+
+function startMeasure(keepResult) {
+  measureActive = true;
+  measureStart = null;
+  measureEnd = null;
+  measureStartVertex = false;
+  measureEndVertex = false;
+  if (!keepResult) updateMeasureOverlay();
+  hideObjMenu();
+  updateHints();
+  toast('测距：点选起点，再点选终点（Esc 退出）');
+}
+
+function cancelMeasure() {
+  measureActive = false;
+  measureStart = null;
+  measureEnd = null;
+  measureStartVertex = false;
+  measureEndVertex = false;
+  hideCursorDot();
+  updateMeasureOverlay();
+  updateHints();
+}
+
+function measureClick(e) {
+  const info = p2pPickPointInfo(e);
+  if (!info) return;
+  const p = info.point;
+  if (!measureStart) {
+    measureStart = p;
+    measureStartVertex = info.vertex;
+    measureEnd = null;
+    measureEndVertex = false;
+    toast('已设起点，点选终点');
+  } else {
+    measureEnd = p;
+    measureEndVertex = info.vertex;
+    measureActive = false;
+    hideCursorDot();
+    updateHints();
+    toast('测距完成，可点「测距」重新测量');
+  }
+  updateMeasureOverlay();
+}
+
+function updateMeasureOverlay() {
+  const lineEl = $('measureLine'), tag = $('measureTag'), marksEl = $('measureMarks');
+  if (!lineEl || !tag) return;
+  if (!measureStart) {
+    setSvgHtml(lineEl, '');
+    tag.style.display = 'none';
+    if (marksEl) marksEl.innerHTML = '';
+    return;
+  }
+  const b = measureEnd || measureStart;
+  const sa = projectToScreen(measureStart), sb = projectToScreen(b);
+  setSvgHtml(lineEl, `<line x1="${sa.x.toFixed(1)}" y1="${sa.y.toFixed(1)}" x2="${sb.x.toFixed(1)}" y2="${sb.y.toFixed(1)}"`
+    + ` stroke="#2f6fed" stroke-width="2.2" opacity=".95"/>`);
+  tag.style.display = 'block';
+  tag.style.left = ((sa.x + sb.x) / 2).toFixed(1) + 'px';
+  tag.style.top = ((sa.y + sb.y) / 2 - 18).toFixed(1) + 'px';
+  tag.textContent = measureStart.distanceTo(b).toFixed(2) + ' mm';
+  if (marksEl) {
+    let html = `<div class="measuremark${measureStartVertex ? ' snap' : ''}" style="left:${sa.x.toFixed(1)}px;top:${sa.y.toFixed(1)}px"></div>`;
+    if (measureEnd) {
+      const endCls = measureActive ? 'hover' : 'end';
+      html += `<div class="measuremark ${endCls}${measureEndVertex ? ' snap' : ''}" style="left:${sb.x.toFixed(1)}px;top:${sb.y.toFixed(1)}px"></div>`;
+    }
+    marksEl.innerHTML = html;
+  }
+}
+
+/** 启动点到点拾取 */
+function startP2p() {
+  const obj = state.selected;
+  if (!obj || !obj.userData.desc || ['sketch', 'sheet'].includes(obj.userData.desc.kind)) {
+    toast('请先选中一个实体再移动'); return false;
+  }
+  p2pRoot = obj; p2pActive = true; p2pStage = 0; p2pStart = null; p2pEnd = null;
+  p2pStartVertex = false; p2pEndVertex = false;
+  moveActive = false;
+  moveLayer.classList.remove('show');
+  updateP2pTip(); p2pRenderMarks();
+  return true;
+}
+
+/** 取消点到点并清理标记 */
+function cancelP2p() {
+  p2pActive = false; p2pStage = 0; p2pStart = null; p2pEnd = null; p2pRoot = null;
+  p2pStartVertex = false; p2pEndVertex = false;
+  hideCursorDot();
+  const l = $('p2pLine'), m = $('p2pMarks');
+  if (l) l.innerHTML = '';
+  if (m) m.innerHTML = '';
+}
+
+/** 点到点画布点击：第一次落起点，第二次落终点并执行平移 */
+function handleP2pClick(e) {
+  const root = p2pRoot || state.selected;
+  if (!root || !root.userData.desc || !modelGroup.children.includes(root)) {
+    cancelP2p(); toast('实体已失效，请重新选中'); return;
+  }
+  const info = p2pPickPointInfo(e);
+  if (!info) return;
+  const p = info.point;
+  if (p2pStage === 0) {
+    p2pStart = p; p2pStartVertex = info.vertex;
+    p2pEnd = null; p2pEndVertex = false;
+    p2pStage = 1;
+    updateP2pTip(); p2pRenderMarks(info);
+    toast('已设起点，现在点终点');
+  } else {
+    p2pEnd = p; p2pEndVertex = info.vertex;
+    const delta = p2pEnd.clone().sub(p2pStart);
+    const d = root.userData.desc;
+    beginEdit();
+    d.pos = [d.pos[0] + delta.x, d.pos[1] + delta.y, d.pos[2] + delta.z];
+    updateObject(root);
+    if (state.selected === root) paintEntity(root, 'selected');
+    commitEdit();
+    syncPanel(); updateStatus();
+    p2pStart = null; p2pEnd = null; p2pStage = 0;
+    p2pStartVertex = false; p2pEndVertex = false;
+    hideCursorDot();
+    updateP2pTip();
+    hideObjMenu();                 // 终点即结束：关闭对象菜单、移动子面板与所有拾取标记
+    moveLayer.classList.remove('show');
+    toast('已按两点平移');
+  }
+}
+
+/** 切换移动选项卡：点到点 / 动态移动（三箭头） */
+function setMoveTab(tab) {
+  moveTab = tab;
+  document.querySelectorAll('#omMoveSub .om-tab').forEach((b) => b.classList.toggle('on', b.dataset.mvtab === tab));
+  const p2p = $('omMvP2P'), free = $('omMvFree');
+  if (p2p) p2p.style.display = tab === 'p2p' ? '' : 'none';
+  if (free) free.style.display = tab === 'free' ? '' : 'none';
+  if (tab === 'p2p') {
+    startP2p();
+  } else {
+    cancelP2p();
+    moveActive = true;
+    updateMoveGizmo();
+  }
+  positionObjUI();
+}
+
 const moveLayer = $('moveLayer'), moveSvg = $('moveSvg'), moveLabels = $('moveLabels');
 const MOVE_AXES = [
   { idx: 0, color: '#e5433e' },   // X 红
@@ -9991,6 +12005,200 @@ const MOVE_WORLD = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new 
 const MOVE_LEN = 58;             // 箭头屏幕长度(px)
 const AXIS_NAME = ['X', 'Y', 'Z'];
 let moveDrag = null, moveEditing = false;
+let centerDrag = null, rotDrag = null, moveSnapInfo = null, lastRotAxis = 2, angleEditing = false;
+
+/** gizmo 锚点：实体包围盒中心，固定不随「移动中心点」变化（箭头/圆弧锚在这里） */
+function gizmoAnchor(obj) {
+  if (!obj) return new THREE.Vector3();
+  obj.updateMatrixWorld();
+  const box = new THREE.Box3().setFromObject(obj);
+  const d = obj && obj.userData.desc;
+  return box.isEmpty() ? new THREE.Vector3().fromArray(d ? d.pos : [0, 0, 0]) : box.getCenter(new THREE.Vector3());
+}
+
+/** gizmo 中心（拖动中心点后可变）：移动过就用自定义中心，否则退回锚点；只用于中心靶 */
+function gizmoCenter(obj) {
+  const d = obj && obj.userData.desc;
+  if (d && Array.isArray(d.moveCenter) && d.moveCenter.length === 3) {
+    return new THREE.Vector3().fromArray(d.moveCenter);
+  }
+  return gizmoAnchor(obj);
+}
+
+/** gizmo 屏幕安全半径：模型投影包围盒相对中心的最大半径，保证箭头/圆弧都落在模型外侧 */
+function gizmoBodyRadius(obj, centerS) {
+  if (!obj) return 18;
+  obj.updateMatrixWorld();
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return 18;
+  let r = 0;
+  for (let i = 0; i < 8; i++) {
+    const p = new THREE.Vector3(
+      (i & 1) ? box.max.x : box.min.x,
+      (i & 2) ? box.max.y : box.min.y,
+      (i & 4) ? box.max.z : box.min.z
+    );
+    const s = projectToScreen(p);
+    r = Math.max(r, Math.hypot(s.x - centerS.x, s.y - centerS.y));
+  }
+  return Math.min(Math.max(r, 18), 600);
+}
+
+/** 收集场景实体的世界空间边线段，供中心点磁吸（上限避免大场景卡顿） */
+function collectSnapSegments() {
+  const segs = [], va = new THREE.Vector3(), vb = new THREE.Vector3();
+  for (const obj of modelGroup.children) {
+    const d = obj.userData.desc;
+    if (!d || d.kind === 'sheet') continue;
+    obj.updateMatrixWorld(true);
+    if (d.kind === 'sketch' && Array.isArray(d.points) && d.points.length >= 2) {
+      /* 草图的轮廓边也算吸附候选：中心点可吸到草图顶点/边，与测距吸附一致 */
+      const pl = d.plane || { u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+      const u = new THREE.Vector3().fromArray(pl.u);
+      const v = new THREE.Vector3().fromArray(pl.v);
+      const at = (i) => {
+        const [x, y] = d.points[i];
+        return new THREE.Vector3().addScaledVector(u, x).addScaledVector(v, y).applyMatrix4(obj.matrixWorld);
+      };
+      const total = d.points.length;
+      const edges = d.closed ? total : total - 1;
+      for (let i = 0; i < edges; i++) {
+        segs.push([at(i), at((i + 1) % total)]);
+        if (segs.length >= 2400) return segs;
+      }
+      continue;
+    }
+    if (!obj.geometry || !obj.geometry.attributes || !obj.geometry.attributes.position) continue;
+    const eg = new THREE.EdgesGeometry(obj.geometry, 24);
+    const arr = eg.attributes.position.array;
+    eg.dispose();
+    for (let i = 0; i + 5 < arr.length; i += 6) {
+      va.fromArray(arr, i).applyMatrix4(obj.matrixWorld);
+      vb.fromArray(arr, i + 3).applyMatrix4(obj.matrixWorld);
+      segs.push([va.clone(), vb.clone()]);
+      if (segs.length >= 2400) return segs;
+    }
+  }
+  return segs;
+}
+
+function closestOnSegment(p, a, b) {
+  const ab = b.clone().sub(a), len2 = ab.lengthSq();
+  if (len2 < 1e-9) return a.clone();
+  const t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / len2, 0, 1);
+  return a.clone().addScaledVector(ab, t);
+}
+
+/** 中心点磁吸：实体边/顶点优先，其次格点，都没有则自由落点。
+    判定用屏幕像素半径（与测距一致），透视投影下也容易吸中；screen = 光标屏幕坐标 {x,y}。 */
+function snapCenterPoint(p, segs, screen) {
+  const PX = 16;   // 屏幕上 16px 内即吸附
+  const sP = screen || projectToScreen(p);
+  let best = null, bestD = PX, bestSeg = null;
+  for (const seg of segs || []) {
+    const [a, b] = seg;
+    const sa = projectToScreen(a), sb = projectToScreen(b);
+    if ((sa.z < -1 || sa.z > 1) && (sb.z < -1 || sb.z > 1)) continue;
+    /* 在屏幕空间求光标到该边投影的最近点与距离 */
+    const s = closestScreenOnSegment(sP, sa, sb);
+    if (s.dd < bestD) {
+      bestD = s.dd;
+      /* 用同一比例回到世界空间的边上，保证吸附点精确落在实体边 */
+      best = a.clone().lerp(b, s.t);
+      bestSeg = seg;
+    }
+  }
+  if (best) {
+    const vertex = bestSeg && (best.distanceTo(bestSeg[0]) < 0.6 || best.distanceTo(bestSeg[1]) < 0.6);
+    return { point: best, snapped: true, label: vertex ? '已吸附到顶点' : '已吸附到边' };
+  }
+  /* 格点：投影到屏幕判定，远处格点不会误吸 */
+  const gp = new THREE.Vector3(snap(p.x), snap(p.y), snap(p.z));
+  const sgp = projectToScreen(gp);
+  if (Math.hypot(sgp.x - sP.x, sgp.y - sP.y) <= PX) {
+    return { point: gp, snapped: true, label: '已吸附到格点' };
+  }
+  return { point: p.clone(), snapped: false, label: '' };
+}
+
+/** 屏幕坐标点 q 到线段 a-b（均为 {x,y}）的最近点：返回 {t, dd} */
+function closestScreenOnSegment(q, a, b) {
+  const abx = b.x - a.x, aby = b.y - a.y;
+  const len2 = abx * abx + aby * aby;
+  if (len2 < 1e-9) return { t: 0, dd: Math.hypot(q.x - a.x, q.y - a.y) };
+  let t = ((q.x - a.x) * abx + (q.y - a.y) * aby) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const dx = a.x + t * abx - q.x, dy = a.y + t * aby - q.y;
+  return { t, dd: Math.hypot(dx, dy) };
+}
+
+/** 过指定点、正对相机的平面：把鼠标位移映射到世界空间 */
+function camFacingPlaneAt(p) {
+  const n = new THREE.Vector3();
+  camera.getWorldDirection(n);
+  return new THREE.Plane().setFromNormalAndCoplanarPoint(n, p);
+}
+
+/** 射线与平面交点，接近平行时返回 null */
+function rayPlanePoint(e, plane) {
+  setRay(e);
+  if (Math.abs(raycaster.ray.direction.dot(plane.normal)) < 0.06) return null;
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(plane, p) ? p : null;
+}
+
+/** 旋转平面的局部基：绕 X 用(Y,Z)，绕 Y 用(Z,X)，绕 Z 用(X,Y)，保证右手正向 */
+const ROT_BASIS = [[1, 2], [2, 0], [0, 1]];
+function rotationPlane(axis, pivot) {
+  return new THREE.Plane().setFromNormalAndCoplanarPoint(MOVE_WORLD[axis], pivot);
+}
+function angleOnPlane(e, axis, pivot, plane) {
+  const p = rayPlanePoint(e, plane);
+  if (!p) return null;
+  const bi = ROT_BASIS[axis], v = p.clone().sub(pivot);
+  return Math.atan2(v.dot(MOVE_WORLD[bi[1]]), v.dot(MOVE_WORLD[bi[0]]));
+}
+function screenAngleAround(e, pivot) {
+  const cS = projectToScreen(pivot), rect = renderer.domElement.getBoundingClientRect();
+  return Math.atan2(e.clientY - rect.top - cS.y, e.clientX - rect.left - cS.x);
+}
+
+/** 把累计旋转写回模型：绕世界轴转，同时让中心点保持不动 */
+function applyRotation(r) {
+  const obj = r.obj, d = obj.userData.desc;
+  const q = new THREE.Quaternion().setFromAxisAngle(MOVE_WORLD[r.axis], r.total);
+  const nq = q.clone().multiply(r.baseQuat);
+  d.quat = nq.toArray();
+  obj.quaternion.copy(nq);
+  const p = new THREE.Vector3().fromArray(r.basePos).sub(r.pivot).applyQuaternion(q).add(r.pivot);
+  d.pos = p.toArray();
+  obj.position.copy(p);
+  if (!Array.isArray(d.moveRot) || d.moveRot.length !== 3) d.moveRot = [0, 0, 0];
+  d.moveRot = r.baseRot.slice();
+  d.moveRot[r.axis] += THREE.MathUtils.radToDeg(r.total);
+  syncPanel();
+}
+
+/** 手动输入角度：相对当前角度的增量绕对应世界轴旋转 */
+function setAxisRotation(axis, deg) {
+  const obj = state.selected, d = obj && obj.userData.desc;
+  if (!d) return;
+  if (!Array.isArray(d.moveRot) || d.moveRot.length !== 3) d.moveRot = [0, 0, 0];
+  const delta = deg - d.moveRot[axis];
+  if (Math.abs(delta) < 1e-6) return;
+  const pivot = gizmoCenter(obj);
+  beginEdit();
+  applyRotation({
+    obj, axis, pivot,
+    total: THREE.MathUtils.degToRad(delta),
+    baseQuat: obj.quaternion.clone(),
+    basePos: d.pos.slice(),
+    baseRot: d.moveRot.slice()
+  });
+  commitEdit();
+  updateMoveGizmo();
+  toast('已绕 ' + AXIS_NAME[axis] + ' 轴旋转 ' + round1(deg) + '°');
+}
 
 function moveGizmoVisible() {
   const obj = state.selected, d = obj && obj.userData.desc;
@@ -10002,39 +12210,123 @@ function moveGizmoVisible() {
 }
 
 function updateMoveGizmo() {
-  if (!moveGizmoVisible()) { moveLayer.classList.remove('show'); return; }
+  if (!moveGizmoVisible()) {
+    moveLayer.classList.remove('show');
+    const t = $('rotAngleTag'); if (t) t.style.display = 'none';
+    return;
+  }
   if (moveEditing) { moveLayer.classList.add('show'); return; }   // 正在输入数值时冻结刷新
   const obj = state.selected, d = obj.userData.desc;
   obj.updateMatrixWorld();
-  const box = new THREE.Box3().setFromObject(obj);
-  const center = box.isEmpty() ? new THREE.Vector3().fromArray(d.pos) : box.getCenter(new THREE.Vector3());
+  /* 三轴箭头/旋转弧固定在实体包围盒中心（锚点），移动中心点时它们不动，只有中心靶移动 */
+  const center = gizmoAnchor(obj);
   const cS = projectToScreen(center);
-  let svg = '';
-  const labels = [];
-  MOVE_AXES.forEach((A, i) => {
+  /* 中心靶的可变位置：拖过中心点后从这里画，与箭头锚点解耦 */
+  const pivotNow = gizmoCenter(obj);
+  const pS = projectToScreen(pivotNow);
+  /* 所有标识从模型投影外缘再向外让开，避免与几何体视觉相交 */
+  const bodyR = gizmoBodyRadius(obj, cS);
+  const startR = bodyR + 10;                 // 箭头起点：距实体投影外缘约 10px
+  const tipR = startR + MOVE_LEN;            // 箭头尖端
+  const arcR = startR + 18;                  // 旋转弧：落在两条相邻箭头之间
+
+  /* 先算出三个轴在屏幕上的方向，后面箭头与扇形共用 */
+  const axisScreens = MOVE_AXES.map((A) => {
     const oneMM = projectToScreen(center.clone().add(MOVE_WORLD[A.idx]));
     let ux = oneMM.x - cS.x, uy = oneMM.y - cS.y;
     let ulen = Math.hypot(ux, uy);
     if (ulen < 0.001) { ux = 0; uy = -1; ulen = 1; }   // 轴正对镜头时的退化方向
     ux /= ulen; uy /= ulen;
-    const pxPerMM = Math.max(0.35, ulen);
+    return { ux, uy, pxPerMM: Math.max(0.35, ulen) };
+  });
+
+  /* 三条旋转弧：参照 3D One 的白色箭头 + 彩色描边，拖弧即可绕对应轴旋转 */
+  const ROT_PLANES = [
+    { axis: 0, u: 1, v: 2 },   // YZ 平面 → 绕 X
+    { axis: 1, u: 2, v: 0 },   // ZX 平面 → 绕 Y
+    { axis: 2, u: 0, v: 1 }    // XY 平面 → 绕 Z
+  ];
+  let fanSvg = '';
+  ROT_PLANES.forEach((P) => {
+    const A = MOVE_AXES[P.axis], su = axisScreens[P.u], sv = axisScreens[P.v];
+    /* 弧心取两条相邻箭头方向的角平分线，弧长固定 30°，正好夹在两箭头中间 */
+    const a0 = Math.atan2(su.uy, su.ux), a1 = Math.atan2(sv.uy, sv.ux);
+    let diff = a1 - a0;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    const mid = a0 + diff / 2, half = Math.PI / 12;
+    const angles = [];
+    const pts = [];
+    for (let i = 0; i <= 20; i++) {
+      const t = mid - half + (i / 20) * half * 2;
+      angles.push(t);
+      pts.push({ x: cS.x + arcR * Math.cos(t), y: cS.y + arcR * Math.sin(t) });
+    }
+    const pointStr = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    fanSvg += `<polyline points="${pointStr}" fill="none" stroke="${A.color}" stroke-width="9.6"`
+      + ` stroke-linecap="round" opacity=".88"/>`;
+    fanSvg += `<polyline points="${pointStr}" fill="none" stroke="#fff" stroke-width="3.6"`
+      + ` stroke-linecap="round" opacity=".95"/>`;
+    /* 首尾双向箭头：起点的反切线、终点的正切线 */
+    const t0 = pts[0], t1 = pts[pts.length - 1];
+    const tx0 = -Math.sin(angles[0]), ty0 = Math.cos(angles[0]);
+    const tx1 = -Math.sin(angles[angles.length - 1]), ty1 = Math.cos(angles[angles.length - 1]);
+    fanSvg += arcArrowHead(t0, -tx0, -ty0, A.color);
+    fanSvg += arcArrowHead(t1, tx1, ty1, A.color);
+    /* 沿弧的透明热区 */
+    fanSvg += `<polyline class="mv-rot-hit" data-axis="${P.axis}" points="${pointStr}"`
+      + ` fill="none" stroke="transparent" stroke-width="18" pointer-events="stroke"/>`;
+  });
+
+  let svg = fanSvg;
+  const labels = [];
+  MOVE_AXES.forEach((A, i) => {
+    const S = axisScreens[i];
     let tipS;
     if (moveDrag && moveDrag.idx === A.idx && moveDrag.tipS) tipS = moveDrag.tipS;
-    else tipS = { x: cS.x + ux * MOVE_LEN, y: cS.y + uy * MOVE_LEN };
-    /* 实线轴 + 固定大小箭头头 */
-    svg += `<line x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}" x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}"`
+    else tipS = { x: cS.x + S.ux * tipR, y: cS.y + S.uy * tipR };
+    /* 箭头整段离开中心点：起点到尖端都在模型外 */
+    const startS = { x: tipS.x - S.ux * MOVE_LEN, y: tipS.y - S.uy * MOVE_LEN };
+    svg += `<line x1="${startS.x.toFixed(1)}" y1="${startS.y.toFixed(1)}" x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}"`
       + ` stroke="${A.color}" stroke-width="2.6" opacity=".96"/>`;
-    svg += arrowHeadAt(tipS, ux, uy, A.color);
+    svg += arrowHeadAt(tipS, S.ux, S.uy, A.color);
     /* 透明拖拽热区：整条轴可抓 */
-    svg += `<line class="mv-hit" data-i="${i}" x1="${cS.x.toFixed(1)}" y1="${cS.y.toFixed(1)}"`
+    svg += `<line class="mv-hit" data-i="${i}" x1="${startS.x.toFixed(1)}" y1="${startS.y.toFixed(1)}"`
       + ` x2="${tipS.x.toFixed(1)}" y2="${tipS.y.toFixed(1)}" stroke="transparent"`
       + ` stroke-width="16" pointer-events="stroke"/>`;
-    labels.push({ idx: A.idx, color: A.color, value: d.pos[A.idx], ux, uy, pxPerMM, tipS });
+    labels.push({ idx: A.idx, color: A.color, value: d.pos[A.idx], ux: S.ux, uy: S.uy, pxPerMM: S.pxPerMM, tipS });
   });
-  /* 中心靶心 */
-  svg += `<circle cx="${cS.x.toFixed(1)}" cy="${cS.y.toFixed(1)}" r="6" fill="#fff" stroke="#334155" stroke-width="1.8"/>`;
+  /* 中心靶心：位置随「移动中心点」变化（pS），三轴箭头/圆弧仍锚在实体中心 cS 不动 */
+  const centerOn = !!($('omMoveCenter') && $('omMoveCenter').checked);
+  svg += `<circle cx="${pS.x.toFixed(1)}" cy="${pS.y.toFixed(1)}" r="6" fill="#fff" stroke="#334155" stroke-width="1.8"/>`;
+  if (centerOn) {
+    /* 吸附到边/顶点/格点时外环实心高亮，明确提示已精确吸附 */
+    const snappedNow = !!(centerDrag && moveSnapInfo && moveSnapInfo.snapped);
+    svg += `<circle class="mv-center-halo" cx="${pS.x.toFixed(1)}" cy="${pS.y.toFixed(1)}" r="10"`
+      + (snappedNow
+        ? ` fill="rgba(245,180,0,.22)" stroke="#f5b400" stroke-width="3.4"`
+        : ` fill="none" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="3 2" opacity=".8"`)
+      + `/>`;
+    svg += `<circle class="mv-center-hit" data-center="1" cx="${pS.x.toFixed(1)}" cy="${pS.y.toFixed(1)}" r="14" fill="transparent"/>`;
+  }
+  /* 旋转角标：DOM 胶囊，醒目且可点击输入角度（无吸附提示浮层） */
+  const badgeAxis = rotDrag ? rotDrag.axis : lastRotAxis;
+  const badgeDeg = rotDrag ? rotDrag.total * 180 / Math.PI
+    : ((d.moveRot && d.moveRot[badgeAxis]) || 0);
+  const angleTag = $('rotAngleTag');
+  if (angleTag) {
+    angleTag.style.display = 'block';
+    if (!angleEditing) {
+      angleTag.style.left = (cS.x + arcR * 0.8).toFixed(1) + 'px';
+      angleTag.style.top = (cS.y + arcR * 0.8).toFixed(1) + 'px';
+      angleTag.innerHTML = `<span class="rdot" style="background:${MOVE_AXES[badgeAxis].color}"></span>`
+        + round1(badgeDeg).toFixed(1) + '°';
+      angleTag._deg = badgeDeg;
+    }
+  }
+
   moveSvg.setAttribute('viewBox', `0 0 ${viewport.clientWidth} ${viewport.clientHeight}`);
-  moveSvg.innerHTML = svg;
+  setSvgHtml(moveSvg, svg);
   /* 坐标标签：复用 .dim-tag 胶囊，DOM 复用避免打断输入 */
   const key = (d.kind || '') + '#' + (d.uid || '');
   if (moveLabels.children.length !== labels.length || moveLabels.dataset.key !== key) {
@@ -10047,12 +12339,9 @@ function updateMoveGizmo() {
   labels.forEach((L, i) => {
     const el = moveLabels.children[i];
     if (!el || el.classList.contains('editing')) return;
-    el.style.left = (L.tipS.x + L.ux * 26) + 'px';
-    el.style.top = (L.tipS.y + L.uy * 26) + 'px';
-    el.style.borderColor = L.color;
+    /* 保留拖拽所需的内部数据，但不再显示 X/Y/Z 数字标签；角度标签单独保留 */
     el._data = L;
-    el.innerHTML = `<span class="mv-ax" style="color:${L.color}">${AXIS_NAME[L.idx]}</span>`
-      + round1(L.value).toFixed(1) + '<span class="u"> mm</span>';
+    el.style.display = 'none';
   });
   moveLayer.classList.add('show');
 }
@@ -10093,6 +12382,41 @@ function beginMoveEdit(i) {
 
 /* 拖动三色箭头 → 沿世界轴平移 */
 moveSvg.addEventListener('pointerdown', (e) => {
+  /* 中心点拖拽：三轴与扇形整体跟随，磁吸到实体边/顶点或格点 */
+  const cHit = e.target.closest && e.target.closest('.mv-center-hit');
+  if (cHit && $('omMoveCenter') && $('omMoveCenter').checked) {
+    const obj = state.selected;
+    if (!obj) return;
+    e.preventDefault(); e.stopPropagation();
+    const pivot = gizmoCenter(obj);
+    centerDrag = { obj, pivot0: pivot.clone(), plane: camFacingPlaneAt(pivot), segs: collectSnapSegments() };
+    moveSnapInfo = null;
+    return;
+  }
+  /* 扇形平面拖拽：绕该平面的法向轴旋转模型 */
+  const rHit = e.target.closest && e.target.closest('.mv-rot-hit');
+  if (rHit && !moveEditing) {
+    const obj = state.selected, d = obj && obj.userData.desc;
+    if (!d) return;
+    e.preventDefault(); e.stopPropagation();
+    const axis = parseInt(rHit.dataset.axis, 10);
+    lastRotAxis = axis;
+    const pivot = gizmoCenter(obj);
+    const plane = rotationPlane(axis, pivot);
+    const a0 = angleOnPlane(e, axis, pivot, plane);
+    rotDrag = {
+      obj, axis, pivot: pivot.clone(), plane,
+      useScreen: a0 === null,
+      a0: a0 === null ? screenAngleAround(e, pivot) : a0,
+      lastA: a0 === null ? screenAngleAround(e, pivot) : a0,
+      total: 0,
+      baseQuat: obj.quaternion.clone(),
+      basePos: d.pos.slice(),
+      baseRot: Array.isArray(d.moveRot) ? d.moveRot.slice() : [0, 0, 0]
+    };
+    beginEdit();
+    return;
+  }
   const hit = e.target.closest && e.target.closest('.mv-hit');
   if (!hit || moveEditing) return;
   const i = parseInt(hit.dataset.i, 10);
@@ -10110,6 +12434,29 @@ moveSvg.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
+  if (centerDrag) {
+    const p = rayPlanePoint(e, centerDrag.plane);
+    if (!p) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const res = snapCenterPoint(p, centerDrag.segs, screen);
+    moveSnapInfo = res;
+    centerDrag.obj.userData.desc.moveCenter = res.point.toArray();
+    updateMoveGizmo();
+    return;
+  }
+  if (rotDrag) {
+    let a = rotDrag.useScreen ? null : angleOnPlane(e, rotDrag.axis, rotDrag.pivot, rotDrag.plane);
+    if (rotDrag.useScreen || a === null) a = screenAngleAround(e, rotDrag.pivot);
+    let da = a - rotDrag.lastA;
+    if (da > Math.PI) da -= Math.PI * 2;
+    else if (da < -Math.PI) da += Math.PI * 2;
+    rotDrag.total += da;
+    rotDrag.lastA = a;
+    applyRotation(rotDrag);
+    updateMoveGizmo();
+    return;
+  }
   if (!moveDrag) return;
   const m = moveDrag;
   const along = (e.clientX - m.sx) * m.ux + (e.clientY - m.sy) * m.uy;
@@ -10130,15 +12477,64 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', () => {
+  if (centerDrag) { centerDrag = null; moveSnapInfo = null; updateMoveGizmo(); return; }
+  if (rotDrag) { rotDrag = null; commitEdit(); updateMoveGizmo(); return; }
   if (!moveDrag) return;
   moveDrag = null;
   commitEdit();
   updateMoveGizmo();
 });
 
+/* 「移动中心点」开关：开启后中心靶心可拖拽，三轴与扇形整体跟随 */
+const centerChk = $('omMoveCenter');
+if (centerChk) centerChk.addEventListener('change', () => {
+  const obj = state.selected, d = obj && obj.userData.desc;
+  if (!d || (d.kind === 'sketch' || d.kind === 'sheet')) return;
+  if (centerChk.checked) {
+    if (!Array.isArray(d.moveCenter)) d.moveCenter = gizmoCenter(obj).toArray();
+    toast('中心点可拖动了，靠近实体边缘会自动磁吸');
+  } else {
+    delete d.moveCenter;
+    moveSnapInfo = null;
+    toast('中心点已恢复为模型中心');
+  }
+  updateMoveGizmo();
+});
+
+/* 角度胶囊：点击出现输入框，回车应用、Esc 取消 */
+const angleTag = $('rotAngleTag');
+if (angleTag) angleTag.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (angleEditing) return;
+  angleEditing = true;
+  angleTag.innerHTML = `<input type="number" step="1" value="${round1(angleTag._deg || 0)}">`;
+  const input = angleTag.querySelector('input');
+  input.focus(); input.select();
+  const finish = (commit) => {
+    if (!angleEditing) return;
+    const v = commit ? parseFloat(input.value) : NaN;
+    angleEditing = false;
+    if (isFinite(v)) setAxisRotation(lastRotAxis, v);
+    else updateMoveGizmo();
+  };
+  input.addEventListener('keydown', (ev) => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+});
+
+let _lastFrameT = performance.now();
 renderer.setAnimationLoop(() => {
+  const _now = performance.now();
+  const _dt = Math.min(64, _now - _lastFrameT);   // 限制单帧步长，避免切后台回来跳变
+  _lastFrameT = _now;
   if (viewAnim) stepViewAnim();
   stabilizeCameraUp();          // 顶/底视角用 Y 作 up，避免网格歪斜
+  refreshGridStep();            // 顶面视图网格 ×1.5（吸附步距联动）
+  stepGridZoom();               // 网格步距平滑过渡
+  stepOriginMarker(_dt);        // 原点目标点闪烁 + 浮动 + 脉冲
   controls.update();
   renderer.render(scene, camera);
   renderViewCube();
@@ -10147,7 +12543,10 @@ renderer.setAnimationLoop(() => {
   updateMoveGizmo();
   updateExtrudeArrow();
   updateSegOverlay();
+  updateMeasureOverlay();
+  updateSketchDone();
   if (!drag) positionObjUI();   // 选中实体菜单跟随对象（拖动时避让）
+  if (!exPopDrag) positionExPop();   // 拉伸面板保持顶部居中/用户拖到的位置
 });
 
 /* 启动 */
@@ -10169,19 +12568,42 @@ window.Sketch3D = {
   buildObject, updateObject, select, pickFace, pickSketchFace,
   faceBoundary, buildFaceHighlight, faceExtrudeDesc, applyExtrude,
   sketchToPlate, commitSketch, addSketchPoint, closeSketch, shapePoints, booleanWith,
-  updateSegOverlay, clearSegOverlay,
+  updateSegOverlay, clearSegOverlay, magnetSnap2D, sketchVertexCandidates, worldToPlane2D,
+  grid, originMarker, isTopDownView, refreshGridStep,
+  get gridStep() { return grid.material.uniforms.uStep.value; },
+  get snapStep() { return SNAP; },
   lockSketchPlane, backToPickPlane,
+  beginSketchSession, endSketchSession, reenterSketchSession, sketchGroupOf,
   openExtrudePanel, closeExtrudePanel, setTool, setMode,
   entityBoolean, selectB, setEntityTone, renderSwatches, updateBoolButtons,
   animateView, viewCubeRect,
   primitiveDesc, makeGeometry, hornGeometry, isPrimitive, PRIM_KINDS, dimAxesOf, dimAxisDir, updateDimGizmo, beginDimEdit,
+  alignLoopsToFaceEdges,
   confirmDim, autoConfirmDim, applyBodyAppearance,
-  serializeScene, restoreScene, undo,
+  serializeScene, restoreScene, undo, redo,
   saveZ1, openZ1, exportSTL, exportSTEP, buildSTEP, buildSTLBinary, collectExportTriangles, download,
   /* 本轮：面贴附放置 + 选中实体三功能（探针） */
   placePlaneInfo, placementTransform, showObjMenu, hideObjMenu,
   nudgeSelected, scaleSelected, flattenSelected,
   surfaceUnderCursor, updateMoveGizmo, beginMoveEdit, updateExtrudeArrow,
+  /* 动态移动：中心点磁吸 + 扇形旋转（探针） */
+  gizmoCenter, collectSnapSegments, snapCenterPoint, rotationPlane, angleOnPlane,
+  setAxisRotation, applyRotation,
+  get moveCenter() { const o = state.selected; return o ? gizmoCenter(o).toArray() : null; },
+  get moveRot() { const d = state.selected && state.selected.userData.desc; return d && Array.isArray(d.moveRot) ? d.moveRot.slice() : null; },
+  get centerDragActive() { return !!centerDrag; },
+  get rotDragActive() { return !!rotDrag; },
+  /* 点到点移动 + 顶点磁吸（探针） */
+  startP2p, cancelP2p, setMoveTab, handleP2pClick, worldSnapPoint, worldSnapPointInfo, p2pPickPointInfo,
+  magnetSnapMoveDelta, entityWorldVertsXY,
+  /* 精确面延伸 / 中心磁吸（探针） */
+  exactExtrudeUnion, snapCenterPoint, setSvgHtml,
+  startMeasure, cancelMeasure, updateMeasureOverlay,
+  selectAllEntities, repeatLastOp,
+  get measureState() { return { active: measureActive, start: measureStart && measureStart.toArray(), end: measureEnd && measureEnd.toArray() }; },
+  get multiCount() { return state.multi.length; },
+  get sketchSession() { return { id: state.sketchSessionId, tool: state.sketchSessionTool, stage: state.sketchStage }; },
+  get p2pState() { return { active: p2pActive, stage: p2pStage, tab: moveTab, start: p2pStart && p2pStart.toArray(), end: p2pEnd && p2pEnd.toArray() }; },
   get exArrowShown() { return exArrowLayer.classList.contains('show'); },
   get exArrowH() { return state.ex.h; },
   get exArrowDir() { return state.ex.dir; },
@@ -10189,6 +12611,7 @@ window.Sketch3D = {
   get objMenuShown() { return objMenuEl.classList.contains('show'); },
   get faceMenuShown() { return faceMenuEl.classList.contains('show'); },
   get moveShown() { return moveLayer.classList.contains('show'); },
+  get moveRotArcs() { return moveSvg.querySelectorAll('.mv-rot-hit').length; },
   get moveAxes() {
     return Array.from(moveLabels.children).map((el) => ({
       value: el._data ? +el._data.value.toFixed(2) : null,
@@ -10293,6 +12716,7 @@ function openZ1(file) {
       if (!Array.isArray(arr)) throw new Error('bad format');
       restoreScene(JSON.stringify(arr));   // 复用统一的场景还原路径
       undoStack.length = 0;
+      redoStack.length = 0;
       updateUndoBtn();
       toast('已打开「' + file.name + '」：' + arr.length + ' 个对象');
     } catch (e) {
@@ -10470,8 +12894,9 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
         点地面网格 = 在 z=0 的 XY 平面（默认地面）画；点实体表面 = 草图贴着那个面画
         （悬停时该面会淡橙色预览；选中的面保持橙色高亮）。
       · 第 2 步：在所选平面上绘制：
-        线段 (S)：逐点点击绘线，回到起点（圆圈变橙）自动闭合；
-          ≥3 点时也可 Enter 闭合，Backspace 撤回一点，双击结束保留开放线段。
+        多线段 (S)：逐点点击连成折线，每落一点出现对勾；
+          点对勾结束绘制并退回选择箭头（单段线与多段线相同）；
+          点回起点附近闭合成蓝色阴影面，选中后可拉伸成体；Backspace 撤回一点。
         矩形 (R)：按住左键从一角拖到对角。
         圆 (O)：按住左键从圆心拖出半径。
         椭圆 (L)：按住左键从中心拖出长短轴。
@@ -10483,7 +12908,7 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
    三、面 → 体（拉伸，双入口冗余设计）
       入口 A（视口浮层，3D One 式）：单击闭合草图（蓝色平面）或已选实体的面，
         → 整面橙色高亮 + 浮出「拉伸」菜单（快捷键 E）→ 弹出面板：
-          · 高度输入实时预览；正向 / 反向；
+          · 类型下拉：一边 / 两边 / 对称；拖箭头改高度，点高度标签精确输入；
           · 四张运算卡片：新建实体 / 加运算 / 减运算 / 交运算
             （草图没有母体，仅支持「新建实体」；布尔结果可继续选面继续运算）。
       入口 B（右侧属性面板，冗余保留）：选中草图或面后，在面板里输入高度拉伸。
@@ -10496,7 +12921,7 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
       · 布尔运算结果同样可以继续选面、拉伸、再运算，反复叠加造型。
 
    五、视角与坐标系
-      · 左键拖拽（空白处）= 旋转视图；中键按住拖动 = 平移；滚轮 = 缩放；右键已禁用。
+      · 右键拖拽（任意位置）= 旋转视图；左键仅用于选中/绘制/魔方，不旋转视图；中键按住拖动 = 平移；滚轮 = 缩放。
       · 实体交互色：鼠标悬停 = 浅黄；单击选中 = 深黄；按住拖动 = 透明浅绿。
       · 选中实体后点浮出菜单的「移动」才会出现 X/Y/Z 三轴箭头；点坐标标签可输入精确数值，
         Esc / 点空白处退出移动模式。
@@ -10510,10 +12935,12 @@ document.addEventListener('click', () => $('exportDD').classList.remove('open'))
       · Del / Backspace 或左侧「删除」按钮删除选中对象。
 
    七、显示模式
-      · 左侧「线框」按钮在实体着色 / 线框之间切换，便于检查拓扑。
+      · 左侧「线框」按钮只显示实体外轮廓与真实硬边（球面/柱面补一圈屏幕轮廓），
+        不绘制任何三角网格碎线；再点一次回到实体着色。
 
-   快捷键总表：V 选择 · B 立方体 · C 圆柱 · S 线段 · R 矩形 · O 圆 ·
-              L 椭圆 · P 正多边形 · E 拉伸选中面 · Esc 取消 · Enter 确认
+   快捷键总表：V 选择 · B 立方体 · C 圆柱 · S 多线段 · N 线段 · R 矩形 · O 圆 ·
+              L 椭圆 · P 正多边形 · E 拉伸选中面 · G 显示/隐藏网格 · Esc 取消 · Enter 确认
+   视图菜单：视口内右键轻点弹出「隐藏/显现网格」，右键拖动仍是旋转视图；中键短按重复上步。
 
    已知边界（后续迭代）：倒角、STL / DXF 导出、激光排版、多草图共存、
    尺寸约束、草图点编辑。扩展入口见上方第 16 节。
@@ -11220,7 +13647,7 @@ function openDemo() {
   stageEl.appendChild(dRenderer.domElement);
   if (!dControls) {
     dControls = new OrbitControls(dCamera, dRenderer.domElement);
-    dControls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: null };
+    dControls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     dControls.target.copy(TARGET);
     dControls.enableDamping = true; dControls.dampingFactor = .09;
     dControls.minDistance = 90; dControls.maxDistance = 1400;
